@@ -8,10 +8,13 @@
 - Plan: `docs/roadmaps/STRATEGIC_DIFFERENTIATORS_IMPLEMENTATION_PLAN.md`.
 - Contrato DRAFT de Etapa 1:
   `docs/specifications/PHASE_15_EVENT_DELIVERY_TRACEABILITY.md`.
+- Contrato DRAFT de Etapa 2:
+  `docs/specifications/PHASE_16_CANONICAL_SECURITY_MODEL_PROVENANCE.md`.
 
 Las decisiones D-001 a D-012 están aprobadas. La Etapa 1 de entrega de eventos
 está implementada y validada. La siguiente puerta es especificar el modelo
-canónico y la procedencia de Etapa 2.
+canónico y aprobar la procedencia de Etapa 2. Su contrato está redactado, pero
+no autoriza todavía implementación.
 
 Cada fase requiere aprobación de sus especificaciones y criterios antes de
 autorizar contratos o implementación de la siguiente.

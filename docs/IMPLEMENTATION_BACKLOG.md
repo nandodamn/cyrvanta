@@ -10,7 +10,13 @@
 - [x] Especificar envelope, outbox/inbox e idempotencia.
 - [x] GATE: aprobar `PHASE_15_EVENT_DELIVERY_TRACEABILITY.md`.
 - [x] Implementar Etapa 1.
-- [ ] GATE: especificar y aprobar Etapa 2 — modelo canónico y procedencia.
+- [x] Especificar Etapa 2 — modelo canónico y procedencia.
+- [ ] GATE: aprobar
+  `PHASE_16_CANONICAL_SECURITY_MODEL_PROVENANCE.md`.
+- [ ] Fijar límites físicos, retención, calidad, severidad y redacción con
+  muestras representativas antes de implementar Etapa 2.
+- [ ] Implementar Etapa 2 solo después de aprobar su contrato y pendientes
+  físicos.
 
 ## Gobernanza
 

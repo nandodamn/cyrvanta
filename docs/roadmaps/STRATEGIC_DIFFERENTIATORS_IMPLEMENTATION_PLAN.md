@@ -69,6 +69,9 @@ duplicar efectos, preservando correlation y causation.
 **Resultado:** señal independiente del proveedor compatible con Wazuh y futuros
 adaptadores.
 
+**Estado de especificación:** DRAFT pendiente de aprobación. Ver
+`docs/specifications/PHASE_16_CANONICAL_SECURITY_MODEL_PROVENANCE.md`.
+
 **Trabajo:**
 
 - Resolver el alcance de finding, alert, event e incidente externo.
@@ -230,6 +233,6 @@ API/eventos, permisos, auditoría, RLS, i18n, observabilidad, pruebas y rollback
 
 ## Próxima decisión humana
 
-Revisar el contrato DRAFT de Etapa 1 en
-`docs/specifications/PHASE_15_EVENT_DELIVERY_TRACEABILITY.md`. Todavía no crear
-su migración ni modificar el worker.
+Revisar y aprobar, enmendar o rechazar el contrato DRAFT de Etapa 2 en
+`docs/specifications/PHASE_16_CANONICAL_SECURITY_MODEL_PROVENANCE.md`. Todavía
+no crear su migración, contratos públicos ni productor Wazuh.

@@ -69,8 +69,11 @@ duplicar efectos, preservando correlation y causation.
 **Resultado:** señal independiente del proveedor compatible con Wazuh y futuros
 adaptadores.
 
-**Estado de especificación:** DRAFT pendiente de aprobación. Ver
+**Estado de especificación:** APROBADA PARA IMPLEMENTACIÓN el 2026-07-28. Ver
 `docs/specifications/PHASE_16_CANONICAL_SECURITY_MODEL_PROVENANCE.md`.
+
+**Estado de implementación:** COMPLETADA el 2026-07-28, con ingestión real
+acotada validada y polling automático deliberadamente desactivado.
 
 **Trabajo:**
 
@@ -233,6 +236,5 @@ API/eventos, permisos, auditoría, RLS, i18n, observabilidad, pruebas y rollback
 
 ## Próxima decisión humana
 
-Revisar y aprobar, enmendar o rechazar el contrato DRAFT de Etapa 2 en
-`docs/specifications/PHASE_16_CANONICAL_SECURITY_MODEL_PROVENANCE.md`. Todavía
-no crear su migración, contratos públicos ni productor Wazuh.
+Especificar la Etapa 3 — ledger de claims. En paralelo, retención por tenant y
+activación periódica de Wazuh conservan puertas operativas separadas.

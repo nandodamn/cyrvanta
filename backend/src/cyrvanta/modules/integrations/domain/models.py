@@ -1,10 +1,27 @@
 from datetime import datetime
 from enum import StrEnum
-from ipaddress import IPv4Address, IPv6Address
 from typing import Any
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
+
+from cyrvanta.modules.integrations.domain.findings import (
+    CanonicalEntityReference,
+    CanonicalFile,
+    CanonicalFinding,
+    CanonicalIndicator,
+    CanonicalProcess,
+    ExternalEvidenceReference,
+)
+
+__all__ = [
+    "CanonicalEntityReference",
+    "CanonicalFile",
+    "CanonicalFinding",
+    "CanonicalIndicator",
+    "CanonicalProcess",
+    "ExternalEvidenceReference",
+]
 
 
 class ConnectorStatus(StrEnum):
@@ -44,71 +61,6 @@ class ConnectorConfiguration(BaseModel):
     connector_type: str
     schema_version: str
     values: dict[str, Any]
-
-
-class CanonicalEntityReference(BaseModel):
-    entity_type: str
-    value: str
-    display_name: str | None = None
-
-
-class CanonicalProcess(BaseModel):
-    name: str | None = None
-    pid: int | None = Field(default=None, ge=0)
-    command_line: str | None = None
-    executable: str | None = None
-
-
-class CanonicalFile(BaseModel):
-    path: str | None = None
-    name: str | None = None
-    sha256: str | None = Field(default=None, pattern=r"^[0-9a-fA-F]{64}$")
-
-
-class CanonicalIndicator(BaseModel):
-    indicator_type: str
-    value: str
-    confidence: float | None = Field(default=None, ge=0, le=1)
-
-
-class ExternalEvidenceReference(BaseModel):
-    source_system: str
-    source_instance_id: UUID
-    source_object_type: str
-    source_object_id: str
-    source_timestamp: datetime
-    locator: str
-    adapter_version: str
-    normalizer_version: str
-    payload_sha256: str | None = Field(default=None, pattern=r"^[0-9a-fA-F]{64}$")
-
-
-class CanonicalFinding(BaseModel):
-    id: UUID
-    tenant_id: UUID
-    source_system: str
-    source_instance_id: UUID
-    source_object_type: str
-    source_object_id: str
-    occurred_at: datetime
-    ingested_at: datetime
-    title: str
-    description: str | None = None
-    severity: int = Field(ge=0, le=100)
-    confidence: float | None = Field(default=None, ge=0, le=1)
-    category: str | None = None
-    status: str
-    rule_reference: str | None = None
-    host: CanonicalEntityReference | None = None
-    user: CanonicalEntityReference | None = None
-    source_ip: IPv4Address | IPv6Address | None = None
-    destination_ip: IPv4Address | IPv6Address | None = None
-    process: CanonicalProcess | None = None
-    file: CanonicalFile | None = None
-    indicators: list[CanonicalIndicator] = Field(default_factory=list)
-    labels: dict[str, str] = Field(default_factory=dict)
-    raw_reference: ExternalEvidenceReference
-    normalized_payload_version: str
 
 
 class CanonicalExternalIncident(BaseModel):
@@ -157,4 +109,3 @@ class CanonicalEvidence(BaseModel):
     reference: ExternalEvidenceReference
     content_type: str
     redacted_payload: dict[str, Any]
-

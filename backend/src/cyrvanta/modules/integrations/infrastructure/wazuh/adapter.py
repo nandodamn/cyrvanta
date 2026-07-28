@@ -32,9 +32,7 @@ from cyrvanta.modules.integrations.infrastructure.wazuh.normalizer import WazuhN
 class WazuhSIEMAdapter(SIEMConnectorPort):
     ADAPTER_VERSION = "1.0"
 
-    def __init__(
-        self, configuration: WazuhConnectorConfigV1, source_instance_id: UUID
-    ) -> None:
+    def __init__(self, configuration: WazuhConnectorConfigV1, source_instance_id: UUID) -> None:
         self.configuration = configuration
         self.source_instance_id = source_instance_id
         self.client = WazuhIndexerClient(configuration)
@@ -105,9 +103,7 @@ class WazuhSIEMAdapter(SIEMConnectorPort):
     ) -> ExternalIncidentBatch:
         raise UnsupportedCapabilityError("supports_incident_polling")
 
-    async def search_events(
-        self, tenant_id: UUID, query: CanonicalEventQuery
-    ) -> EventSearchResult:
+    async def search_events(self, tenant_id: UUID, query: CanonicalEventQuery) -> EventSearchResult:
         source = await self.client.search_alerts(
             None,
             query.start_time,

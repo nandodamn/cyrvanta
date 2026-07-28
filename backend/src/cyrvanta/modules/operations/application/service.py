@@ -12,6 +12,12 @@ from cyrvanta.modules.incident.application.service import IncidentService
 from cyrvanta.modules.integrations.application.ports.siem_connector import (
     SIEMConnectorPort,
 )
+from cyrvanta.modules.integrations.domain.findings import (
+    EffectiveTimeBasis,
+    FingerprintMode,
+    NormalizationAssessment,
+    NormalizationStatus,
+)
 from cyrvanta.modules.integrations.domain.models import (
     CanonicalFinding,
     ConnectorStatus,
@@ -36,15 +42,21 @@ from cyrvanta.shared.database import tenant_session
 
 CATALOG = {
     "T1110": Technique(
-        external_id="T1110", name_es="Fuerza bruta", name_en="Brute Force",
+        external_id="T1110",
+        name_es="Fuerza bruta",
+        name_en="Brute Force",
         tactic="credential-access",
     ),
     "T1078": Technique(
-        external_id="T1078", name_es="Cuentas válidas", name_en="Valid Accounts",
+        external_id="T1078",
+        name_es="Cuentas válidas",
+        name_en="Valid Accounts",
         tactic="defense-evasion",
     ),
     "T1098": Technique(
-        external_id="T1098", name_es="Manipulación de cuenta", name_en="Account Manipulation",
+        external_id="T1098",
+        name_es="Manipulación de cuenta",
+        name_en="Account Manipulation",
         tactic="persistence",
     ),
 }
@@ -62,13 +74,16 @@ class OperationsService:
 
     async def health(self) -> list[IntegrationHealth]:
         return [
-            await self._http_health("opensearch", self.settings.opensearch_mode,
-                                    self.settings.opensearch_url),
+            await self._http_health(
+                "opensearch", self.settings.opensearch_mode, self.settings.opensearch_url
+            ),
             await self._siem_health(),
-            await self._http_health("ollama", self.settings.ollama_mode,
-                                    f"{self.settings.ollama_base_url}/api/tags"),
-            await self._http_health("n8n", self.settings.n8n_mode,
-                                    f"{self.settings.n8n_base_url}/healthz"),
+            await self._http_health(
+                "ollama", self.settings.ollama_mode, f"{self.settings.ollama_base_url}/api/tags"
+            ),
+            await self._http_health(
+                "n8n", self.settings.n8n_mode, f"{self.settings.n8n_base_url}/healthz"
+            ),
         ]
 
     async def _http_health(self, code: str, mode: str, url: str) -> IntegrationHealth:
@@ -76,18 +91,22 @@ class OperationsService:
         if normalized == "disabled":
             return IntegrationHealth(code=code, mode=normalized, healthy=False, detail="disabled")
         if normalized == "simulated":
-            return IntegrationHealth(code=code, mode=normalized, healthy=True,
-                                     detail="simulated; no external call")
+            return IntegrationHealth(
+                code=code, mode=normalized, healthy=True, detail="simulated; no external call"
+            )
         try:
             async with httpx.AsyncClient(timeout=5) as client:
                 response = await client.get(url)
             return IntegrationHealth(
-                code=code, mode=normalized, healthy=response.is_success,
+                code=code,
+                mode=normalized,
+                healthy=response.is_success,
                 detail=f"HTTP {response.status_code}",
             )
         except httpx.HTTPError:
-            return IntegrationHealth(code=code, mode=normalized, healthy=False,
-                                     detail="unavailable")
+            return IntegrationHealth(
+                code=code, mode=normalized, healthy=False, detail="unavailable"
+            )
 
     async def _siem_health(self) -> IntegrationHealth:
         normalized = self._mode(self.settings.wazuh_mode)
@@ -133,14 +152,18 @@ class OperationsService:
         items: list[PlaybookSummary] = []
         for workflow_id in sorted(allowed):
             workflow = by_id.get(workflow_id)
-            connectors = [
-                PlaybookConnector(
-                    node_type=node.node_type,
-                    name=node.name,
-                    credential_names=list(node.credential_names),
-                )
-                for node in workflow.nodes
-            ] if workflow is not None else []
+            connectors = (
+                [
+                    PlaybookConnector(
+                        node_type=node.node_type,
+                        name=node.name,
+                        credential_names=list(node.credential_names),
+                    )
+                    for node in workflow.nodes
+                ]
+                if workflow is not None
+                else []
+            )
             items.append(
                 PlaybookSummary(
                     workflow_id=workflow_id,
@@ -196,8 +219,13 @@ class OperationsService:
             status=incident.status,
         )
         techniques = [CATALOG[item] for item in ("T1110", "T1078", "T1098")]
-        severity_weight = {"informational": 10, "low": 25, "medium": 45,
-                           "high": 70, "critical": 90}.get(incident.severity, 25)
+        severity_weight = {
+            "informational": 10,
+            "low": 25,
+            "medium": 45,
+            "high": 70,
+            "critical": 90,
+        }.get(incident.severity, 25)
         confidence = 0.86 if incident.is_simulated else 0.65
         risk = min(100, round(severity_weight * 0.8 + confidence * 20))
         if self.settings.ollama_mode == "live":
@@ -217,9 +245,15 @@ class OperationsService:
             provider = "deterministic-demo"
             mode = self.settings.ollama_mode
         return AnalysisResponse(
-            incident_id=incident.id, provider=provider, model=self.settings.ollama_model,
-            mode=mode, summary_es=summary_es, summary_en=summary_en,
-            confidence=confidence, risk_score=risk, techniques=techniques,
+            incident_id=incident.id,
+            provider=provider,
+            model=self.settings.ollama_model,
+            mode=mode,
+            summary_es=summary_es,
+            summary_en=summary_en,
+            confidence=confidence,
+            risk_score=risk,
+            techniques=techniques,
             recommendations=[
                 "Validar la identidad y el origen antes de contener.",
                 "Revocar sesiones únicamente tras aprobación humana.",
@@ -246,21 +280,40 @@ class OperationsService:
             "critical": 90,
         }.get(severity, 25)
         source_instance_id = uuid5(NAMESPACE_URL, f"cyrvanta:{tenant_id}:core")
+        payload_hash = sha256(
+            json.dumps(
+                {
+                    "incident_id": str(incident_id),
+                    "occurred_at": occurred_at.astimezone(UTC).isoformat(),
+                    "title": title,
+                    "description": description,
+                    "severity": severity,
+                    "category": category,
+                    "status": status,
+                },
+                ensure_ascii=False,
+                separators=(",", ":"),
+                sort_keys=True,
+            ).encode("utf-8")
+        ).hexdigest()
         return CanonicalFinding(
-            id=incident_id,
+            finding_id=incident_id,
             tenant_id=tenant_id,
+            integration_id=source_instance_id,
             source_system="cyrvanta",
             source_instance_id=source_instance_id,
             source_object_type="incident",
             source_object_id=str(incident_id),
-            occurred_at=occurred_at,
-            ingested_at=datetime.now(UTC),
+            source_occurred_at=occurred_at,
+            observed_at=datetime.now(UTC),
+            effective_at=occurred_at,
+            effective_time_basis=EffectiveTimeBasis.SOURCE,
             title=title,
             description=description,
-            severity=severity_score,
+            severity_score=severity_score,
             category=category,
             status=status,
-            raw_reference=ExternalEvidenceReference(
+            evidence_reference=ExternalEvidenceReference(
                 source_system="cyrvanta",
                 source_instance_id=source_instance_id,
                 source_object_type="incident",
@@ -269,16 +322,38 @@ class OperationsService:
                 locator=f"cyrvanta://incidents/{incident_id}",
                 adapter_version="core-1",
                 normalizer_version="canonical-1",
+                payload_sha256=payload_hash,
             ),
-            normalized_payload_version="1.0",
+            payload_fingerprint=payload_hash,
+            normalization=NormalizationAssessment(
+                status=NormalizationStatus.VALID,
+                completeness_score=100,
+                issue_codes=(),
+                adapter_name="cyrvanta",
+                adapter_version="core-1",
+                normalizer_version="canonical-1",
+                fingerprint_mode=FingerprintMode.ADAPTER_MATERIAL,
+            ),
         )
 
-    async def _ollama_summary(
-        self, finding: CanonicalFinding
-    ) -> tuple[str, str] | None:
-        evidence = finding.model_dump_json(
-            exclude={"tenant_id", "raw_reference"},
-            exclude_none=True,
+    async def _ollama_summary(self, finding: CanonicalFinding) -> tuple[str, str] | None:
+        evidence = json.dumps(
+            {
+                "finding_id": str(finding.finding_id),
+                "source_system": finding.source_system,
+                "source_object_type": finding.source_object_type,
+                "effective_at": finding.effective_at.isoformat(),
+                "title": finding.title,
+                "description": finding.description,
+                "severity_score": finding.severity_score,
+                "confidence": finding.confidence,
+                "category": finding.category,
+                "status": finding.status,
+                "rule_reference": finding.rule_reference,
+            },
+            ensure_ascii=False,
+            separators=(",", ":"),
+            sort_keys=True,
         )
         prompt = (
             "Return only JSON with string keys summary_es and summary_en. Analyze this "
@@ -293,8 +368,10 @@ class OperationsService:
                 response = await client.post(
                     f"{self.settings.ollama_base_url}/api/generate",
                     json={
-                        "model": self.settings.ollama_model, "prompt": prompt,
-                        "stream": False, "format": "json",
+                        "model": self.settings.ollama_model,
+                        "prompt": prompt,
+                        "stream": False,
+                        "format": "json",
                     },
                 )
                 response.raise_for_status()
@@ -317,14 +394,18 @@ class OperationsService:
         if self.settings.n8n_mode == "live":
             await self._n8n_execute(payload)
             return AutomationResponse(
-                execution_id=f"n8n-{digest}", status="completed",
-                mode="live", workflow_id=payload.workflow_id,
+                execution_id=f"n8n-{digest}",
+                status="completed",
+                mode="live",
+                workflow_id=payload.workflow_id,
             )
         if self.settings.n8n_mode != "simulated":
             raise ValueError("Automation adapter is disabled")
         return AutomationResponse(
-            execution_id=f"demo-{digest}", status="simulated_completed",
-            mode=self.settings.n8n_mode, workflow_id=payload.workflow_id,
+            execution_id=f"demo-{digest}",
+            status="simulated_completed",
+            mode=self.settings.n8n_mode,
+            workflow_id=payload.workflow_id,
         )
 
     async def _n8n_execute(self, payload: AutomationRequest) -> None:

@@ -27,9 +27,13 @@ def production_connector_registry() -> ConnectorRegistry:
     return registry
 
 
+def configured_wazuh_integration_id(tenant_id: UUID) -> UUID:
+    return uuid5(NAMESPACE_URL, f"cyrvanta:{tenant_id}:wazuh-local")
+
+
 def configured_wazuh_connector(tenant_id: UUID) -> SIEMConnectorPort:
     settings = get_settings()
-    integration_id = uuid5(NAMESPACE_URL, f"cyrvanta:{tenant_id}:wazuh-local")
+    integration_id = configured_wazuh_integration_id(tenant_id)
     configuration = ConnectorConfiguration(
         integration_id=integration_id,
         tenant_id=tenant_id,

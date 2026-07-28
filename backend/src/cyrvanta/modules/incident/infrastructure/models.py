@@ -12,6 +12,11 @@ class AlertReferenceModel(Base):
     __tablename__ = "alert_references"
     id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
     tenant_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), ForeignKey("tenants.id"))
+    integration_id: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True))
+    current_revision_id: Mapped[UUID | None] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("finding_revisions.id")
+    )
+    current_revision_number: Mapped[int | None] = mapped_column(Integer)
     source: Mapped[str] = mapped_column(String, nullable=False)
     external_id: Mapped[str] = mapped_column(String, nullable=False)
     observed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)

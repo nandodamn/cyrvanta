@@ -1,8 +1,9 @@
 # Fase 16 — Modelo canónico de seguridad y procedencia
 
-**Estado:** DRAFT — pendiente de revisión y aprobación humana.  
-**Fecha:** 2026-07-28  
-**Implementación autorizada:** no.
+**Estado:** APROBADO PARA IMPLEMENTACIÓN — autorizado por instrucción humana el
+2026-07-28.
+**Fecha:** 2026-07-28
+**Implementación autorizada:** sí.
 
 ## 1. Objetivo
 
@@ -508,8 +509,10 @@ Se necesita aprobar o aportar:
    completa;
 10. ambiente Wazuh real autorizado para la prueba de aceptación operativa.
 
-Estos pendientes no impiden aprobar el diseño lógico, pero sí bloquean la
-migración física definitiva o la validación real correspondiente.
+Durante la implementación se resolvieron límites, calidad, severidad,
+localizadores, backfill conservador y validación Wazuh real. Retención y
+frecuencia/polling permanecen como puertas separadas: no bloquean la ingestión
+manual acotada ya validada, pero sí el borrado o scheduler periódico.
 
 ## 21. Criterios de aprobación
 
@@ -528,5 +531,37 @@ Para autorizar implementación se debe confirmar:
 11. Los diez pendientes de la sección 20 se resolverán antes de la parte física
     que dependa de ellos.
 
-Hasta registrar esa aprobación, este documento no autoriza código, migraciones,
-contratos públicos ni cambios del worker.
+La aprobación quedó registrada el 2026-07-28. Los parámetros físicos y
+excepciones resultantes se registran en ADR 0010.
+
+## 22. Resultado de implementación
+
+Implementado el 2026-07-28:
+
+- `CanonicalFinding` y value objects como dataclasses inmutables;
+- semántica temporal sin timestamp de origen inventado;
+- fingerprint SHA-256 canónico y calidad Wazuh v1;
+- migración `0009_finding_provenance`;
+- revisiones append-only con RLS y proyección compatible;
+- repositorio e ingestión transaccional;
+- evento `security.finding.normalized` mediante outbox/inbox;
+- topología RabbitMQ y handler durable para el evento;
+- comando acotado `python -m cyrvanta.sync_wazuh_findings`;
+- ADR 0010 con parámetros físicos y decisiones de compatibilidad.
+
+Validación observada:
+
+- Ruff y mypy: correctos;
+- pytest: 50 pruebas aprobadas;
+- migración `0009_finding_provenance` aplicada en PostgreSQL Compose;
+- lote real OpenSearch/Wazuh: 10 recibidos, 10 revisiones y 10 eventos;
+- replay del mismo lote: 10 duplicados y cero revisiones/eventos nuevos;
+- worker: 10 inbox completados;
+- RLS real: tenant propietario ve 10 revisiones y el segundo tenant ve 0;
+- tabla de revisiones sin columna de payload/documento raw;
+- API de salud y aplicación web: HTTP 200.
+
+La retención configurable y la FK de `integration_id` permanecen pendientes de
+sus contratos de gobierno/configuración. El polling automático no se activa:
+el comando real queda listo para job/scheduler cuando se aprueben frecuencia,
+cursor durable y política operativa.

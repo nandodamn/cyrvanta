@@ -49,7 +49,9 @@ class RabbitTopology:
 
 
 async def declare_topology(
-    channel: AbstractChannel, retry_delays: tuple[int, ...]
+    channel: AbstractChannel,
+    retry_delays: tuple[int, ...],
+    additional_event_names: tuple[str, ...] = (),
 ) -> RabbitTopology:
     events = await channel.declare_exchange(EVENTS_EXCHANGE, ExchangeType.TOPIC, durable=True)
     retry = await channel.declare_exchange(RETRY_EXCHANGE, ExchangeType.TOPIC, durable=True)
@@ -62,6 +64,8 @@ async def declare_topology(
         arguments={"x-dead-letter-exchange": DEADLETTER_EXCHANGE},
     )
     await main_queue.bind(events, routing_key=TRACEABILITY_EVENT)
+    for event_name in additional_event_names:
+        await main_queue.bind(events, routing_key=event_name)
 
     for attempt, delay in enumerate(retry_delays, start=1):
         retry_queue = await channel.declare_queue(
@@ -74,6 +78,17 @@ async def declare_topology(
             },
         )
         await retry_queue.bind(retry, routing_key=f"traceability.{attempt}")
+        for event_name in additional_event_names:
+            event_retry_queue = await channel.declare_queue(
+                f"{TRACEABILITY_QUEUE}.{event_name}.retry.{attempt}",
+                durable=True,
+                arguments={
+                    "x-message-ttl": delay * 1000,
+                    "x-dead-letter-exchange": EVENTS_EXCHANGE,
+                    "x-dead-letter-routing-key": event_name,
+                },
+            )
+            await event_retry_queue.bind(retry, routing_key=f"{event_name}.{attempt}")
 
     dlq = await channel.declare_queue(TRACEABILITY_DLQ, durable=True)
     await dlq.bind(deadletter, routing_key="#")
@@ -166,7 +181,18 @@ class EventConsumer:
     async def start(self) -> RabbitTopology:
         channel = await self._connection.channel(publisher_confirms=True)
         await channel.set_qos(prefetch_count=self._settings.event_consumer_prefetch)
-        topology = await declare_topology(channel, self._settings.retry_delays_seconds)
+        additional_event_names = tuple(
+            sorted(
+                event_name
+                for event_name, _version in self._handlers
+                if event_name != TRACEABILITY_EVENT
+            )
+        )
+        topology = await declare_topology(
+            channel,
+            self._settings.retry_delays_seconds,
+            additional_event_names,
+        )
         queue = await channel.get_queue(TRACEABILITY_QUEUE, ensure=True)
         await queue.consume(self._on_message)
         self._topology = topology
@@ -281,9 +307,15 @@ class EventConsumer:
             headers=headers,
         )
         if not permanent and attempt < len(self._settings.retry_delays_seconds):
+            event_name = envelope.event_name if envelope else TRACEABILITY_EVENT
+            retry_routing_key = (
+                f"traceability.{attempt + 1}"
+                if event_name == TRACEABILITY_EVENT
+                else f"{event_name}.{attempt + 1}"
+            )
             await self._topology.retry.publish(
                 outgoing,
-                routing_key=f"traceability.{attempt + 1}",
+                routing_key=retry_routing_key,
                 mandatory=True,
             )
             self._logger.warning(

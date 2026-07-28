@@ -78,3 +78,16 @@ def test_event_delivery_migration_forces_rls_and_restricts_dispatch() -> None:
     assert "FOR UPDATE SKIP LOCKED" in migration
     assert "REVOKE ALL ON FUNCTION" in migration
     assert "tables are not empty" in migration
+
+
+def test_finding_revision_migration_is_tenant_scoped_and_non_destructive() -> None:
+    migration = (
+        Path(__file__).parents[2] / "alembic" / "versions" / "0009_canonical_finding_provenance.py"
+    ).read_text(encoding="utf-8")
+    assert "finding_revisions" in migration
+    assert "FORCE ROW LEVEL SECURITY" in migration
+    assert "app.current_tenant_id" in migration
+    assert "uq_finding_revision_payload" in migration
+    assert "payload_sha256" in migration
+    assert "canonical finding data exists" in migration
+    assert "GRANT SELECT, INSERT ON finding_revisions" in migration

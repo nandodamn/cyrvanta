@@ -19,7 +19,7 @@ def finding_idempotency_key(integration_id: UUID, finding: CanonicalFinding) -> 
             str(integration_id),
             finding.source_object_type,
             finding.source_object_id,
-            finding.raw_reference.payload_sha256 or finding.occurred_at.isoformat(),
+            finding.payload_fingerprint,
         )
     )
     return sha256(material.encode()).hexdigest()
@@ -42,13 +42,13 @@ class FindingSynchronizationService:
         capabilities = await self.connector.get_capabilities()
         if not capabilities.supports_alert_polling:
             raise UnsupportedCapabilityError("supports_alert_polling")
-        batch = await self.connector.fetch_findings(
-            tenant_id, cursor, start_time, end_time, limit
-        )
+        batch = await self.connector.fetch_findings(tenant_id, cursor, start_time, end_time, limit)
         seen_keys: set[str] = set()
         for finding in batch.items:
             if finding.tenant_id != tenant_id:
                 raise ValueError("Connector returned a finding outside the tenant scope")
+            if finding.integration_id != integration_id:
+                raise ValueError("Connector returned a finding for another integration")
             idempotency_key = finding_idempotency_key(integration_id, finding)
             if idempotency_key in seen_keys:
                 continue

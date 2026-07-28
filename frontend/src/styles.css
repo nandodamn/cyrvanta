@@ -908,6 +908,45 @@ nav a.active {
   border-radius: 5px;
 }
 
+.claim-panel {
+  align-items: start;
+}
+
+.claim-grid {
+  display: grid;
+  flex: 1;
+  gap: 10px;
+  min-width: min(100%, 420px);
+}
+
+.claim-card {
+  padding: 14px;
+  background: var(--panel-raised);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+}
+
+.claim-card p {
+  margin: 10px 0;
+}
+
+.claim-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.claim-badges span {
+  padding: 3px 7px;
+  color: var(--accent-ink);
+  background: var(--accent-soft);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
 .auth-tabs {
   display: grid;
   grid-template-columns: 1fr 1fr;

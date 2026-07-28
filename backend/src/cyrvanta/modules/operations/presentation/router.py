@@ -81,7 +81,12 @@ async def analyze(
     incident_id: UUID, request: Request, context: AnalysisRequester
 ) -> AnalysisResponse:
     service = OperationsService()
-    result = await service.analyze(context.tenant_id, incident_id)
+    result = await service.analyze(
+        context.tenant_id,
+        incident_id,
+        correlation_id=correlation_id(request),
+        record_claims=True,
+    )
     await service.audit(
         context.tenant_id, context.user_id, correlation_id(request),
         "analysis.requested", "incident", incident_id,

@@ -16,6 +16,7 @@ import {
   generateDemoScenario,
   getAlerts,
   getAuditEvents,
+  getClaims,
   getDirectoryConfiguration,
   getIncident,
   getIncidents,
@@ -599,6 +600,7 @@ function IncidentDetailPage() {
   const queryClient = useQueryClient();
   const incident = useQuery({ queryKey: ["incident", id], queryFn: () => getIncident(id) });
   const timeline = useQuery({ queryKey: ["timeline", id], queryFn: () => getTimeline(id) });
+  const claims = useQuery({ queryKey: ["claims", id], queryFn: () => getClaims(id) });
   const transition = useMutation({
     mutationFn: (target: string) => transitionIncident(id, incident.data!.version, target),
     onSuccess: async () => {
@@ -609,7 +611,12 @@ function IncidentDetailPage() {
       ]);
     },
   });
-  const analysis = useMutation({ mutationFn: () => analyzeIncident(id) });
+  const analysis = useMutation({
+    mutationFn: () => analyzeIncident(id),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["claims", id] });
+    },
+  });
   const automation = useMutation({ mutationFn: () => executeDemoAutomation(id) });
   const next: Record<string, string> = {
     new: "triaged",
@@ -717,6 +724,45 @@ function IncidentDetailPage() {
               {t("actionError")}
             </p>
           )}
+        </div>
+      </section>
+      <section className="panel claim-panel">
+        <div>
+          <p className="eyebrow">{t("traceability")}</p>
+          <h2>{t("knowledgeClaims")}</h2>
+          <p>{t("knowledgeClaimsIntro")}</p>
+        </div>
+        <div className="claim-grid">
+          {claims.data?.map((claim) => {
+            const locale = i18n.language.startsWith("es") ? "es" : "en";
+            const statement =
+              claim.presentations[locale] ??
+              (claim.language_code === locale ? claim.statement : undefined) ??
+              claim.presentations.en ??
+              claim.presentations.es ??
+              claim.statement;
+            return (
+              <article className="claim-card" key={claim.id}>
+                <div className="claim-badges">
+                  <span>{t(`claimTypes.${claim.claim_type}`, { defaultValue: claim.claim_type })}</span>
+                  <span>{t(`claimStates.${claim.state}`, { defaultValue: claim.state })}</span>
+                  <span>{t(`claimOrigins.${claim.origin_type}`, { defaultValue: claim.origin_type })}</span>
+                  {claim.is_simulated && <span>{t("simulated")}</span>}
+                </div>
+                <p>{statement}</p>
+                {claim.confidence !== null && (
+                  <small>
+                    {t("confidence")}: {Math.round(claim.confidence * 100)}%
+                  </small>
+                )}
+              </article>
+            );
+          })}
+          <PageState
+            loading={claims.isLoading}
+            error={claims.isError}
+            empty={!claims.isLoading && !claims.isError && claims.data?.length === 0}
+          />
         </div>
       </section>
     </>

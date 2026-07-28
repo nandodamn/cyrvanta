@@ -7,6 +7,11 @@ from uuid import NAMESPACE_URL, UUID, uuid5
 
 import httpx
 
+from cyrvanta.modules.claims.application.service import (
+    AnalysisClaimInput,
+    ClaimService,
+)
+from cyrvanta.modules.claims.domain.models import ClaimType
 from cyrvanta.modules.identity.infrastructure.models import AuditEventModel
 from cyrvanta.modules.incident.application.service import IncidentService
 from cyrvanta.modules.integrations.application.ports.siem_connector import (
@@ -206,7 +211,14 @@ class OperationsService:
             return "Cyrvanta Demo Response"
         return workflow_id
 
-    async def analyze(self, tenant_id: UUID, incident_id: UUID) -> AnalysisResponse:
+    async def analyze(
+        self,
+        tenant_id: UUID,
+        incident_id: UUID,
+        *,
+        correlation_id: UUID | None = None,
+        record_claims: bool = False,
+    ) -> AnalysisResponse:
         incident = await IncidentService().get_incident(tenant_id, incident_id)
         normalized_finding = self._incident_as_canonical_finding(
             tenant_id=tenant_id,
@@ -244,7 +256,7 @@ class OperationsService:
             summary_en = "Sequence consistent with credential abuse and valid-account activity."
             provider = "deterministic-demo"
             mode = self.settings.ollama_mode
-        return AnalysisResponse(
+        result = AnalysisResponse(
             incident_id=incident.id,
             provider=provider,
             model=self.settings.ollama_model,
@@ -260,6 +272,66 @@ class OperationsService:
             ],
             grounded=True,
         )
+        if record_claims:
+            if correlation_id is None:
+                raise ValueError("correlation_id is required when recording claims")
+            claim_inputs = (
+                AnalysisClaimInput(
+                    claim_type=ClaimType.INFERENCE,
+                    statement=summary_en,
+                    language_code="en",
+                    confidence=confidence,
+                    explanation=(
+                        "Evidence-bounded incident analysis; this inference is not a verified fact."
+                    ),
+                    presentation_locale="es",
+                    presentation_text=summary_es,
+                    claim_slot="summary",
+                ),
+                *(
+                    AnalysisClaimInput(
+                        claim_type=ClaimType.INFERENCE,
+                        statement=(
+                            f"MITRE ATT&CK technique {technique.external_id} "
+                            f"({technique.name_en}) may apply to this incident."
+                        ),
+                        language_code="en",
+                        confidence=confidence,
+                        explanation=(
+                            "Proposed technique mapping derived from the current incident context."
+                        ),
+                        presentation_locale="es",
+                        presentation_text=(
+                            f"La técnica MITRE ATT&CK {technique.external_id} "
+                            f"({technique.name_es}) podría aplicar a este incidente."
+                        ),
+                    )
+                    for technique in techniques
+                ),
+                *(
+                    AnalysisClaimInput(
+                        claim_type=ClaimType.RECOMMENDATION,
+                        statement=recommendation,
+                        language_code="es",
+                        confidence=confidence,
+                        explanation=(
+                            "Proposed investigative or response step; it is not an authorization."
+                        ),
+                    )
+                    for recommendation in result.recommendations
+                ),
+            )
+            await ClaimService().record_analysis(
+                tenant_id=tenant_id,
+                incident_id=incident_id,
+                correlation_id=correlation_id,
+                provider=provider,
+                model=self.settings.ollama_model,
+                mode=mode,
+                input_fingerprint=normalized_finding.payload_fingerprint,
+                claims=claim_inputs,
+            )
+        return result
 
     @staticmethod
     def _incident_as_canonical_finding(

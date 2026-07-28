@@ -136,6 +136,35 @@ const analysisSchema = z.object({
   recommendations: z.array(z.string()),
   grounded: z.boolean(),
 });
+const claimSchema = z.object({
+  id: z.string().uuid(),
+  incident_id: z.string().uuid(),
+  claim_type: z.string(),
+  statement: z.string(),
+  language_code: z.string(),
+  confidence: z.number().nullable(),
+  origin_type: z.string(),
+  origin_actor_user_id: z.string().uuid().nullable(),
+  origin_code: z.string().nullable(),
+  origin_version: z.string().nullable(),
+  provider: z.string().nullable(),
+  model: z.string().nullable(),
+  explanation: z.string().nullable(),
+  validation_criteria: z.string().nullable(),
+  missing_evidence: z.array(z.string()),
+  is_simulated: z.boolean(),
+  state: z.string(),
+  evidence: z.array(
+    z.object({
+      evidence_type: z.string(),
+      evidence_id: z.string().uuid(),
+      relationship: z.string(),
+      evidence_sha256: z.string().nullable(),
+    }),
+  ),
+  presentations: z.record(z.string()),
+  created_at: z.string(),
+});
 const playbookConnectorSchema = z.object({
   node_type: z.string(),
   name: z.string(),
@@ -163,6 +192,7 @@ const playbookManagementSchema = z.object({
 });
 export type IntegrationHealth = z.infer<typeof integrationHealthSchema>;
 export type Analysis = z.infer<typeof analysisSchema>;
+export type Claim = z.infer<typeof claimSchema>;
 export type PlaybookCatalog = z.infer<typeof playbookCatalogSchema>;
 export type PlaybookManagement = z.infer<typeof playbookManagementSchema>;
 export type ListQuery = {
@@ -393,6 +423,9 @@ export async function getIncident(id: string): Promise<Incident> {
 }
 export async function getTimeline(id: string): Promise<TimelineEntry[]> {
   return z.array(timelineSchema).parse(await authorized(`/api/v1/incidents/${id}/timeline`));
+}
+export async function getClaims(id: string): Promise<Claim[]> {
+  return z.array(claimSchema).parse(await authorized(`/api/v1/incidents/${id}/claims?limit=25`));
 }
 export async function generateDemoScenario() {
   return z

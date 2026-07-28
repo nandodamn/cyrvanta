@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { getIncidents, getPlaybooks, login } from "../src/api";
+import { getClaims, getIncidents, getPlaybooks, login } from "../src/api";
 
 describe("bounded list requests", () => {
   afterEach(() => {
@@ -77,6 +77,69 @@ describe("bounded list requests", () => {
     expect(fetchMock).toHaveBeenNthCalledWith(
       2,
       "/api/v1/playbooks?limit=10&offset=10&q=response",
+      expect.objectContaining({ credentials: "include" }),
+    );
+  });
+
+  it("validates and requests a bounded claim ledger projection", async () => {
+    const incidentId = "00000000-0000-0000-0000-000000000010";
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            access_token: "synthetic-access-token",
+            token_type: "bearer",
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify([
+            {
+              id: "00000000-0000-0000-0000-000000000011",
+              incident_id: incidentId,
+              claim_type: "INFERENCE",
+              statement: "Synthetic inference",
+              language_code: "en",
+              confidence: 0.65,
+              origin_type: "RULE",
+              origin_actor_user_id: null,
+              origin_code: "incident-analysis",
+              origin_version: "1",
+              provider: null,
+              model: null,
+              explanation: "Evidence-bounded test",
+              validation_criteria: null,
+              missing_evidence: [],
+              is_simulated: true,
+              state: "PROPOSED",
+              evidence: [
+                {
+                  evidence_type: "INCIDENT",
+                  evidence_id: incidentId,
+                  relationship: "SUPPORTS",
+                  evidence_sha256: null,
+                },
+              ],
+              presentations: { es: "Inferencia sintética" },
+              created_at: "2026-07-28T00:00:00Z",
+            },
+          ]),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        ),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await login("tenant-demo", "demo@example.invalid", "not-a-real-password", false);
+    const claims = await getClaims(incidentId);
+
+    expect(claims).toHaveLength(1);
+    expect(claims[0].state).toBe("PROPOSED");
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      `/api/v1/incidents/${incidentId}/claims?limit=25`,
       expect.objectContaining({ credentials: "include" }),
     );
   });

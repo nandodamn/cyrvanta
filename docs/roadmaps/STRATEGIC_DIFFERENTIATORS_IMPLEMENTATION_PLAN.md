@@ -91,8 +91,12 @@ del proveedor ni poder cambiar el tenant.
 **Resultado:** separación persistente y visible entre observación, derivación,
 inferencia, hipótesis, recomendación, decisión, acción y resultado.
 
-**Estado de especificación:** DRAFT pendiente de aprobación. Ver
+**Estado de especificación:** APROBADA PARA IMPLEMENTACIÓN el 2026-07-28. Ver
 `docs/specifications/PHASE_17_CLAIM_LEDGER.md`.
+
+**Estado de implementación:** COMPLETADA el 2026-07-28. Incluye migración
+append-only con RLS, permisos explícitos, API, eventos, persistencia del análisis
+Ollama/determinístico y presentación bilingüe.
 
 **Trabajo:**
 
@@ -239,6 +243,6 @@ API/eventos, permisos, auditoría, RLS, i18n, observabilidad, pruebas y rollback
 
 ## Próxima decisión humana
 
-Revisar y aprobar, enmendar o rechazar el contrato DRAFT de Etapa 3 en
-`docs/specifications/PHASE_17_CLAIM_LEDGER.md`. Todavía no crear su migración,
-API, permisos ni eventos.
+Especificar y revisar la Etapa 4 — correlación determinista multi-fuente— antes
+de crear nuevas tablas, contratos o endpoints. Las puertas independientes de
+retención por tenant y polling periódico Wazuh continúan abiertas.

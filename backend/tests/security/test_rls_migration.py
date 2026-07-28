@@ -91,3 +91,34 @@ def test_finding_revision_migration_is_tenant_scoped_and_non_destructive() -> No
     assert "payload_sha256" in migration
     assert "canonical finding data exists" in migration
     assert "GRANT SELECT, INSERT ON finding_revisions" in migration
+
+
+def test_claim_ledger_is_append_only_tenant_scoped_and_fail_closed() -> None:
+    migration = (
+        Path(__file__).parents[2] / "alembic" / "versions" / "0010_claim_ledger.py"
+    ).read_text(encoding="utf-8")
+    for table in (
+        "claims",
+        "claim_evidence_links",
+        "claim_relationships",
+        "claim_assessments",
+        "claim_presentations",
+    ):
+        assert table in migration
+    assert "FORCE ROW LEVEL SECURITY" in migration
+    assert "app.current_tenant_id" in migration
+    assert "GRANT SELECT, INSERT ON" in migration
+    assert "GRANT UPDATE" not in migration
+    assert "GRANT DELETE" not in migration
+    assert "claim type is reserved" not in migration
+    assert "claim_type NOT IN ('DECISION','ACTION','RESULT')" in migration
+    assert "claim ledger contains data" in migration
+
+
+def test_claim_type_specific_invariants_are_database_enforced() -> None:
+    migration = (
+        Path(__file__).parents[2] / "alembic" / "versions" / "0011_claim_invariants.py"
+    ).read_text(encoding="utf-8")
+    assert "ck_claim_hypothesis_missing" in migration
+    assert "cardinality(missing_evidence) > 0" in migration
+    assert "ck_claim_nondeterministic_explanation" in migration

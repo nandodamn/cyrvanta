@@ -310,7 +310,7 @@ class IncidentService:
                 incident = await self._get(session, existing_run.incident_id)
                 return DemoScenarioResponse(
                     scenario="credential-attack-v1",
-                    incident=incident,  # type: ignore[arg-type]
+                    incident=incident,
                     alerts_created=0,
                     idempotent_replay=True,
                 )
@@ -391,7 +391,7 @@ class IncidentService:
             )
             return DemoScenarioResponse(
                 scenario="credential-attack-v1",
-                incident=incident,  # type: ignore[arg-type]
+                incident=incident,
                 alerts_created=len(alerts),
                 idempotent_replay=False,
             )

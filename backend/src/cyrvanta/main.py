@@ -5,6 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from redis.asyncio import Redis
 
+from cyrvanta.modules.claims.presentation.router import router as claims_router
 from cyrvanta.modules.directory.presentation.authentication_router import (
     router as directory_auth_router,
 )
@@ -64,4 +65,5 @@ app.include_router(directory_auth_router, prefix="/api/v1")
 app.include_router(directory_link_router, prefix="/api/v1")
 app.include_router(incident_router, prefix="/api/v1")
 app.include_router(operations_router, prefix="/api/v1")
+app.include_router(claims_router, prefix="/api/v1")
 install_problem_handlers(app)

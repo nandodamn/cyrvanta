@@ -1,8 +1,9 @@
 # Fase 17 — Ledger de claims y clasificación epistemológica
 
-**Estado:** DRAFT — pendiente de revisión y aprobación humana.
+**Estado:** APROBADO E IMPLEMENTADO — autorizado por instrucción humana el
+2026-07-28 e implementado el 2026-07-28.
 **Fecha:** 2026-07-28
-**Implementación autorizada:** no.
+**Implementación autorizada:** sí.
 
 ## 1. Objetivo
 
@@ -22,8 +23,8 @@ El ledger impedirá que una inferencia humana, de regla o IA se presente como un
 hecho y permitirá reconstruir evidencia, procedencia, validación, contradicción
 y supersesión sin guardar cadenas privadas de razonamiento.
 
-Esta especificación no autoriza todavía migraciones, endpoints, eventos,
-permisos ni cambios en el análisis actual.
+Esta especificación autorizó las migraciones, endpoints, eventos, permisos y
+cambios de análisis descritos, sin ampliar los tipos reservados.
 
 ## 2. Significado de “claim”
 
@@ -40,7 +41,7 @@ Un claim:
 - nunca se edita para ocultar su historia;
 - no concede autorización ni ejecuta acciones.
 
-## 3. Estado actual
+## 3. Estado de partida al aprobar el contrato
 
 La base reutilizable incluye:
 
@@ -619,20 +620,20 @@ Logs estructurados:
 - una versión defectuosa de regla/template se retira creando versión nueva, no
   reescribiendo historia.
 
-## 25. Información pendiente antes de implementar
+## 25. Decisiones aplicadas para implementar
 
-1. límites físicos de statement, explicación, criterios y colecciones;
-2. política de retención de claims, evaluaciones y traducciones;
-3. qué roles además de tenant-admin podrán crear/evaluar/retractar;
-4. si el creador humano puede validar su propio claim;
-5. catálogo inicial de códigos de evidencia faltante;
-6. schema estructurado exacto para salida Ollama;
-7. versiones/tags reales permitidos para Gemma 4;
-8. contenido mínimo del hash de inputs IA;
-9. comportamiento cuando evidencia retenida ya no esté disponible;
-10. umbral o política para mostrar claims IA no validados;
-11. estrategia de migración de `AnalysisResponse.grounded`;
-12. volúmenes esperados por incidente y límites de consulta.
+ADR 0011 resolvió los pendientes materiales con límites físicos explícitos,
+retención sin borrado automático, permisos iniciales para `tenant-admin`,
+evaluación independiente del autor humano, códigos de evidencia acotados,
+procedencia IA versionada y fingerprint del input canónico. Los claims IA no
+validados se muestran como `PROPOSED`; `AnalysisResponse` conserva
+compatibilidad y las consultas quedan limitadas a 100 elementos con offset
+máximo 10.000.
+
+Los tags futuros de Gemma 4, roles adicionales y cualquier política de
+eliminación siguen siendo decisiones de gobierno: no bloquean esta primera
+implementación porque el proveedor/modelo son configurables, no se amplían
+permisos y el ledger no elimina historia.
 
 ## 26. Criterios de aprobación
 
@@ -652,5 +653,9 @@ Para autorizar implementación se debe confirmar:
 12. `DECISION`, `ACTION` y `RESULT` deshabilitados inicialmente;
 13. resolución de los pendientes materiales aplicables de sección 25.
 
-Hasta registrar aprobación, no se crean migraciones, modelos, endpoints,
-permisos, eventos ni cambios de worker para esta etapa.
+La aprobación fue registrada el 2026-07-28. La implementación resultante usa
+las migraciones `0010_claim_ledger` y `0011_claim_invariants`, eventos
+`knowledge.claim.*`, API tenant-scoped, persistencia idempotente del análisis y
+presentación bilingüe. La validación local pasó 61 pruebas backend, 5 pruebas
+frontend, build de producción, RLS negativo, privilegios append-only y entrega
+outbox/inbox.

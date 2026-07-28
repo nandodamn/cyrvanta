@@ -3,6 +3,12 @@ import logging
 
 import aio_pika
 
+from cyrvanta.modules.claims.application.service import (
+    CLAIM_ASSESSED_EVENT,
+    CLAIM_CREATED_EVENT,
+    CLAIM_PRESENTATION_CREATED_EVENT,
+    CLAIM_RELATED_EVENT,
+)
 from cyrvanta.modules.integrations.application.finding_ingestion import (
     FINDING_NORMALIZED_EVENT,
 )
@@ -30,6 +36,17 @@ async def handle_normalized_finding(event: DomainEvent) -> None:
         raise ValueError("unexpected normalized finding event")
 
 
+async def handle_claim_event(event: DomainEvent) -> None:
+    expected = {
+        CLAIM_CREATED_EVENT,
+        CLAIM_ASSESSED_EVENT,
+        CLAIM_RELATED_EVENT,
+        CLAIM_PRESENTATION_CREATED_EVENT,
+    }
+    if event.event_name not in expected:
+        raise ValueError("unexpected claim event")
+
+
 async def run() -> None:
     settings = get_settings()
     configure_logging(settings.log_level)
@@ -43,6 +60,10 @@ async def run() -> None:
         {
             (TRACEABILITY_EVENT, 1): lambda _session: handle_traceability_probe,
             (FINDING_NORMALIZED_EVENT, 1): lambda _session: handle_normalized_finding,
+            (CLAIM_CREATED_EVENT, 1): lambda _session: handle_claim_event,
+            (CLAIM_ASSESSED_EVENT, 1): lambda _session: handle_claim_event,
+            (CLAIM_RELATED_EVENT, 1): lambda _session: handle_claim_event,
+            (CLAIM_PRESENTATION_CREATED_EVENT, 1): lambda _session: handle_claim_event,
         },
     )
     try:

@@ -2,6 +2,14 @@
 
 **Estado:** DRAFT — sujeto a aprobación humana.
 
+## Diferenciadores estratégicos
+
+- Auditoría: `docs/audits/STRATEGIC_DIFFERENTIATORS_GAP_ANALYSIS.md`.
+- Plan: `docs/roadmaps/STRATEGIC_DIFFERENTIATORS_IMPLEMENTATION_PLAN.md`.
+
+El plan permanece `DRAFT`. Su siguiente puerta es aprobar D-001 a D-012 antes
+de definir contratos físicos o implementar migraciones.
+
 Cada fase requiere aprobación de sus especificaciones y criterios antes de
 autorizar contratos o implementación de la siguiente.
 

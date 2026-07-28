@@ -2,6 +2,14 @@
 
 **Estado:** DRAFT. Los ítems `GATE` bloquean diseño físico o código.
 
+## Diferenciadores estratégicos
+
+- [x] Auditar capacidades contra el flujo real.
+- [x] Ordenar implementación por dependencias.
+- [ ] GATE: aprobar D-001 a D-012 del plan estratégico.
+- [ ] Especificar envelope, outbox/inbox e idempotencia.
+- [ ] Implementar Etapa 1 después de aprobar su contrato.
+
 ## Gobernanza
 
 - [ ] GATE: revisión humana de todos los documentos de Fase 0 y Fase 1.

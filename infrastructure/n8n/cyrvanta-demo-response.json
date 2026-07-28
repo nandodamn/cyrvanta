@@ -1,0 +1,63 @@
+[
+{
+  "id": "cyrvanta-demo-response",
+  "name": "Cyrvanta Demo Response",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "cyrvanta-demo-response",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "1d788842-99f4-4f98-a434-1355a4fe4b4e",
+      "name": "Approved Cyrvanta Request",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        260,
+        300
+      ],
+      "webhookId": "8ec1ed03-8523-4d17-b30b-b20997ad4b06"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"accepted\": true, \"status\": \"completed\", \"workflow_id\": \"cyrvanta-demo-response\", \"incident_id\": $json.body.incident_id, \"idempotency_key\": $json.body.idempotency_key } }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "ce346a12-ce85-4ec5-a2d4-b2857e81b3cd",
+      "name": "Return Safe Demo Result",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        500,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Approved Cyrvanta Request": {
+      "main": [
+        [
+          {
+            "node": "Return Safe Demo Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "pinData": {},
+  "versionId": "7ec19835-0138-4ed7-bce0-fcd038aaac28",
+  "tags": []
+}
+]

@@ -6,8 +6,9 @@
 
 - [x] Auditar capacidades contra el flujo real.
 - [x] Ordenar implementación por dependencias.
-- [ ] GATE: aprobar D-001 a D-012 del plan estratégico.
-- [ ] Especificar envelope, outbox/inbox e idempotencia.
+- [x] GATE: aprobar D-001 a D-012 del plan estratégico.
+- [x] Especificar envelope, outbox/inbox e idempotencia.
+- [ ] GATE: aprobar `PHASE_15_EVENT_DELIVERY_TRACEABILITY.md`.
 - [ ] Implementar Etapa 1 después de aprobar su contrato.
 
 ## Gobernanza
@@ -15,7 +16,7 @@
 - [ ] GATE: revisión humana de todos los documentos de Fase 0 y Fase 1.
 - [ ] GATE: incorporar la consulta/requisitos oficiales de AGESIC con versión y
   trazabilidad.
-- [ ] Verificar o inicializar Git y configurar el remoto autorizado.
+- [x] Verificar o inicializar Git y configurar el remoto autorizado.
 - [ ] Aprobar licencia, política de contribución y responsables.
 - [ ] Fijar versiones de Python, Node, PostgreSQL, OpenSearch y demás imágenes.
 - [ ] Decidir herramientas exactas de paquetes, tipado, proxy y secretos.
@@ -25,7 +26,8 @@
 ## Dominio
 
 - [ ] GATE: aprobar glosario y terminología bilingüe.
-- [ ] GATE: definir pertenencia de usuarios a uno o varios tenants.
+- [x] GATE: usuarios multi-tenant mediante membresía explícita (D-001);
+  contrato físico pendiente.
 - [ ] GATE: aprobar ciclo de vida de incidentes y reglas de concurrencia.
 - [ ] GATE: aprobar identidad local/LDAP y resolución de colisiones.
 - [ ] GATE: aprobar modelo RBAC y alcance del administrador de plataforma.

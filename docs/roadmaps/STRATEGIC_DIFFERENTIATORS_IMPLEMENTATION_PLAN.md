@@ -1,8 +1,9 @@
 # Plan de implementación de diferenciadores estratégicos
 
 **Fecha:** 2026-07-28
-**Estado:** DRAFT — requiere aprobación humana antes de crear contratos,
-migraciones o endpoints.
+**Estado:** APROBADO PARA ESPECIFICACIÓN — decisiones D-001 a D-012 aprobadas
+por instrucción humana el 2026-07-28. Cada contrato de etapa conserva su propia
+puerta de aprobación antes de implementar.
 **Entrada:** `docs/audits/STRATEGIC_DIFFERENTIATORS_GAP_ANALYSIS.md`
 
 ## Objetivo
@@ -226,5 +227,6 @@ API/eventos, permisos, auditoría, RLS, i18n, observabilidad, pruebas y rollback
 
 ## Próxima decisión humana
 
-Revisar y aprobar, modificar o rechazar D-001 a D-012. Después corresponde
-redactar el contrato de Etapa 1; todavía no crear sus migraciones o endpoints.
+Revisar el contrato DRAFT de Etapa 1 en
+`docs/specifications/PHASE_15_EVENT_DELIVERY_TRACEABILITY.md`. Todavía no crear
+su migración ni modificar el worker.

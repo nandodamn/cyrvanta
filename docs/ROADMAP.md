@@ -6,9 +6,11 @@
 
 - Auditoría: `docs/audits/STRATEGIC_DIFFERENTIATORS_GAP_ANALYSIS.md`.
 - Plan: `docs/roadmaps/STRATEGIC_DIFFERENTIATORS_IMPLEMENTATION_PLAN.md`.
+- Contrato DRAFT de Etapa 1:
+  `docs/specifications/PHASE_15_EVENT_DELIVERY_TRACEABILITY.md`.
 
-El plan permanece `DRAFT`. Su siguiente puerta es aprobar D-001 a D-012 antes
-de definir contratos físicos o implementar migraciones.
+Las decisiones D-001 a D-012 están aprobadas para especificación. La siguiente
+puerta es aprobar el contrato de Etapa 1 antes de implementar su migración.
 
 Cada fase requiere aprobación de sus especificaciones y criterios antes de
 autorizar contratos o implementación de la siguiente.

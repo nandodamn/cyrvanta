@@ -18,8 +18,9 @@
 Las decisiones D-001 a D-012 están aprobadas. Las Etapas estratégicas 1, 2 y 3
 están implementadas y validadas. La correlación determinista multi-fuente de
 Etapa 4 está especificada como DRAFT y su aprobación humana es la siguiente
-puerta estratégica; retención y polling periódico Wazuh conservan puertas
-operativas independientes.
+puerta estratégica. Incluye un paquete recomendado de 18 decisiones para
+revisión; retención y polling periódico Wazuh conservan puertas operativas
+independientes.
 
 Cada fase requiere aprobación de sus especificaciones y criterios antes de
 autorizar contratos o implementación de la siguiente.

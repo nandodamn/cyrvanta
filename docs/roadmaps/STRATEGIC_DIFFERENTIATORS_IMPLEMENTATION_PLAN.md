@@ -249,7 +249,8 @@ API/eventos, permisos, auditoría, RLS, i18n, observabilidad, pruebas y rollback
 ## Próxima decisión humana
 
 Revisar, enmendar o aprobar el contrato DRAFT de Etapa 4 en
-`docs/specifications/PHASE_18_DETERMINISTIC_MULTI_SOURCE_CORRELATION.md`. No
-crear todavía tablas, contratos, handlers o endpoints. Las puertas
+`docs/specifications/PHASE_18_DETERMINISTIC_MULTI_SOURCE_CORRELATION.md`,
+incluido su paquete recomendado de 18 decisiones. No crear todavía tablas,
+contratos, handlers o endpoints. Las puertas
 independientes de retención por tenant y polling periódico Wazuh continúan
 abiertas.

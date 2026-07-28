@@ -63,6 +63,13 @@ Brechas:
 6. No hay evaluación humana reutilizable ni métricas de precisión.
 7. Score de correlación, riesgo, severidad y confianza podrían confundirse.
 8. No hay estrategia aprobada para ampliar un incidente o iniciar otro.
+9. Wazuh conserva su primer `rule.groups` como `category`; ese valor no es una
+   taxonomía semántica neutral entre proveedores.
+10. Las referencias Wazuh de `ASSET` y `ACCOUNT` aún no incluyen
+    `normalized_value`; no pueden usarse para coincidencia exacta hasta aprobar
+    perfiles de normalización.
+11. El escenario demo actual crea `alert_references` y `correlation_runs`
+    directamente, sin generar revisiones canónicas aptas para este motor.
 
 ## 4. Alcance
 
@@ -673,6 +680,84 @@ Antes del modelo físico se debe aprobar:
 13. Persistencia limitada de no-match y métricas.
 14. Estrategia transaccional única o saga explícita.
 15. Retención futura; hasta aprobarla no habrá borrado automático.
+16. Selectores de señal iniciales sin presentar categorías de proveedor como
+    taxonomía neutral.
+17. Tipos de entidad habilitados según perfiles de normalización disponibles.
+18. Convivencia y migración del escenario demo legado hacia ingestión
+    canónica.
+
+### 28.1 Paquete recomendado para aprobación
+
+Se recomienda resolver los puntos anteriores de la siguiente forma:
+
+1. **Bounded contexts:** aprobar el puerto Correlation → Incident Management.
+   Correlation no importa ni escribe persistencia de Incident Management.
+2. **Matching:** exclusivamente exacto y determinista; sin fuzzy, embeddings,
+   IA o equivalencias implícitas.
+3. **Ventana:** primera versión con bucket UTC fijo, semiabierto y no
+   solapado de diez minutos `[inicio, fin)`. El inicio se obtiene truncando
+   `effective_at` al múltiplo UTC de diez minutos. La grouping key contiene
+   regla/versión, bucket y entidad exacta. La limitación de borde se documenta;
+   cambiarla exige nueva versión de regla.
+4. **Incidentes ampliables:** `new`, `triaged`, `investigating`, `contained` y
+   `reopened`. `resolved` y `closed` siempre producen otro incidente y nunca
+   se reabren automáticamente.
+5. **Severidad/prioridad inicial:** severidad máxima de los miembros. Mapeo
+   determinista `critical → 1`, `high → 2`, `medium → 3`, `low → 4`,
+   `informational → 5`. Una revisión humana posterior prevalece y Correlation
+   no la recalcula.
+6. **Factores v1:** entidad exacta `40` obligatorio; patrón de al menos dos
+   selectores de señal distintos `25` obligatorio; misma ventana `20`
+   obligatorio; diversidad de sistemas fuente `15` opcional. Threshold `85`.
+   El score solo expresa factores satisfechos, no probabilidad, riesgo,
+   confianza ni severidad.
+7. **Límites v1:** hasta `500` candidatos, `32` miembros y `8` reglas
+   aplicables por trigger. Una única evaluación concurrente por
+   tenant/regla/versión/grouping key se reclama en PostgreSQL. Exceder un
+   límite falla cerrado; la concurrencia global del worker continúa siendo
+   configuración de despliegue.
+8. **Inputs incompletos:** `PARTIAL` participa solo si sus `issue_codes` son
+   subconjunto de la allowlist de la regla y todos los campos requeridos están
+   presentes. Basis `INGESTED` queda rechazado en v1. Basis `DERIVED` requiere
+   allowlist explícita de código de derivación.
+9. **Persistencia legada:** evolucionar `correlation_runs` como raíz única del
+   match y agregar relaciones normalizadas. Las filas demo existentes se
+   marcan `LEGACY_SIMULATED_V0`, permanecen legibles y no adquieren miembros o
+   factores inventados.
+10. **Aceptación:** dos secuencias sintéticas canónicas y una secuencia Wazuh
+    versionada, con IPs reservadas para documentación y tiempos UTC fijos.
+    Deben atravesar normalización/persistencia y producir el mismo resultado
+    lógico. Ningún fixture se presenta como telemetría real.
+11. **Permisos:** `tenant-admin` recibe `correlation.read` y
+    `correlation.evaluate`; la identidad técnica del worker recibe solo
+    capacidades internas. `correlation.replay` no se asigna. El usuario demo,
+    que es `tenant-admin`, puede ver y probar todo el slice.
+12. **Claim:** cada match crea exactamente un `DERIVED_FACT` idempotente con
+    evidencias `FINDING_REVISION`; no se crea un tipo nuevo de evidencia.
+13. **No-match:** solo métricas agregadas acotadas. Fallos y reintentos usan
+    inbox, retry, DLQ y observabilidad; no se crea una tabla ilimitada de
+    evaluaciones negativas.
+14. **Transacción:** una única unidad de trabajo PostgreSQL del monolito para
+    match, miembros, factores, incidente, timeline, claim y outbox. Si el
+    diseño físico demuestra que no es posible, se vuelve a revisión; no se
+    introduce una saga silenciosamente.
+15. **Retención:** ningún borrado automático en esta etapa. La política futura
+    no podrá reescribir ni eliminar historia sin especificación separada.
+16. **Selectores de señal:** la regla declara allowlists exactas y versionadas
+    de `(source_system, rule_reference/category)`. Son datos de configuración,
+    no imports de Wazuh ni una taxonomía universal. Una taxonomía semántica
+    futura requerirá especificación propia.
+17. **Entidades v1:** solo `IP_ADDRESS`, cuyo parser canónico ya normaliza el
+    valor. `ASSET`, `ACCOUNT`, `DOMAIN`, `URL`, `HASH`, `PROCESS` y `FILE`
+    permanecen deshabilitados hasta aprobar y probar sus perfiles de
+    normalización por namespace.
+18. **Demo:** el escenario actual continúa disponible como legado simulado.
+    Un escenario canónico v2 entra por el servicio de ingestión y alimenta la
+    correlación real; no se crean nuevas filas directas de demo en las
+    relaciones de Etapa 4.
+
+Este paquete continúa siendo una recomendación DRAFT. Sus números y semántica
+no son vinculantes hasta aprobación humana explícita.
 
 ## 29. Criterios de aprobación
 
@@ -689,7 +774,7 @@ Para autorizar implementación se debe confirmar o enmendar:
 9. eventos y permisos candidatos;
 10. persistencia lógica y migración del demo;
 11. seguridad, pruebas y rollback;
-12. decisiones pendientes de sección 28.
+12. decisiones y paquete recomendado de sección 28.
 
 Hasta registrar aprobación humana, no se crean modelos, migraciones, endpoints,
 permisos, eventos, handlers ni UI para esta etapa.

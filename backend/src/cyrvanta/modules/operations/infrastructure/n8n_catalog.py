@@ -39,8 +39,7 @@ class N8nWorkflowCatalog:
         workflows = tuple(
             workflow
             for item in raw_workflows
-            if isinstance(item, Mapping)
-            and (workflow := self._workflow(item)) is not None
+            if isinstance(item, Mapping) and (workflow := self._workflow(item)) is not None
         )
         return WorkflowCatalogSnapshot(workflows, True, "synchronized")
 
@@ -51,11 +50,16 @@ class N8nWorkflowCatalog:
         if not isinstance(workflow_id, str) or not isinstance(name, str):
             return None
         raw_nodes = item.get("nodes")
-        nodes = tuple(
-            node
-            for value in raw_nodes if isinstance(value, Mapping)
-            if (node := N8nWorkflowCatalog._node(value)) is not None
-        ) if isinstance(raw_nodes, list) else ()
+        nodes = (
+            tuple(
+                node
+                for value in raw_nodes
+                if isinstance(value, Mapping)
+                if (node := N8nWorkflowCatalog._node(value)) is not None
+            )
+            if isinstance(raw_nodes, list)
+            else ()
+        )
         version_id = item.get("versionId")
         return WorkflowSnapshot(
             workflow_id=workflow_id,

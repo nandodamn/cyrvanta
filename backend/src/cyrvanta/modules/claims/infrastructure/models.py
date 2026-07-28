@@ -60,9 +60,7 @@ class ClaimModel(Base):
     causation_id: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True))
     idempotency_key: Mapped[str | None] = mapped_column(String(64))
     schema_version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
 class ClaimEvidenceLinkModel(Base):
@@ -89,9 +87,7 @@ class ClaimEvidenceLinkModel(Base):
         PGUUID(as_uuid=True), ForeignKey("users.id")
     )
     correlation_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), nullable=False)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
 class ClaimRelationshipModel(Base):
@@ -116,9 +112,7 @@ class ClaimRelationshipModel(Base):
     )
     producer: Mapped[str] = mapped_column(String(120), nullable=False)
     correlation_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), nullable=False)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
 class ClaimAssessmentModel(Base):
@@ -135,9 +129,7 @@ class ClaimAssessmentModel(Base):
     evaluator_rule_version: Mapped[str | None] = mapped_column(String(80))
     explanation: Mapped[str] = mapped_column(Text, nullable=False)
     correlation_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), nullable=False)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
 class ClaimPresentationModel(Base):
@@ -165,6 +157,4 @@ class ClaimPresentationModel(Base):
     provider: Mapped[str | None] = mapped_column(String(80))
     model: Mapped[str | None] = mapped_column(String(160))
     correlation_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), nullable=False)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

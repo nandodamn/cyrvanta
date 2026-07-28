@@ -4,9 +4,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
-ClaimTypeInput = Literal[
-    "FACT", "DERIVED_FACT", "INFERENCE", "HYPOTHESIS", "RECOMMENDATION"
-]
+ClaimTypeInput = Literal["FACT", "DERIVED_FACT", "INFERENCE", "HYPOTHESIS", "RECOMMENDATION"]
 EvidenceTypeInput = Literal[
     "FINDING_REVISION",
     "ALERT_REFERENCE",
@@ -16,9 +14,7 @@ EvidenceTypeInput = Literal[
     "CLAIM",
 ]
 EvidenceRelationshipInput = Literal["SUPPORTS", "REFUTES", "CONTEXT"]
-AssessmentOutcomeInput = Literal[
-    "VALIDATED", "REJECTED", "INSUFFICIENT_EVIDENCE", "RETRACTED"
-]
+AssessmentOutcomeInput = Literal["VALIDATED", "REJECTED", "INSUFFICIENT_EVIDENCE", "RETRACTED"]
 ClaimRelationshipInput = Literal[
     "SUPPORTS", "CONTRADICTS", "DERIVED_FROM", "SUPERSEDES", "RESPONDS_TO"
 ]

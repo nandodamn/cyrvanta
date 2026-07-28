@@ -219,10 +219,11 @@ La siguiente agrupación orienta consistencia, pero no está aprobada:
 
 - **Propósito/ownership:** afirmación versionada entre evidencia de incidente y
   objeto ATT&CK; tenant-owned aunque catálogo sea global.
-- **Atributos conceptuales:** ID ATT&CK, versión de dataset, evidencia, origen
-  humano/regla/modelo, confianza, razón bilingüe y validación humana.
-- **Invariantes/ciclo:** ID debe existir en versión indicada; evidencia
-  accesible al mismo tenant; propuesto, validado, rechazado o supersedido.
+- **Atributos conceptuales:** objeto y release ATT&CK, evidencia tipada, regla y
+  versión, selectores exactos, fingerprint, estado y supersesión.
+- **Invariantes/ciclo:** el objeto debe existir en la release activa al crear el
+  mapping; evidencia accesible al mismo tenant; `PROPOSED`, `SUPPORTED`,
+  `VALIDATED`, `REJECTED` o `SUPERSEDED`; historial append-only.
 - **Comandos/eventos candidatos:** proponer, validar, rechazar, superseder;
   `MITREMappingProposed/Validated`.
 - **Relaciones/permisos:** Incident, Evidence y catálogo; lectura `mitre.read`
@@ -252,13 +253,13 @@ La siguiente agrupación orienta consistencia, pero no está aprobada:
   riesgo; tenant-owned.
 - **Atributos conceptuales:** score, categoría, factores, pesos, modelo/regla,
   evidencia, instante y explicación.
-- **Invariantes/ciclo:** IA solo aporta señales; mismos inputs/version producen
-  resultado reproducible; calculado y posteriormente supersedido, no
-  reescrito.
+- **Invariantes/ciclo:** IA, confidence y score de correlación no aportan puntos;
+  mismos inputs/versión producen resultado reproducible; calculado y
+  posteriormente supersedido, no reescrito.
 - **Comandos/eventos candidatos:** calcular/recalcular;
   `RiskAssessed`, `RiskAssessmentSuperseded`.
-- **Relaciones/permisos:** Incident, Asset, Mapping y AIAnalysis como señal;
-  lectura sigue permiso de incidente; configuración de modelo separada.
+- **Relaciones/permisos:** Incident, Correlation, finding revisions y mappings;
+  lectura y recálculo usan permisos tenant-scoped separados.
 - **Sensibilidad/auditoría:** factores pueden revelar contexto; conservar
   versión, inputs referenciados y actor/proceso.
 

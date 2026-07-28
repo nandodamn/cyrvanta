@@ -5,8 +5,9 @@ ciberseguridad asistida por IA. Correlaciona alertas, organiza incidentes,
 enriquece evidencia con MITRE ATT&CK y permite respuestas controladas sin
 ceder el control de datos, infraestructura o decisiones de autorización.
 
-> Estado: **bootstrap técnico en implementación**. Incluye infraestructura base,
-> identidad local mínima y UI inicial; los módulos SOC continúan pendientes.
+> Estado: **plataforma SOC modular en implementación incremental**. Las Etapas
+> estratégicas 1 a 5 incluyen trazabilidad, findings canónicos, claims,
+> correlación multi-fuente, ATT&CK 19.1, riesgo y explicabilidad.
 
 ## Principios
 

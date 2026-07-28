@@ -43,7 +43,9 @@ async def test_unapproved_automation_fails_closed() -> None:
 
 def test_mitre_catalog_uses_stable_ids() -> None:
     assert {item.external_id for item in OperationsService.techniques()} == {
-        "T1110", "T1078", "T1098"
+        "T1110",
+        "T1078",
+        "T1098",
     }
 
 
@@ -115,18 +117,14 @@ async def test_playbook_catalog_only_exposes_allowlisted_metadata(
     monkeypatch: MonkeyPatch,
 ) -> None:
     service = OperationsService(workflow_catalog=FakeWorkflowCatalog())
-    monkeypatch.setattr(
-        service.settings, "n8n_allowed_workflow_ids", "cyrvanta-demo-response"
-    )
+    monkeypatch.setattr(service.settings, "n8n_allowed_workflow_ids", "cyrvanta-demo-response")
 
     result = await service.playbooks(limit=10, offset=0, query=None)
 
     assert result.synchronized is True
     assert result.total == 1
     assert result.items[0].workflow_id == "cyrvanta-demo-response"
-    assert result.items[0].connectors[0].credential_names == [
-        "Synthetic credential label"
-    ]
+    assert result.items[0].connectors[0].credential_names == ["Synthetic credential label"]
 
 
 async def test_playbook_catalog_is_bounded_and_searchable(

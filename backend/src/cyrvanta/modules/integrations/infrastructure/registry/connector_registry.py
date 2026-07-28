@@ -43,4 +43,3 @@ class ConnectorRegistry:
 
     def registered_types(self) -> tuple[str, ...]:
         return tuple(sorted(self._factories))
-

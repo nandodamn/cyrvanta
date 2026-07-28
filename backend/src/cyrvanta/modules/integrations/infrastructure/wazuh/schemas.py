@@ -20,4 +20,3 @@ class WazuhSearchResponse(BaseModel):
         raw_hits = payload.get("hits", {})
         values = raw_hits.get("hits", []) if isinstance(raw_hits, dict) else []
         return cls(hits=[WazuhHit.model_validate(item) for item in values])
-

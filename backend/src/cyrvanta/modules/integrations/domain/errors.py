@@ -29,4 +29,3 @@ class UnsupportedCapabilityError(ConnectorError):
             ConnectorErrorCode.UNSUPPORTED_CAPABILITY,
             f"Connector capability is not available: {capability}",
         )
-

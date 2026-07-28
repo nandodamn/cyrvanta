@@ -142,11 +142,7 @@ class SqlCorrelationRepository:
                     correlation_run_id=inserted_id,
                     finding_id=member.finding_id,
                     revision_id=member.revision_id,
-                    role=(
-                        "TRIGGER"
-                        if member.revision_id == trigger_revision_id
-                        else "SUPPORTING"
-                    ),
+                    role=("TRIGGER" if member.revision_id == trigger_revision_id else "SUPPORTING"),
                     sort_order=order,
                     selector_code=match.selector_codes[member.revision_id],
                     effective_at=member.effective_at,
@@ -171,9 +167,7 @@ class SqlCorrelationRepository:
         await self._session.flush()
         return ReservedMatch(inserted_id, True)
 
-    async def prior_incident(
-        self, match_id: UUID, match: CorrelationMatch
-    ) -> UUID | None:
+    async def prior_incident(self, match_id: UUID, match: CorrelationMatch) -> UUID | None:
         return await self._session.scalar(
             select(CorrelationRunModel.incident_id)
             .join(IncidentModel, IncidentModel.id == CorrelationRunModel.incident_id)
@@ -241,9 +235,7 @@ class SqlCorrelationRepository:
         )
 
     @staticmethod
-    def _candidate(
-        model: FindingRevisionModel, is_simulated: bool
-    ) -> CorrelationCandidate:
+    def _candidate(model: FindingRevisionModel, is_simulated: bool) -> CorrelationCandidate:
         entities: list[EntityReference] = []
         for item in model.entity_references:
             if not isinstance(item, dict):

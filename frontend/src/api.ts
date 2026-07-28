@@ -200,6 +200,52 @@ const correlationSchema = z.object({
     }),
   ),
 });
+const enrichmentSchema = z.object({
+  mappings: z.array(
+    z.object({
+      id: z.string().uuid(),
+      incident_id: z.string().uuid(),
+      correlation_run_id: z.string().uuid(),
+      external_id: z.string(),
+      name_en: z.string(),
+      tactic_codes: z.array(z.string()),
+      status: z.string(),
+      selector_codes: z.array(z.string()),
+      evidence_revision_ids: z.array(z.string().uuid()),
+      created_at: z.string(),
+    }),
+  ),
+  risk: z.object({
+    id: z.string().uuid(),
+    incident_id: z.string().uuid(),
+    definition_code: z.string(),
+    definition_version: z.string(),
+    score: z.number().int().min(0).max(100),
+    band: z.string(),
+    fingerprint: z.string(),
+    factors: z.array(
+      z.object({
+        code: z.string(),
+        weight: z.number().int(),
+        contribution: z.number().int(),
+      }),
+    ),
+    created_at: z.string(),
+  }),
+  explanations: z.array(
+    z.object({
+      id: z.string().uuid(),
+      incident_id: z.string().uuid(),
+      risk_assessment_id: z.string().uuid(),
+      locale: z.string(),
+      mode: z.string(),
+      provider: z.string(),
+      text: z.string(),
+      grounded: z.boolean(),
+      created_at: z.string(),
+    }),
+  ),
+});
 const playbookConnectorSchema = z.object({
   node_type: z.string(),
   name: z.string(),
@@ -229,6 +275,7 @@ export type IntegrationHealth = z.infer<typeof integrationHealthSchema>;
 export type Analysis = z.infer<typeof analysisSchema>;
 export type Claim = z.infer<typeof claimSchema>;
 export type Correlation = z.infer<typeof correlationSchema>;
+export type Enrichment = z.infer<typeof enrichmentSchema>;
 export type PlaybookCatalog = z.infer<typeof playbookCatalogSchema>;
 export type PlaybookManagement = z.infer<typeof playbookManagementSchema>;
 export type ListQuery = {
@@ -467,6 +514,19 @@ export async function getCorrelations(id: string): Promise<Correlation[]> {
   return z
     .array(correlationSchema)
     .parse(await authorized(`/api/v1/incidents/${id}/correlations?limit=25`));
+}
+export async function getIncidentEnrichment(id: string): Promise<Enrichment> {
+  return enrichmentSchema.parse(await authorized(`/api/v1/incidents/${id}/enrichment`));
+}
+export async function recalculateIncidentRisk(id: string): Promise<Enrichment> {
+  return enrichmentSchema.parse(
+    await authorizedMutation(`/api/v1/incidents/${id}/risk-assessments`, "POST", {}),
+  );
+}
+export async function generateIncidentExplanation(id: string): Promise<Enrichment> {
+  return enrichmentSchema.parse(
+    await authorizedMutation(`/api/v1/incidents/${id}/explanations`, "POST", {}),
+  );
 }
 export async function generateDemoScenario() {
   return z

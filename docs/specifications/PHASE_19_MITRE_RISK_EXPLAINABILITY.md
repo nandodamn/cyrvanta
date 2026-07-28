@@ -2,11 +2,11 @@
 
 **Etapa estratégica:** 5
 
-**Estado:** DRAFT — propuesta para revisión humana; no autoriza implementación
+**Estado:** APROBADO E IMPLEMENTADO
 
 **Fecha:** 2026-07-28
 
-**Implementación autorizada:** no
+**Implementación autorizada:** sí, por aprobación humana del 2026-07-28
 
 ## 1. Objetivo
 
@@ -447,7 +447,8 @@ otro análisis.
 
 ## 12. Persistencia lógica candidata
 
-No se aprueban nombres físicos con este DRAFT. Conceptualmente se requieren:
+Los nombres físicos se fijarán en la migración de esta etapa manteniendo los
+conceptos aprobados:
 
 ### 12.1 Datos globales
 
@@ -716,9 +717,9 @@ La implementación queda bloqueada hasta aprobar o enmendar:
 Se recomienda aprobar las alternativas descritas en las secciones 3 a 21 sin
 variaciones y registrar la decisión en un ADR nuevo.
 
-La aprobación autorizaría diseñar el catálogo físico, migraciones, contratos,
-puertos, schemas, endpoints, eventos, permisos y UI exactos. Mientras el
-documento permanezca `DRAFT`, no se implementará ninguna de esas piezas.
+La aprobación humana del 2026-07-28 autoriza diseñar e implementar el catálogo
+físico, migraciones, contratos, puertos, schemas, endpoints, eventos, permisos
+y UI conforme a este contrato y al ADR 0013.
 
 ## 25. Criterios de salida de Etapa 5
 
@@ -735,3 +736,24 @@ La etapa estará completa cuando:
 9. los servicios existentes y la demo no sufran regresiones;
 10. documentación, ADR, migración, rollback y comandos operativos estén
     actualizados.
+
+## 26. Registro de implementación
+
+Implementado y validado el 2026-07-28:
+
+- migración `0014_attack_risk`;
+- importador offline `python -m cyrvanta.import_attack`;
+- release oficial Enterprise ATT&CK 19.1 activa con SHA-256 registrado;
+- mappings exactos de `credential-attack` v2 con evidencia tenant-scoped;
+- riesgo `incident-risk` v1 con cinco factores y fingerprint idempotente;
+- explicaciones deterministas ES/EN y redacción opcional mediante `AIProvider`;
+- endpoints acotados de catálogo, consulta, recálculo y explicación;
+- eventos implementados `security.threat_mapping.assessed`,
+  `security.risk.assessed`, `security.explanation.generated` y
+  `security.explanation.failed`;
+- UI bilingüe y responsive en detalle de incidente;
+- pruebas unitarias, tipado, build, Docker, API real, Ollama real y RLS
+  cross-tenant aprobados.
+
+Los workflows n8n permanecen fuera de esta etapa y conservan la puerta formal
+de Etapa 7.

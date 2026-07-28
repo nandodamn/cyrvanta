@@ -16,9 +16,7 @@ from cyrvanta.shared.dependencies import SecurityContext, require_permission
 
 router = APIRouter(tags=["correlation"])
 Service = Annotated[CorrelationQueryService, Depends(CorrelationQueryService)]
-CorrelationRead = Annotated[
-    SecurityContext, Depends(require_permission("correlation.read"))
-]
+CorrelationRead = Annotated[SecurityContext, Depends(require_permission("correlation.read"))]
 CorrelationEvaluate = Annotated[
     SecurityContext, Depends(require_permission("correlation.evaluate"))
 ]

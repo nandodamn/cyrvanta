@@ -53,9 +53,7 @@ class CorrelationQueryService:
             return await self._view(session, match)
 
     @staticmethod
-    async def _view(
-        session: AsyncSession, match: CorrelationRunModel
-    ) -> CorrelationResponse:
+    async def _view(session: AsyncSession, match: CorrelationRunModel) -> CorrelationResponse:
         if match.incident_id is None:
             raise CorrelationNotFound
         members = (
@@ -86,12 +84,6 @@ class CorrelationQueryService:
             window_end=match.window_end,
             claim_id=match.claim_id,
             created_at=match.created_at,
-            members=[
-                CorrelationMemberResponse.model_validate(member)
-                for member in members
-            ],
-            factors=[
-                CorrelationFactorResponse.model_validate(factor)
-                for factor in factors
-            ],
+            members=[CorrelationMemberResponse.model_validate(member) for member in members],
+            factors=[CorrelationFactorResponse.model_validate(factor) for factor in factors],
         )

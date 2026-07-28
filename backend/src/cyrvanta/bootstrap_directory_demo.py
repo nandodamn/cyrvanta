@@ -43,7 +43,8 @@ async def bootstrap(tenant_slug: str) -> None:
                     last_test_success=true
             """),
             {
-                "id": uuid4(), "tenant": tenant_id,
+                "id": uuid4(),
+                "tenant": tenant_id,
                 "secret": cipher.encrypt("simulated-no-network-secret"),
             },
         )

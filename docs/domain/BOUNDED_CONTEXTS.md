@@ -18,9 +18,9 @@ operación tenant-owned.
 | Telemetry and Alert Intake | Referencias canónicas de hallazgos y alertas | AlertReference; modelos canónicos transitorios | Security Integrations mediante puerto |
 | Incident Management | Ciclo, asignación, evidencia y timeline | Incident, IncidentEvidence, IncidentTimelineEntry | Intake; Identity; Audit |
 | Correlation | Candidatos, agrupación y explicación | Decisiones/versiones de correlación por especificar | Intake; Incident; Risk |
-| Threat Knowledge | Catálogo ATT&CK y mappings versionados | MITREMapping y catálogo global | Incident; fuente STIX por puerto |
+| Threat Knowledge | Catálogo ATT&CK y mappings versionados | Releases, objetos, relaciones y mappings sustentados | Correlation; Incident; fuente STIX offline |
 | AI Analysis | Solicitudes, resultados y provenance | AIAnalysis | Incident; Threat Knowledge; `AIProvider` |
-| Risk and Policy | Evaluación determinística y elegibilidad | RiskAssessment | Incident; AI como señal; Tenant policy |
+| Risk and Policy | Evaluación determinística y explicabilidad | RiskAssessment, factores y explicaciones | Incident; Correlation; Threat Knowledge; IA solo como redacción |
 | Playbook and Response | Definiciones, aprobaciones y ejecución | Playbook, PlaybookVersion, Approval, PlaybookExecution | Risk; Identity; automation port |
 | Audit and Compliance | Registro append-oriented y consulta autorizada | AuditEvent | Recibe hechos de todos; no controla su negocio |
 | Reporting and Analytics | Métricas y vistas autorizadas | Proyecciones/reportes por especificar | Puertos de lectura acotados |
@@ -53,7 +53,9 @@ operación tenant-owned.
 
 - ¿Puede una persona/usuario pertenecer a varios tenants?
 - ¿Qué operaciones cross-tenant posee un administrador de plataforma?
-- ¿Qué datos de Threat Knowledge puede personalizar un tenant?
-- ¿Correlation crea incidentes o propone comandos a Incident Management?
+- El catálogo ATT&CK es global e inmutable; los mappings y evaluaciones son
+  tenant-owned. Personalizaciones semánticas posteriores requieren contrato.
+- Correlation solicita cambios a Incident Management mediante puerto y emite
+  eventos para enriquecimiento.
 - ¿Qué consistencia se exige entre PostgreSQL, OpenSearch y RabbitMQ?
 - ¿Qué eventos son de dominio internos y cuáles son contratos de integración?

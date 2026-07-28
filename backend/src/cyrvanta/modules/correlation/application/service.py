@@ -77,9 +77,7 @@ class CorrelationService:
                     },
                 )
                 continue
-            prior_incident_id = await self._repository.prior_incident(
-                reserved.match_id, match
-            )
+            prior_incident_id = await self._repository.prior_incident(reserved.match_id, match)
             incident_result = await self._incidents.apply_match(
                 tenant_id=event.tenant_id,
                 match_id=reserved.match_id,
@@ -87,9 +85,7 @@ class CorrelationService:
                 prior_incident_id=prior_incident_id,
                 correlation_id=event.correlation_id,
             )
-            await self._repository.attach_incident(
-                reserved.match_id, incident_result.incident_id
-            )
+            await self._repository.attach_incident(reserved.match_id, incident_result.incident_id)
             claim_id = await self._claims.record_match(
                 tenant_id=event.tenant_id,
                 incident_id=incident_result.incident_id,

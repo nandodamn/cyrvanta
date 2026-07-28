@@ -85,9 +85,7 @@ def candidate(
         rule_reference=selector,
         normalization_status=status,
         issue_codes=issues,
-        entities=(
-            EntityReference("IP_ADDRESS", value, namespace),
-        ),
+        entities=(EntityReference("IP_ADDRESS", value, namespace),),
         is_simulated=simulated,
     )
 
@@ -113,9 +111,7 @@ def test_source_diversity_is_optional_and_explainable() -> None:
     match = evaluate_rule(rule(), trigger, (failed, trigger))
     assert match is not None
     assert match.score == 100
-    diversity = next(
-        factor for factor in match.factors if factor.code == "source_diversity"
-    )
+    diversity = next(factor for factor in match.factors if factor.code == "source_diversity")
     assert diversity.matched is True
     assert diversity.contribution == 15
 
@@ -214,9 +210,7 @@ def test_wazuh_and_synthetic_inputs_use_the_same_rule_engine_contract() -> None:
             rule_reference=finding.rule_reference,
             normalization_status=finding.normalization.status.value,
             issue_codes=finding.normalization.issue_codes,
-            entities=(
-                EntityReference("IP_ADDRESS", str(finding.source_ip), "source"),
-            ),
+            entities=(EntityReference("IP_ADDRESS", str(finding.source_ip), "source"),),
             is_simulated=False,
         )
 

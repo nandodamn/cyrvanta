@@ -60,4 +60,3 @@ class SIEMConnectorPort(ABC):
     async def close_external_incident(
         self, tenant_id: UUID, external_incident_id: str, resolution: str
     ) -> None: ...
-

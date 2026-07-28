@@ -130,9 +130,7 @@ class Claim:
             if self.confidence is None or not 0 <= self.confidence <= 1:
                 raise ValueError("confidence is required for non-deterministic claims")
             if self.explanation is None or not self.explanation.strip():
-                raise ValueError(
-                    "explanation is required for non-deterministic claims"
-                )
+                raise ValueError("explanation is required for non-deterministic claims")
         elif self.confidence is not None:
             raise ValueError("confidence is not allowed for deterministic claims")
         if self.origin_type is ClaimOriginType.HUMAN and self.origin_actor_user_id is None:
@@ -160,8 +158,7 @@ class Claim:
         if self.validation_criteria is not None and len(self.validation_criteria) > 2000:
             raise ValueError("validation criteria is too long")
         if len(self.missing_evidence) > 16 or any(
-            MISSING_EVIDENCE_CODE.fullmatch(code) is None
-            for code in self.missing_evidence
+            MISSING_EVIDENCE_CODE.fullmatch(code) is None for code in self.missing_evidence
         ):
             raise ValueError("missing evidence codes are invalid")
         if self.input_fingerprint is not None and len(self.input_fingerprint) != 64:

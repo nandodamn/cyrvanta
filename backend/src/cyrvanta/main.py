@@ -21,6 +21,9 @@ from cyrvanta.modules.identity.presentation.router import router as auth_router
 from cyrvanta.modules.incident.presentation.router import router as incident_router
 from cyrvanta.modules.operations.presentation.router import router as operations_router
 from cyrvanta.modules.platform.presentation.router import router as platform_router
+from cyrvanta.modules.threat_knowledge.presentation.router import (
+    router as threat_knowledge_router,
+)
 from cyrvanta.shared.config import get_settings
 from cyrvanta.shared.http import RequestContextMiddleware, install_problem_handlers
 from cyrvanta.shared.logging import configure_logging
@@ -68,4 +71,5 @@ app.include_router(incident_router, prefix="/api/v1")
 app.include_router(operations_router, prefix="/api/v1")
 app.include_router(claims_router, prefix="/api/v1")
 app.include_router(correlation_router, prefix="/api/v1")
+app.include_router(threat_knowledge_router, prefix="/api/v1")
 install_problem_handlers(app)

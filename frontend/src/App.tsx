@@ -14,12 +14,14 @@ import {
   downloadIncidentReport,
   executeDemoAutomation,
   generateCanonicalDemoScenario,
+  generateIncidentExplanation,
   getAlerts,
   getAuditEvents,
   getClaims,
   getCorrelations,
   getDirectoryConfiguration,
   getIncident,
+  getIncidentEnrichment,
   getIncidents,
   getIntegrationHealth,
   getMe,
@@ -33,6 +35,7 @@ import {
   getUserRoles,
   getUsers,
   login,
+  recalculateIncidentRisk,
   replaceRolePermissions,
   replaceUserRoles,
   saveDirectoryConfiguration,
@@ -610,6 +613,11 @@ function IncidentDetailPage() {
     queryKey: ["correlations", id],
     queryFn: () => getCorrelations(id),
   });
+  const enrichment = useQuery({
+    queryKey: ["enrichment", id],
+    queryFn: () => getIncidentEnrichment(id),
+    retry: false,
+  });
   const transition = useMutation({
     mutationFn: (target: string) => transitionIncident(id, incident.data!.version, target),
     onSuccess: async () => {
@@ -624,6 +632,18 @@ function IncidentDetailPage() {
     mutationFn: () => analyzeIncident(id),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["claims", id] });
+    },
+  });
+  const recalculateRisk = useMutation({
+    mutationFn: () => recalculateIncidentRisk(id),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["enrichment", id] });
+    },
+  });
+  const generateExplanation = useMutation({
+    mutationFn: () => generateIncidentExplanation(id),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["enrichment", id] });
     },
   });
   const automation = useMutation({ mutationFn: () => executeDemoAutomation(id) });
@@ -733,6 +753,88 @@ function IncidentDetailPage() {
               {t("actionError")}
             </p>
           )}
+        </div>
+      </section>
+      <section className="panel claim-panel">
+        <div>
+          <p className="eyebrow">MITRE ATT&amp;CK</p>
+          <h2>{t("threatEnrichment")}</h2>
+          <p>{t("threatEnrichmentIntro")}</p>
+          <button
+            className="ghost"
+            disabled={recalculateRisk.isPending}
+            onClick={() => recalculateRisk.mutate()}
+          >
+            {t("recalculateRisk")}
+          </button>
+          <button
+            className="ghost"
+            disabled={generateExplanation.isPending || !enrichment.data}
+            onClick={() => generateExplanation.mutate()}
+          >
+            {t("redactWithAi")}
+          </button>
+        </div>
+        <div className="claim-grid">
+          {enrichment.data && (
+            <>
+              <article className="claim-card analysis-card">
+                <div className="claim-badges">
+                  <span>
+                    {t("riskDefinition")} {enrichment.data.risk.definition_code} v
+                    {enrichment.data.risk.definition_version}
+                  </span>
+                  <span>
+                    {t(`riskBands.${enrichment.data.risk.band}`, {
+                      defaultValue: enrichment.data.risk.band,
+                    })}
+                  </span>
+                </div>
+                <strong>
+                  {t("risk")}: {enrichment.data.risk.score}/100
+                </strong>
+                <div className="correlation-factors">
+                  {enrichment.data.risk.factors.map((factor) => (
+                    <span key={factor.code}>
+                      {t(`riskFactors.${factor.code}`, { defaultValue: factor.code })}:{" "}
+                      {factor.contribution}/{factor.weight}
+                    </span>
+                  ))}
+                </div>
+                <p>
+                  {enrichment.data.explanations.find(
+                    (item) =>
+                      item.locale === (i18n.language.startsWith("es") ? "es" : "en") &&
+                      item.mode === "AI_REDACTION",
+                  )?.text ??
+                    enrichment.data.explanations.find(
+                      (item) =>
+                        item.locale === (i18n.language.startsWith("es") ? "es" : "en") &&
+                        item.mode === "DETERMINISTIC",
+                    )?.text}
+                </p>
+              </article>
+              {enrichment.data.mappings.map((mapping) => (
+                <article className="claim-card" key={mapping.id}>
+                  <div className="claim-badges">
+                    <span>{mapping.status}</span>
+                    <span>{mapping.external_id}</span>
+                  </div>
+                  <strong>{mapping.name_en}</strong>
+                  <p>{mapping.tactic_codes.join(" · ")}</p>
+                  <small>
+                    {t("evidence")}: {mapping.evidence_revision_ids.length} ·{" "}
+                    {mapping.selector_codes.join(", ")}
+                  </small>
+                </article>
+              ))}
+            </>
+          )}
+          <PageState
+            loading={enrichment.isLoading || recalculateRisk.isPending}
+            error={recalculateRisk.isError || generateExplanation.isError}
+            empty={!enrichment.isLoading && !enrichment.data}
+          />
         </div>
       </section>
       <section className="panel claim-panel">

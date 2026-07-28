@@ -56,9 +56,7 @@ async def synchronize(tenant_id: UUID, limit: int, cursor: str | None) -> None:
                 "created": created,
                 "duplicates": duplicates,
                 "next_cursor": batch.next_cursor,
-                "watermark": (
-                    batch.watermark.isoformat() if batch.watermark is not None else None
-                ),
+                "watermark": (batch.watermark.isoformat() if batch.watermark is not None else None),
                 "correlation_id": str(correlation_id),
             },
             separators=(",", ":"),

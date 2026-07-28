@@ -24,18 +24,10 @@ from cyrvanta.shared.dependencies import SecurityContext, require_permission
 
 router = APIRouter(tags=["operations"])
 IncidentReader = Annotated[SecurityContext, Depends(require_permission("incident.read"))]
-AnalysisRequester = Annotated[
-    SecurityContext, Depends(require_permission("analysis.request"))
-]
-ResponseExecutor = Annotated[
-    SecurityContext, Depends(require_permission("response.execute"))
-]
-PlaybookReader = Annotated[
-    SecurityContext, Depends(require_permission("playbook.read"))
-]
-PlaybookManager = Annotated[
-    SecurityContext, Depends(require_permission("playbook.manage"))
-]
+AnalysisRequester = Annotated[SecurityContext, Depends(require_permission("analysis.request"))]
+ResponseExecutor = Annotated[SecurityContext, Depends(require_permission("response.execute"))]
+PlaybookReader = Annotated[SecurityContext, Depends(require_permission("playbook.read"))]
+PlaybookManager = Annotated[SecurityContext, Depends(require_permission("playbook.manage"))]
 
 
 def correlation_id(request: Request) -> UUID:
@@ -88,8 +80,12 @@ async def analyze(
         record_claims=True,
     )
     await service.audit(
-        context.tenant_id, context.user_id, correlation_id(request),
-        "analysis.requested", "incident", incident_id,
+        context.tenant_id,
+        context.user_id,
+        correlation_id(request),
+        "analysis.requested",
+        "incident",
+        incident_id,
         {"provider": result.provider, "mode": result.mode, "risk_score": result.risk_score},
     )
     return result
@@ -106,8 +102,12 @@ async def execute(
     except ValueError as exc:
         raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
     await service.audit(
-        context.tenant_id, context.user_id, correlation_id(request),
-        "response.execution.requested", "incident", payload.incident_id,
+        context.tenant_id,
+        context.user_id,
+        correlation_id(request),
+        "response.execution.requested",
+        "incident",
+        payload.incident_id,
         {"workflow_id": result.workflow_id, "mode": result.mode, "status": result.status},
     )
     return result
@@ -134,9 +134,16 @@ async def report(incident_id: UUID, request: Request, context: IncidentReader) -
         "</body></html>"
     )
     await OperationsService().audit(
-        context.tenant_id, context.user_id, correlation_id(request),
-        "report.generated", "incident", incident_id,
+        context.tenant_id,
+        context.user_id,
+        correlation_id(request),
+        "report.generated",
+        "incident",
+        incident_id,
         {"format": "html", "provenance": provenance.lower()},
     )
-    return Response(body, media_type="text/html",
-                    headers={"Content-Disposition": f'attachment; filename="{incident.code}.html"'})
+    return Response(
+        body,
+        media_type="text/html",
+        headers={"Content-Disposition": f'attachment; filename="{incident.code}.html"'},
+    )

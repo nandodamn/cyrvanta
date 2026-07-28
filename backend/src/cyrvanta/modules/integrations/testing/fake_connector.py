@@ -60,13 +60,9 @@ class FakeSIEMConnector(SIEMConnectorPort):
     ) -> ExternalIncidentBatch:
         raise UnsupportedCapabilityError("supports_incident_polling")
 
-    async def search_events(
-        self, tenant_id: UUID, query: CanonicalEventQuery
-    ) -> EventSearchResult:
+    async def search_events(self, tenant_id: UUID, query: CanonicalEventQuery) -> EventSearchResult:
         return EventSearchResult(
-            findings=[item for item in self.findings if item.tenant_id == tenant_id][
-                : query.limit
-            ]
+            findings=[item for item in self.findings if item.tenant_id == tenant_id][: query.limit]
         )
 
     async def get_evidence(
@@ -83,4 +79,3 @@ class FakeSIEMConnector(SIEMConnectorPort):
         self, tenant_id: UUID, external_incident_id: str, resolution: str
     ) -> None:
         raise UnsupportedCapabilityError("supports_incident_closure")
-

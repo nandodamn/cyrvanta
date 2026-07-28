@@ -30,10 +30,14 @@ Do not begin a demonstration unless the last line is `CYRVANTA_ACCEPTANCE_OK`.
 2. Generate the credential-attack scenario from Overview.
 3. Inspect the four alerts and the linked incident.
 4. Advance the incident through its audited lifecycle.
-5. Request the bounded AI analysis and review deterministic risk plus ATT&CK mappings.
-6. Simulate the explicitly approved allowlisted response.
-7. Download the incident HTML report.
-8. Review adapter status under Integrations and audit events under Administration.
+5. Open the incident and review its evidence-backed ATT&CK mappings, five
+   deterministic risk factors and bilingual explanation.
+6. Optionally request an `AIProvider` rewrite. If Ollama is cold, the first
+   Gemma 4 response can take longer; the deterministic explanation remains
+   available and authoritative.
+7. Simulate the explicitly approved allowlisted response.
+8. Download the incident HTML report.
+9. Review adapter status under Integrations and audit events under Administration.
 
 LDAP/Active Directory can remain unconfigured until an enterprise directory or isolated
 directory lab is available. Local break-glass access remains independent of LDAP.

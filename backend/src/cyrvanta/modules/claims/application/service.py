@@ -97,11 +97,7 @@ class ClaimService:
             await self._incident(session, incident_id)
             statement = select(ClaimModel).where(ClaimModel.incident_id == incident_id)
             if query and (normalized := query.strip()):
-                escaped = (
-                    normalized.replace("\\", "\\\\")
-                    .replace("%", "\\%")
-                    .replace("_", "\\_")
-                )
+                escaped = normalized.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
                 statement = statement.where(
                     or_(
                         ClaimModel.statement.ilike(f"%{escaped}%", escape="\\"),
@@ -114,9 +110,7 @@ class ClaimService:
             claims = list(
                 (
                     await session.scalars(
-                        statement.order_by(
-                            ClaimModel.created_at.desc(), ClaimModel.id.desc()
-                        )
+                        statement.order_by(ClaimModel.created_at.desc(), ClaimModel.id.desc())
                         .offset(offset)
                         .limit(limit)
                     )
@@ -405,24 +399,14 @@ class ClaimService:
         async with tenant_session(tenant_id) as session:
             incident = await self._incident(session, incident_id)
             for item in claims:
-                origin_type = (
-                    ClaimOriginType.AI
-                    if provider == "ollama"
-                    else ClaimOriginType.RULE
-                )
+                origin_type = ClaimOriginType.AI if provider == "ollama" else ClaimOriginType.RULE
                 origin_code = (
                     f"incident-analysis:{item.claim_slot}"
                     if item.claim_slot
-                    else (
-                        None
-                        if origin_type is ClaimOriginType.AI
-                        else "incident-analysis"
-                    )
+                    else (None if origin_type is ClaimOriginType.AI else "incident-analysis")
                 )
                 if item.claim_slot == "summary":
-                    legacy_summary = (
-                        ClaimModel.statement.not_ilike("MITRE ATT&CK technique %")
-                    )
+                    legacy_summary = ClaimModel.statement.not_ilike("MITRE ATT&CK technique %")
                     existing_summary = await session.scalar(
                         select(ClaimModel.id)
                         .where(ClaimModel.incident_id == incident_id)
@@ -468,15 +452,11 @@ class ClaimService:
                     origin_type=origin_type,
                     origin_actor_user_id=None,
                     origin_code=origin_code,
-                    origin_version=(
-                        None if origin_type is ClaimOriginType.AI else "1"
-                    ),
+                    origin_version=(None if origin_type is ClaimOriginType.AI else "1"),
                     provider=provider if origin_type is ClaimOriginType.AI else None,
                     model=model if origin_type is ClaimOriginType.AI else None,
                     prompt_template_version=(
-                        "incident-summary-v1"
-                        if origin_type is ClaimOriginType.AI
-                        else None
+                        "incident-summary-v1" if origin_type is ClaimOriginType.AI else None
                     ),
                     output_schema_version=(
                         "summary-v1" if origin_type is ClaimOriginType.AI else None
@@ -590,8 +570,7 @@ class ClaimService:
             output_schema_version=None,
             input_fingerprint=input_fingerprint,
             explanation=(
-                f"Deterministic correlation match {match_id}; "
-                "the score is not risk or confidence."
+                f"Deterministic correlation match {match_id}; the score is not risk or confidence."
             ),
             validation_criteria=None,
             missing_evidence=(),
@@ -628,9 +607,7 @@ class ClaimService:
         session.add(model)
         await session.flush()
         for item in evidence:
-            await self._insert_evidence(
-                session, claim, model.id, item, actor_user_id=actor_user_id
-            )
+            await self._insert_evidence(session, claim, model.id, item, actor_user_id=actor_user_id)
         await self._record_event(
             session,
             event_name=CLAIM_CREATED_EVENT,
@@ -729,8 +706,7 @@ class ClaimService:
                     select(FindingRevisionModel.id)
                     .join(
                         IncidentAlertModel,
-                        IncidentAlertModel.alert_id
-                        == FindingRevisionModel.alert_reference_id,
+                        IncidentAlertModel.alert_id == FindingRevisionModel.alert_reference_id,
                     )
                     .where(IncidentAlertModel.incident_id == claim.incident_id)
                     .where(FindingRevisionModel.id == evidence.evidence_id)
@@ -770,9 +746,7 @@ class ClaimService:
                 await session.scalars(
                     select(ClaimAssessmentModel)
                     .where(ClaimAssessmentModel.claim_id == claim.id)
-                    .order_by(
-                        ClaimAssessmentModel.created_at, ClaimAssessmentModel.id
-                    )
+                    .order_by(ClaimAssessmentModel.created_at, ClaimAssessmentModel.id)
                 )
             ).all()
         )

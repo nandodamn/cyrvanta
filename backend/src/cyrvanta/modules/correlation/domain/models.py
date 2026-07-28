@@ -12,9 +12,7 @@ BUCKET_MINUTES = 10
 MAX_CANDIDATES = 500
 MAX_MEMBERS = 32
 MAX_RULES_PER_TRIGGER = 8
-ACTIVE_INCIDENT_STATES = frozenset(
-    {"new", "triaged", "investigating", "contained", "reopened"}
-)
+ACTIVE_INCIDENT_STATES = frozenset({"new", "triaged", "investigating", "contained", "reopened"})
 
 
 class CorrelationLimitExceeded(Exception):
@@ -32,9 +30,7 @@ class SignalSelector:
         if candidate.source_system != self.source_system:
             return False
         observed = (
-            candidate.rule_reference
-            if self.field == "rule_reference"
-            else candidate.category
+            candidate.rule_reference if self.field == "rule_reference" else candidate.category
         )
         return observed == self.value
 
@@ -94,9 +90,7 @@ class CorrelationCandidate:
             sorted(
                 entity.key
                 for entity in self.entities
-                if entity.kind == "IP_ADDRESS"
-                and entity.namespace == "source"
-                and entity.value
+                if entity.kind == "IP_ADDRESS" and entity.namespace == "source" and entity.value
             )
         )
 
@@ -111,9 +105,8 @@ class CorrelationCandidate:
             return False
         if self.normalization_status == "VALID":
             return True
-        return (
-            self.normalization_status == "PARTIAL"
-            and set(self.issue_codes).issubset(rule.partial_issue_allowlist)
+        return self.normalization_status == "PARTIAL" and set(self.issue_codes).issubset(
+            rule.partial_issue_allowlist
         )
 
 
@@ -144,9 +137,7 @@ class CorrelationMatch:
     factors: tuple[FactorResult, ...]
 
     def __post_init__(self) -> None:
-        object.__setattr__(
-            self, "selector_codes", MappingProxyType(dict(self.selector_codes))
-        )
+        object.__setattr__(self, "selector_codes", MappingProxyType(dict(self.selector_codes)))
 
     @property
     def is_simulated(self) -> bool:
@@ -245,9 +236,7 @@ def evaluate_rule(
         ),
     )
     score = sum(factor.contribution for factor in factors)
-    if score < rule.threshold or any(
-        not factor.matched for factor in factors[:3]
-    ):
+    if score < rule.threshold or any(not factor.matched for factor in factors[:3]):
         return None
     grouping_material = "|".join(
         (

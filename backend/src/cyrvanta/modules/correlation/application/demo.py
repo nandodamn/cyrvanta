@@ -25,9 +25,7 @@ from cyrvanta.shared.infrastructure.event_store import SqlEventStore
 
 
 class CanonicalCorrelationDemo:
-    async def generate(
-        self, tenant_id: UUID, correlation_id: UUID
-    ) -> CanonicalDemoResponse:
+    async def generate(self, tenant_id: UUID, correlation_id: UUID) -> CanonicalDemoResponse:
         settings = get_settings()
         event_store = SqlEventStore(SessionFactory, settings.event_max_payload_bytes)
         now = datetime.now(UTC)
@@ -56,10 +54,7 @@ class CanonicalCorrelationDemo:
                     "source_ip": "192.0.2.44",
                 }
                 fingerprint = canonical_payload_sha256(material)
-                object_id = (
-                    f"credential-attack-v2-"
-                    f"{bucket_start.strftime('%Y%m%dT%H%MZ')}-{code}"
-                )
+                object_id = f"credential-attack-v2-{bucket_start.strftime('%Y%m%dT%H%MZ')}-{code}"
                 finding = CanonicalFinding(
                     finding_id=uuid5(
                         NAMESPACE_URL,
@@ -107,9 +102,7 @@ class CanonicalCorrelationDemo:
                     labels={"simulation": "true"},
                     schema_version=1,
                 )
-                result = await ingestion.ingest(
-                    finding, correlation_id=correlation_id
-                )
+                result = await ingestion.ingest(finding, correlation_id=correlation_id)
                 if result.created:
                     created += 1
                 else:

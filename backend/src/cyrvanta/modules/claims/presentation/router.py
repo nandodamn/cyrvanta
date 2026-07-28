@@ -29,12 +29,8 @@ router = APIRouter(tags=["claims"])
 Service = Annotated[ClaimService, Depends(ClaimService)]
 Authenticated = Annotated[SecurityContext, Depends(get_security_context)]
 ClaimRead = Annotated[SecurityContext, Depends(require_permission("claim.read"))]
-ClaimCreatePermission = Annotated[
-    SecurityContext, Depends(require_permission("claim.create"))
-]
-ClaimTranslate = Annotated[
-    SecurityContext, Depends(require_permission("claim.translate"))
-]
+ClaimCreatePermission = Annotated[SecurityContext, Depends(require_permission("claim.create"))]
+ClaimTranslate = Annotated[SecurityContext, Depends(require_permission("claim.translate"))]
 
 
 def correlation_id(request: Request) -> UUID:

@@ -43,9 +43,7 @@ def claim(**overrides: object) -> Claim:
     return Claim(**values)  # type: ignore[arg-type]
 
 
-@pytest.mark.parametrize(
-    "reserved", [ClaimType.DECISION, ClaimType.ACTION, ClaimType.RESULT]
-)
+@pytest.mark.parametrize("reserved", [ClaimType.DECISION, ClaimType.ACTION, ClaimType.RESULT])
 def test_reserved_claim_types_fail_closed(reserved: ClaimType) -> None:
     with pytest.raises(ValueError, match="reserved"):
         claim(claim_type=reserved, confidence=None)

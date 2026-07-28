@@ -48,4 +48,3 @@ def configured_wazuh_connector(tenant_id: UUID) -> SIEMConnectorPort:
         },
     )
     return production_connector_registry().create("wazuh", configuration)
-

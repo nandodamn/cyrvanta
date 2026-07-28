@@ -19,22 +19,16 @@ from cyrvanta.shared.database import Base
 
 class CorrelationRuleVersionModel(Base):
     __tablename__ = "correlation_rule_versions"
-    __table_args__ = (
-        UniqueConstraint("rule_code", "version", name="uq_correlation_rule_version"),
-    )
+    __table_args__ = (UniqueConstraint("rule_code", "version", name="uq_correlation_rule_version"),)
 
-    id: Mapped[UUID] = mapped_column(
-        PGUUID(as_uuid=True), primary_key=True, default=uuid4
-    )
+    id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
     rule_code: Mapped[str] = mapped_column(String(120), nullable=False)
     version: Mapped[str] = mapped_column(String(40), nullable=False)
     status: Mapped[str] = mapped_column(String(16), nullable=False)
     definition: Mapped[dict[str, object]] = mapped_column(JSONB, nullable=False)
     definition_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
     activated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
 class CorrelationMemberModel(Base):
@@ -48,9 +42,7 @@ class CorrelationMemberModel(Base):
         ),
     )
 
-    id: Mapped[UUID] = mapped_column(
-        PGUUID(as_uuid=True), primary_key=True, default=uuid4
-    )
+    id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
     tenant_id: Mapped[UUID] = mapped_column(
         PGUUID(as_uuid=True), ForeignKey("tenants.id"), nullable=False
     )
@@ -70,9 +62,7 @@ class CorrelationMemberModel(Base):
     integration_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), nullable=False)
     source_system: Mapped[str] = mapped_column(String(80), nullable=False)
     is_simulated: Mapped[bool] = mapped_column(Boolean, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
 class CorrelationFactorModel(Base):
@@ -86,9 +76,7 @@ class CorrelationFactorModel(Base):
         ),
     )
 
-    id: Mapped[UUID] = mapped_column(
-        PGUUID(as_uuid=True), primary_key=True, default=uuid4
-    )
+    id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
     tenant_id: Mapped[UUID] = mapped_column(
         PGUUID(as_uuid=True), ForeignKey("tenants.id"), nullable=False
     )
@@ -103,6 +91,4 @@ class CorrelationFactorModel(Base):
         ARRAY(PGUUID(as_uuid=True)), nullable=False
     )
     explanation_code: Mapped[str] = mapped_column(String(160), nullable=False)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

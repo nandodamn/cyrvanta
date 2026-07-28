@@ -30,4 +30,3 @@ class WazuhConnectorConfigV1(BaseModel):
         if not re.fullmatch(r"[A-Za-z0-9._*-]+", value) or value.count("*") > 1:
             raise ValueError("index_pattern contains unsupported characters")
         return value
-

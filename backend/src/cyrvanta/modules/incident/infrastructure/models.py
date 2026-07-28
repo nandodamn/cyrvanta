@@ -45,9 +45,7 @@ class AlertReferenceModel(Base):
 
 class IncidentModel(Base):
     __tablename__ = "incidents"
-    __table_args__ = (
-        UniqueConstraint("id", "tenant_id", name="uq_incidents_id_tenant"),
-    )
+    __table_args__ = (UniqueConstraint("id", "tenant_id", name="uq_incidents_id_tenant"),)
     id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
     tenant_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), ForeignKey("tenants.id"))
     code: Mapped[str] = mapped_column(String, nullable=False)
@@ -100,9 +98,7 @@ class IncidentTimelineModel(Base):
 
 class CorrelationRunModel(Base):
     __tablename__ = "correlation_runs"
-    __table_args__ = (
-        UniqueConstraint("id", "tenant_id", name="uq_correlation_runs_id_tenant"),
-    )
+    __table_args__ = (UniqueConstraint("id", "tenant_id", name="uq_correlation_runs_id_tenant"),)
     id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
     tenant_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), ForeignKey("tenants.id"))
     incident_id: Mapped[UUID | None] = mapped_column(

@@ -1,5 +1,6 @@
 import asyncio
 import logging
+from uuid import UUID
 
 import aio_pika
 
@@ -23,6 +24,13 @@ from cyrvanta.modules.incident.application.correlation import (
 )
 from cyrvanta.modules.integrations.application.finding_ingestion import (
     FINDING_NORMALIZED_EVENT,
+)
+from cyrvanta.modules.threat_knowledge.application.service import (
+    EXPLANATION_FAILED_EVENT,
+    EXPLANATION_GENERATED_EVENT,
+    RISK_ASSESSED_EVENT,
+    THREAT_MAPPING_ASSESSED_EVENT,
+    ThreatEnrichmentService,
 )
 from cyrvanta.shared.config import get_settings
 from cyrvanta.shared.database import SessionFactory
@@ -62,12 +70,32 @@ async def handle_claim_event(event: DomainEvent) -> None:
         raise ValueError("unexpected claim event")
 
 
-async def handle_correlation_event(event: DomainEvent) -> None:
+async def handle_correlation_event(event: DomainEvent, service: ThreatEnrichmentService) -> None:
     if event.event_name not in {
         CORRELATION_MATCHED_EVENT,
         CORRELATION_MEMBER_ADDED_EVENT,
     }:
         raise ValueError("unexpected correlation event")
+    try:
+        incident_id = UUID(str(event.payload["incident_id"]))
+    except (KeyError, TypeError, ValueError) as exc:
+        raise ValueError("correlation event payload is invalid") from exc
+    await service.enrich(
+        event.tenant_id,
+        incident_id,
+        event.correlation_id,
+        causation_id=event.event_id,
+    )
+
+
+async def handle_enrichment_event(event: DomainEvent) -> None:
+    if event.event_name not in {
+        THREAT_MAPPING_ASSESSED_EVENT,
+        RISK_ASSESSED_EVENT,
+        EXPLANATION_GENERATED_EVENT,
+        EXPLANATION_FAILED_EVENT,
+    }:
+        raise ValueError("unexpected enrichment event")
 
 
 async def run() -> None:
@@ -97,8 +125,22 @@ async def run() -> None:
             (CLAIM_ASSESSED_EVENT, 1): lambda _session: handle_claim_event,
             (CLAIM_RELATED_EVENT, 1): lambda _session: handle_claim_event,
             (CLAIM_PRESENTATION_CREATED_EVENT, 1): lambda _session: handle_claim_event,
-            (CORRELATION_MATCHED_EVENT, 1): lambda _session: handle_correlation_event,
-            (CORRELATION_MEMBER_ADDED_EVENT, 1): lambda _session: handle_correlation_event,
+            (CORRELATION_MATCHED_EVENT, 1): lambda session: (
+                lambda event: handle_correlation_event(
+                    event,
+                    ThreatEnrichmentService(session, store.recorder(session)),
+                )
+            ),
+            (CORRELATION_MEMBER_ADDED_EVENT, 1): lambda session: (
+                lambda event: handle_correlation_event(
+                    event,
+                    ThreatEnrichmentService(session, store.recorder(session)),
+                )
+            ),
+            (THREAT_MAPPING_ASSESSED_EVENT, 1): lambda _session: handle_enrichment_event,
+            (RISK_ASSESSED_EVENT, 1): lambda _session: handle_enrichment_event,
+            (EXPLANATION_GENERATED_EVENT, 1): lambda _session: handle_enrichment_event,
+            (EXPLANATION_FAILED_EVENT, 1): lambda _session: handle_enrichment_event,
         },
     )
     try:

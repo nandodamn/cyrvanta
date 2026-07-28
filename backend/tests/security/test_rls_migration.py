@@ -126,10 +126,7 @@ def test_claim_type_specific_invariants_are_database_enforced() -> None:
 
 def test_correlation_migration_is_tenant_scoped_bounded_and_non_destructive() -> None:
     migration = (
-        Path(__file__).parents[2]
-        / "alembic"
-        / "versions"
-        / "0012_deterministic_correlation.py"
+        Path(__file__).parents[2] / "alembic" / "versions" / "0012_deterministic_correlation.py"
     ).read_text(encoding="utf-8")
     for table in (
         "correlation_runs",
@@ -152,13 +149,34 @@ def test_correlation_migration_is_tenant_scoped_bounded_and_non_destructive() ->
 
 def test_correlation_incident_links_use_composite_tenant_foreign_keys() -> None:
     migration = (
-        Path(__file__).parents[2]
-        / "alembic"
-        / "versions"
-        / "0013_correlation_tenant_fks.py"
+        Path(__file__).parents[2] / "alembic" / "versions" / "0013_correlation_tenant_fks.py"
     ).read_text(encoding="utf-8")
     assert "fk_correlation_run_incident_tenant" in migration
     assert "fk_incident_alert_incident_tenant" in migration
     assert "fk_incident_alert_alert_tenant" in migration
     assert "FOREIGN KEY (incident_id, tenant_id)" in migration
     assert "FOREIGN KEY (alert_id, tenant_id)" in migration
+
+
+def test_attack_risk_migration_is_tenant_scoped_bounded_and_append_only() -> None:
+    migration = (
+        Path(__file__).parents[2] / "alembic" / "versions" / "0014_attack_risk_explainability.py"
+    ).read_text(encoding="utf-8")
+    for table in (
+        "attack_releases",
+        "attack_objects",
+        "incident_attack_mappings",
+        "attack_mapping_evidence",
+        "risk_assessments",
+        "risk_assessment_factors",
+        "incident_explanations",
+    ):
+        assert table in migration
+    assert "FORCE ROW LEVEL SECURITY" in migration
+    assert "app.current_tenant_id" in migration
+    assert "num_nonnulls" in migration
+    assert "FOREIGN KEY (incident_id, tenant_id)" in migration
+    assert "FOREIGN KEY (finding_revision_id, tenant_id)" in migration
+    assert "cardinality(selector_codes) BETWEEN 1 AND 32" in migration
+    assert "GRANT SELECT, INSERT ON incident_attack_mappings" in migration
+    assert "ATT&CK or risk data exists" in migration

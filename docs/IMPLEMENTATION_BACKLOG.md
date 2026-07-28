@@ -36,12 +36,11 @@
 - [x] Especificar Etapa 5 — MITRE ATT&CK, riesgo y explicabilidad.
 - [x] Preparar paquete recomendado para resolver las decisiones materiales de
   Etapa 5 sin autorizar implementación.
-- [ ] GATE: aprobar
+- [x] GATE: aprobar
   `PHASE_19_MITRE_RISK_EXPLAINABILITY.md`.
-- [ ] Resolver catálogo baseline, mappings, factores, límites, permisos y
+- [x] Resolver catálogo baseline, mappings, factores, límites, permisos y
   persistencia física de Etapa 5.
-- [ ] Implementar Etapa 5 solo después de aprobar contrato y pendientes
-  materiales.
+- [x] Implementar Etapa 5 conforme al contrato aprobado y ADR 0013.
 - [x] Registrar requisitos humanos de workflows n8n como código para Etapa 7.
 - [ ] GATE: aprobar modelo de decisión y doble aprobación de Etapa 6 antes de
   `request-dual-approval`.
@@ -71,7 +70,7 @@
 - [ ] GATE: aprobar identidad local/LDAP y resolución de colisiones.
 - [ ] GATE: aprobar modelo RBAC y alcance del administrador de plataforma.
 - [ ] GATE: aprobar evidencia, cadena de custodia, auditoría y retención.
-- [ ] Definir riesgo, confianza y versionado mediante aprobación de
+- [x] Definir riesgo, confianza y versionado mediante aprobación de
   `PHASE_19_MITRE_RISK_EXPLAINABILITY.md`.
 - [ ] Definir modos de respuesta y clasificación de impacto.
 

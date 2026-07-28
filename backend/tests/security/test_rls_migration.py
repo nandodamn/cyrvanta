@@ -49,10 +49,7 @@ def test_permission_dependency_is_deny_by_default() -> None:
 
 def test_operations_use_explicit_permissions() -> None:
     migration = (
-        Path(__file__).parents[2]
-        / "alembic"
-        / "versions"
-        / "0005_operations_permissions.py"
+        Path(__file__).parents[2] / "alembic" / "versions" / "0005_operations_permissions.py"
     ).read_text(encoding="utf-8")
     router = (
         Path(__file__).parents[2]
@@ -67,3 +64,17 @@ def test_operations_use_explicit_permissions() -> None:
     assert "response.execute" in migration
     assert 'require_permission("analysis.request")' in router
     assert 'require_permission("response.execute")' in router
+
+
+def test_event_delivery_migration_forces_rls_and_restricts_dispatch() -> None:
+    migration = (
+        Path(__file__).parents[2] / "alembic" / "versions" / "0008_event_delivery_traceability.py"
+    ).read_text(encoding="utf-8")
+    assert "event_outbox" in migration
+    assert "event_inbox" in migration
+    assert "FORCE ROW LEVEL SECURITY" in migration
+    assert "app.current_tenant_id" in migration
+    assert "SECURITY DEFINER" in migration
+    assert "FOR UPDATE SKIP LOCKED" in migration
+    assert "REVOKE ALL ON FUNCTION" in migration
+    assert "tables are not empty" in migration

@@ -8,8 +8,9 @@
 - [x] Ordenar implementación por dependencias.
 - [x] GATE: aprobar D-001 a D-012 del plan estratégico.
 - [x] Especificar envelope, outbox/inbox e idempotencia.
-- [ ] GATE: aprobar `PHASE_15_EVENT_DELIVERY_TRACEABILITY.md`.
-- [ ] Implementar Etapa 1 después de aprobar su contrato.
+- [x] GATE: aprobar `PHASE_15_EVENT_DELIVERY_TRACEABILITY.md`.
+- [x] Implementar Etapa 1.
+- [ ] GATE: especificar y aprobar Etapa 2 — modelo canónico y procedencia.
 
 ## Gobernanza
 

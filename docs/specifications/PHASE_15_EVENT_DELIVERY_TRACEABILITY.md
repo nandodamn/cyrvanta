@@ -1,8 +1,14 @@
 # Fase 15 — Entrega de eventos y trazabilidad asíncrona
 
-**Estado:** DRAFT — propuesta contractual para revisión humana.
+**Estado:** APROBADO E IMPLEMENTADO — autorizado por instrucción humana el
+2026-07-28.
 **Fecha:** 2026-07-28
-**Implementación autorizada:** no.
+**Implementación autorizada:** sí.
+
+**Enmienda técnica registrada durante implementación:** se agrega el exchange
+interno durable `cyrvanta.retry`. RabbitMQ necesita un exchange separado para
+enrutar a colas TTL sin entregar simultáneamente el mismo mensaje a la cola
+principal. Esta corrección preserva los delays, DLX y routing key aprobados.
 
 ## 1. Objetivo
 
@@ -215,6 +221,7 @@ Reglas:
 Exchanges durables:
 
 - `cyrvanta.events` — topic.
+- `cyrvanta.retry` — topic interno para colas TTL.
 - `cyrvanta.deadletter` — topic.
 
 Cola inicial:
@@ -299,6 +306,7 @@ logs internos controlados; nunca dentro del mensaje.
 - `EVENT_HANDLER_TIMEOUT_SECONDS=30`
 - `EVENT_CONSUMER_PREFETCH=16`
 - `EVENT_RETRY_DELAYS_SECONDS=5,30,300`
+- `OUTBOX_POLL_INTERVAL_SECONDS=1`
 
 Todos tendrán límites seguros en `Settings`. El nombre de exchanges y colas es
 constante de infraestructura versionada, no entrada libre del usuario.
@@ -432,3 +440,47 @@ Para autorizar implementación se debe confirmar:
 8. Downgrade no destructivo cuando existan filas.
 
 La aprobación debe registrarse antes de crear migración o código.
+
+## 20. Resultado de implementación
+
+Implementado:
+
+- migración `0008_event_delivery`;
+- envelope v1 y `DomainEvent` sin dependencias de infraestructura;
+- `EventRecorder` como puerto de aplicación;
+- outbox/inbox tenant-scoped con RLS forzada;
+- funciones de dispatch con privilegios mínimos, leases y `SKIP LOCKED`;
+- exchanges, cola principal, tres retries TTL y DLQ durables;
+- publisher confirms, mensajes persistentes e idempotencia de consumidor;
+- worker real y comando de probe sintético;
+- configuración validada y runbook;
+- pruebas de envelope, payload, causalidad, retry, DLQ, migración y seguridad.
+
+Validación observada:
+
+- Ruff: correcto.
+- mypy estricto: correcto en 63 archivos fuente.
+- pytest: 46 pruebas aprobadas.
+- frontend: 4 pruebas aprobadas y build de producción correcto.
+- migración aplicada en PostgreSQL del entorno Compose.
+- evento sintético real: outbox `published`, inbox `completed`.
+- redelivery controlada: outbox publicó dos veces e inbox mantuvo un único
+  efecto, registrando `event_duplicate`.
+- exchanges y colas verificadas como durables en RabbitMQ.
+
+Preparación para datos reales:
+
+- productores futuros registrarán eventos mediante `EventRecorder`;
+- handlers futuros se construirán dentro de una transacción tenant-scoped;
+- no es necesario modificar el envelope, outbox, inbox o worker para sustituir
+  el probe por datos Wazuh/OpenSearch u otros adaptadores aprobados;
+- ningún dato sintético se presenta como telemetría real.
+
+Limitaciones conocidas:
+
+- el único evento registrado es el probe sintético;
+- no se ejecutó una falla transitoria real contra una dependencia externa;
+  retry y DLQ se verificaron mediante pruebas y topología real;
+- las métricas son actualmente logs estructurados y métricas nativas de
+  RabbitMQ; un exportador consolidado queda para observabilidad;
+- TLS/HA de RabbitMQ corresponde al despliegue de producción.

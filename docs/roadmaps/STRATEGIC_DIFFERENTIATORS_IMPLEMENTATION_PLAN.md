@@ -49,6 +49,9 @@ producirá su especificación contractual revisable.
 **Resultado:** infraestructura común que conserva tenant, evento, correlación,
 causalidad, versión e idempotencia.
 
+**Estado de implementación:** COMPLETADA el 2026-07-28. Ver
+`docs/specifications/PHASE_15_EVENT_DELIVERY_TRACEABILITY.md`.
+
 **Entregables propuestos:**
 
 - Envelope y semántica de entrega formalizados.

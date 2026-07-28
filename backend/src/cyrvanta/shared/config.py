@@ -16,6 +16,13 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+asyncpg://cyrvanta:change-me@postgres:5432/cyrvanta"
     redis_url: str = "redis://redis:6379/0"
     rabbitmq_url: str = "amqp://cyrvanta:change-me@rabbitmq:5672/"
+    event_max_payload_bytes: int = Field(default=262_144, ge=1024, le=1_048_576)
+    outbox_batch_size: int = Field(default=50, ge=1, le=500)
+    outbox_lease_seconds: int = Field(default=60, ge=1, le=3600)
+    outbox_poll_interval_seconds: float = Field(default=1.0, ge=0.1, le=60)
+    event_handler_timeout_seconds: int = Field(default=30, ge=1, le=3600)
+    event_consumer_prefetch: int = Field(default=16, ge=1, le=500)
+    event_retry_delays_seconds: str = "5,30,300"
     jwt_secret: str = Field(min_length=32)
     integration_encryption_key: str = Field(min_length=43, max_length=44)
     jwt_algorithm: str = "HS256"
@@ -49,6 +56,15 @@ class Settings(BaseSettings):
     @property
     def allowed_origins(self) -> list[str]:
         return [item.strip() for item in self.cors_origins.split(",") if item.strip()]
+
+    @property
+    def retry_delays_seconds(self) -> tuple[int, ...]:
+        values = tuple(
+            int(item.strip()) for item in self.event_retry_delays_seconds.split(",") if item.strip()
+        )
+        if not values or len(values) > 5 or any(value < 1 or value > 3600 for value in values):
+            raise ValueError("EVENT_RETRY_DELAYS_SECONDS must contain 1-5 values from 1 to 3600")
+        return values
 
     @property
     def secure_session_cookie(self) -> bool:

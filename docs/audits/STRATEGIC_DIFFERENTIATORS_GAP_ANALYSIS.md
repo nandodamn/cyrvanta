@@ -204,6 +204,10 @@ límites de profundidad, nodos y período.
 **Esfuerzo:** L transversal
 **Prioridad:** P0 transversal
 
+**Actualización 2026-07-28:** la infraestructura de entrega asíncrona ya dispone
+de outbox/inbox, RLS, RabbitMQ, deduplicación, retry y DLQ. La capacidad general
+sigue `PARTIAL` hasta enlazar señales, claims, decisiones, acciones y resultados.
+
 ### Evidencia existente
 
 - `audit_events`, timeline append-oriented y correlation ID HTTP.

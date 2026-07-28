@@ -136,6 +136,12 @@ con miembros, factores y versión, sin LLM como autoridad.
 **Resultado:** ATT&CK versionado, riesgo determinista y explicación basada en
 evidencia.
 
+**Estado de especificación:** DRAFT PARA REVISIÓN el 2026-07-28. Ver
+`docs/specifications/PHASE_19_MITRE_RISK_EXPLAINABILITY.md`.
+
+**Estado de implementación:** BLOQUEADA hasta aprobación humana del contrato y
+sus decisiones materiales.
+
 **Trabajo:**
 
 - Importación STIX con versión y procedencia.
@@ -165,6 +171,9 @@ cualquier cambio de inputs invalida la autorización.
 ## Etapa 7 — ejecución, rollback y resultado
 
 **Resultado:** ejecuciones durables mediante adaptador reemplazable.
+
+**Entrada obligatoria registrada:**
+`docs/requirements/N8N_WORKFLOWS_AS_CODE_REQUIREMENTS.md`.
 
 **Trabajo:**
 
@@ -250,6 +259,7 @@ API/eventos, permisos, auditoría, RLS, i18n, observabilidad, pruebas y rollback
 
 ## Próxima decisión humana
 
-Revisar y aprobar la especificación de Etapa 5 antes de diseñar MITRE, riesgo y
-explicabilidad. Las puertas independientes de retención por tenant y polling
-periódico Wazuh continúan abiertas.
+Revisar y aprobar o enmendar
+`docs/specifications/PHASE_19_MITRE_RISK_EXPLAINABILITY.md`. Las puertas
+independientes de retención por tenant y polling periódico Wazuh continúan
+abiertas.

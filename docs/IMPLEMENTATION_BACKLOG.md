@@ -33,6 +33,22 @@
   persistencia física de Etapa 4.
 - [x] Implementar Etapa 4 solo después de aprobar contrato y pendientes
   materiales.
+- [x] Especificar Etapa 5 — MITRE ATT&CK, riesgo y explicabilidad.
+- [x] Preparar paquete recomendado para resolver las decisiones materiales de
+  Etapa 5 sin autorizar implementación.
+- [ ] GATE: aprobar
+  `PHASE_19_MITRE_RISK_EXPLAINABILITY.md`.
+- [ ] Resolver catálogo baseline, mappings, factores, límites, permisos y
+  persistencia física de Etapa 5.
+- [ ] Implementar Etapa 5 solo después de aprobar contrato y pendientes
+  materiales.
+- [x] Registrar requisitos humanos de workflows n8n como código para Etapa 7.
+- [ ] GATE: aprobar modelo de decisión y doble aprobación de Etapa 6 antes de
+  `request-dual-approval`.
+- [ ] Especificar Etapa 7 incorporando
+  `N8N_WORKFLOWS_AS_CODE_REQUIREMENTS.md`.
+- [ ] Implementar workflows n8n, scripts y callbacks únicamente después de
+  aprobar Etapas 5, 6 y 7.
 
 ## Gobernanza
 
@@ -55,7 +71,8 @@
 - [ ] GATE: aprobar identidad local/LDAP y resolución de colisiones.
 - [ ] GATE: aprobar modelo RBAC y alcance del administrador de plataforma.
 - [ ] GATE: aprobar evidencia, cadena de custodia, auditoría y retención.
-- [ ] Definir reglas de correlación, riesgo, confianza y versionado.
+- [ ] Definir riesgo, confianza y versionado mediante aprobación de
+  `PHASE_19_MITRE_RISK_EXPLAINABILITY.md`.
 - [ ] Definir modos de respuesta y clasificación de impacto.
 
 ## Datos y contratos — no iniciar antes de los GATE

@@ -91,6 +91,9 @@ del proveedor ni poder cambiar el tenant.
 **Resultado:** separación persistente y visible entre observación, derivación,
 inferencia, hipótesis, recomendación, decisión, acción y resultado.
 
+**Estado de especificación:** DRAFT pendiente de aprobación. Ver
+`docs/specifications/PHASE_17_CLAIM_LEDGER.md`.
+
 **Trabajo:**
 
 - Especificar agregado, estados, validaciones y evidencia.
@@ -236,5 +239,6 @@ API/eventos, permisos, auditoría, RLS, i18n, observabilidad, pruebas y rollback
 
 ## Próxima decisión humana
 
-Especificar la Etapa 3 — ledger de claims. En paralelo, retención por tenant y
-activación periódica de Wazuh conservan puertas operativas separadas.
+Revisar y aprobar, enmendar o rechazar el contrato DRAFT de Etapa 3 en
+`docs/specifications/PHASE_17_CLAIM_LEDGER.md`. Todavía no crear su migración,
+API, permisos ni eventos.

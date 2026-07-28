@@ -19,6 +19,11 @@
   físicos.
 - [ ] GATE: aprobar retención por tenant y mínimos de plataforma.
 - [ ] GATE: aprobar frecuencia, cursor durable y activación scheduler Wazuh.
+- [x] Especificar Etapa 3 — ledger de claims.
+- [ ] GATE: aprobar `PHASE_17_CLAIM_LEDGER.md`.
+- [ ] Resolver límites, permisos humanos, retención y schema IA de Etapa 3.
+- [ ] Implementar Etapa 3 solo después de aprobar contrato y pendientes
+  materiales.
 
 ## Gobernanza
 

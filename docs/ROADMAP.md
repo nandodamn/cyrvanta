@@ -10,11 +10,14 @@
   `docs/specifications/PHASE_15_EVENT_DELIVERY_TRACEABILITY.md`.
 - Contrato aprobado e implementado de Etapa 2:
   `docs/specifications/PHASE_16_CANONICAL_SECURITY_MODEL_PROVENANCE.md`.
+- Contrato DRAFT de Etapa 3:
+  `docs/specifications/PHASE_17_CLAIM_LEDGER.md`.
 
 Las decisiones D-001 a D-012 están aprobadas. Las Etapas 1 y 2 están
 implementadas y validadas. La siguiente puerta estratégica es especificar el
-ledger de claims de Etapa 3; retención y polling periódico Wazuh conservan
-puertas operativas independientes.
+ledger de claims de Etapa 3. Su contrato está redactado y pendiente de
+aprobación; retención y polling periódico Wazuh conservan puertas operativas
+independientes.
 
 Cada fase requiere aprobación de sus especificaciones y criterios antes de
 autorizar contratos o implementación de la siguiente.

@@ -24,6 +24,13 @@
 - [x] Resolver límites, permisos humanos, retención y schema IA de Etapa 3.
 - [x] Implementar Etapa 3 solo después de aprobar contrato y pendientes
   materiales.
+- [x] Especificar Etapa 4 — correlación determinista multi-fuente.
+- [ ] GATE: aprobar
+  `PHASE_18_DETERMINISTIC_MULTI_SOURCE_CORRELATION.md`.
+- [ ] Resolver ventanas, factores, límites, política de incidentes y
+  persistencia física de Etapa 4.
+- [ ] Implementar Etapa 4 solo después de aprobar contrato y pendientes
+  materiales.
 
 ## Gobernanza
 

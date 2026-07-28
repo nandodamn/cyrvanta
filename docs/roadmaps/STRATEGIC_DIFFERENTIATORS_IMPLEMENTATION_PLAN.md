@@ -113,6 +113,11 @@ hecho y no puede cruzar tenants.
 
 **Resultado:** correlaciones versionadas, explicables y validables.
 
+**Estado de especificación:** DRAFT PARA REVISIÓN HUMANA el 2026-07-28. Ver
+`docs/specifications/PHASE_18_DETERMINISTIC_MULTI_SOURCE_CORRELATION.md`.
+
+**Estado de implementación:** NO AUTORIZADA.
+
 **Trabajo:**
 
 - Selección acotada de candidatos y resolución tenant-scoped.
@@ -243,6 +248,8 @@ API/eventos, permisos, auditoría, RLS, i18n, observabilidad, pruebas y rollback
 
 ## Próxima decisión humana
 
-Especificar y revisar la Etapa 4 — correlación determinista multi-fuente— antes
-de crear nuevas tablas, contratos o endpoints. Las puertas independientes de
-retención por tenant y polling periódico Wazuh continúan abiertas.
+Revisar, enmendar o aprobar el contrato DRAFT de Etapa 4 en
+`docs/specifications/PHASE_18_DETERMINISTIC_MULTI_SOURCE_CORRELATION.md`. No
+crear todavía tablas, contratos, handlers o endpoints. Las puertas
+independientes de retención por tenant y polling periódico Wazuh continúan
+abiertas.

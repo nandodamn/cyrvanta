@@ -1,7 +1,8 @@
 # Fase 18 — Correlación determinista multi-fuente
 
-**Estado:** DRAFT PARA REVISIÓN HUMANA  
-**Fecha:** 2026-07-28  
+**Estado:** DRAFT PARA REVISIÓN HUMANA
+
+**Fecha:** 2026-07-28
 **Implementación autorizada:** no.
 
 ## 1. Objetivo

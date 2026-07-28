@@ -165,6 +165,41 @@ const claimSchema = z.object({
   presentations: z.record(z.string()),
   created_at: z.string(),
 });
+const correlationSchema = z.object({
+  id: z.string().uuid(),
+  incident_id: z.string().uuid(),
+  rule_code: z.string(),
+  rule_version: z.string(),
+  score: z.number().int().min(0).max(100),
+  threshold: z.number().int().min(0).max(100),
+  result_type: z.string(),
+  explanation: z.string(),
+  is_simulated: z.boolean(),
+  window_start: z.string().nullable(),
+  window_end: z.string().nullable(),
+  claim_id: z.string().uuid().nullable(),
+  created_at: z.string(),
+  members: z.array(
+    z.object({
+      finding_id: z.string().uuid(),
+      revision_id: z.string().uuid(),
+      role: z.string(),
+      selector_code: z.string(),
+      effective_at: z.string(),
+      source_system: z.string(),
+      is_simulated: z.boolean(),
+    }),
+  ),
+  factors: z.array(
+    z.object({
+      factor_code: z.string(),
+      matched: z.boolean(),
+      weight: z.number().int(),
+      contribution: z.number().int(),
+      explanation_code: z.string(),
+    }),
+  ),
+});
 const playbookConnectorSchema = z.object({
   node_type: z.string(),
   name: z.string(),
@@ -193,6 +228,7 @@ const playbookManagementSchema = z.object({
 export type IntegrationHealth = z.infer<typeof integrationHealthSchema>;
 export type Analysis = z.infer<typeof analysisSchema>;
 export type Claim = z.infer<typeof claimSchema>;
+export type Correlation = z.infer<typeof correlationSchema>;
 export type PlaybookCatalog = z.infer<typeof playbookCatalogSchema>;
 export type PlaybookManagement = z.infer<typeof playbookManagementSchema>;
 export type ListQuery = {
@@ -427,6 +463,11 @@ export async function getTimeline(id: string): Promise<TimelineEntry[]> {
 export async function getClaims(id: string): Promise<Claim[]> {
   return z.array(claimSchema).parse(await authorized(`/api/v1/incidents/${id}/claims?limit=25`));
 }
+export async function getCorrelations(id: string): Promise<Correlation[]> {
+  return z
+    .array(correlationSchema)
+    .parse(await authorized(`/api/v1/incidents/${id}/correlations?limit=25`));
+}
 export async function generateDemoScenario() {
   return z
     .object({
@@ -436,6 +477,17 @@ export async function generateDemoScenario() {
       idempotent_replay: z.boolean(),
     })
     .parse(await authorizedMutation("/api/v1/demo/scenarios/credential-attack", "POST", {}));
+}
+export async function generateCanonicalDemoScenario() {
+  return z
+    .object({
+      scenario: z.string(),
+      findings_created: z.number().int().nonnegative(),
+      duplicates: z.number().int().nonnegative(),
+      correlation_queued: z.boolean(),
+      correlation_id: z.string().uuid(),
+    })
+    .parse(await authorizedMutation("/api/v1/demo/scenarios/credential-attack-v2", "POST", {}));
 }
 export async function transitionIncident(
   id: string,

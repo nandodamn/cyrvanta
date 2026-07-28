@@ -10,6 +10,7 @@ from cyrvanta.modules.incident.application.schemas import (
     DemoScenarioResponse,
     IncidentAssign,
     IncidentCreate,
+    IncidentResponse,
     IncidentTransition,
     IncidentUpdate,
     TimelineCreate,
@@ -306,11 +307,11 @@ class IncidentService:
                     CorrelationRunModel.input_fingerprint == fingerprint,
                 )
             )
-            if existing_run is not None:
+            if existing_run is not None and existing_run.incident_id is not None:
                 incident = await self._get(session, existing_run.incident_id)
                 return DemoScenarioResponse(
                     scenario="credential-attack-v1",
-                    incident=incident,
+                    incident=IncidentResponse.model_validate(incident),
                     alerts_created=0,
                     idempotent_replay=True,
                 )
@@ -370,6 +371,15 @@ class IncidentService:
                     incident_id=incident.id,
                     rule_code="credential-attack",
                     rule_version="1",
+                    rule_definition_sha256=sha256(b"legacy-demo-v0").hexdigest(),
+                    grouping_key_hash=fingerprint,
+                    score=0,
+                    threshold=0,
+                    window_start=None,
+                    window_end=None,
+                    claim_id=None,
+                    result_type="LEGACY_SIMULATED_V0",
+                    schema_version=0,
                     explanation=(
                         "Four synthetic signals share tenant, asset, identity, "
                         "category, and a ten-minute window."
@@ -391,7 +401,7 @@ class IncidentService:
             )
             return DemoScenarioResponse(
                 scenario="credential-attack-v1",
-                incident=incident,
+                incident=IncidentResponse.model_validate(incident),
                 alerts_created=len(alerts),
                 idempotent_replay=False,
             )

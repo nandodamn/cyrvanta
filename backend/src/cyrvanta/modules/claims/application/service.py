@@ -541,6 +541,81 @@ class ClaimService:
                 created.append(inserted_id)
         return tuple(created)
 
+    async def record_correlation_match(
+        self,
+        session: AsyncSession,
+        *,
+        tenant_id: UUID,
+        incident_id: UUID,
+        match_id: UUID,
+        rule_code: str,
+        rule_version: str,
+        score: int,
+        input_fingerprint: str,
+        revision_ids: tuple[UUID, ...],
+        is_simulated: bool,
+        correlation_id: UUID,
+        causation_id: UUID,
+    ) -> UUID:
+        await self._incident(session, incident_id)
+        idempotency_key = sha256(
+            f"{tenant_id}|{incident_id}|correlation|{match_id}".encode()
+        ).hexdigest()
+        existing = await session.scalar(
+            select(ClaimModel.id).where(
+                ClaimModel.incident_id == incident_id,
+                ClaimModel.idempotency_key == idempotency_key,
+            )
+        )
+        if isinstance(existing, UUID):
+            return existing
+        claim = Claim(
+            claim_id=uuid4(),
+            tenant_id=tenant_id,
+            incident_id=incident_id,
+            claim_type=ClaimType.DERIVED_FACT,
+            statement=(
+                f"Rule {rule_code} version {rule_version} correlated "
+                f"{len(revision_ids)} finding revisions with score {score}."
+            ),
+            language_code="und",
+            confidence=None,
+            origin_type=ClaimOriginType.RULE,
+            origin_actor_user_id=None,
+            origin_code=rule_code,
+            origin_version=rule_version,
+            provider=None,
+            model=None,
+            prompt_template_version=None,
+            output_schema_version=None,
+            input_fingerprint=input_fingerprint,
+            explanation=(
+                f"Deterministic correlation match {match_id}; "
+                "the score is not risk or confidence."
+            ),
+            validation_criteria=None,
+            missing_evidence=(),
+            is_simulated=is_simulated,
+            correlation_id=correlation_id,
+            causation_id=causation_id,
+            created_at=datetime.now(UTC),
+            idempotency_key=idempotency_key,
+        )
+        model = await self._insert_claim(
+            session,
+            claim,
+            [
+                EvidenceInput(
+                    evidence_type="FINDING_REVISION",
+                    evidence_id=revision_id,
+                    relationship="SUPPORTS",
+                )
+                for revision_id in revision_ids
+            ],
+            actor_user_id=None,
+        )
+        return model.id
+
     async def _insert_claim(
         self,
         session: AsyncSession,
@@ -568,6 +643,7 @@ class ClaimService:
                 "origin_type": claim.origin_type.value,
                 "schema_version": claim.schema_version,
             },
+            causation_id=claim.causation_id,
         )
         return model
 
@@ -788,6 +864,7 @@ class ClaimService:
         claim_id: UUID,
         correlation_id: UUID,
         payload: dict[str, object],
+        causation_id: UUID | None = None,
     ) -> None:
         await self._events.recorder(session).add(
             DomainEvent.create(
@@ -796,6 +873,7 @@ class ClaimService:
                 aggregate_type="claim",
                 aggregate_id=claim_id,
                 correlation_id=correlation_id,
+                causation_id=causation_id,
                 producer="claim_ledger",
                 payload={
                     "claim_id": str(claim_id),

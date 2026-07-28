@@ -100,11 +100,25 @@ class IncidentTimelineModel(Base):
 
 class CorrelationRunModel(Base):
     __tablename__ = "correlation_runs"
+    __table_args__ = (
+        UniqueConstraint("id", "tenant_id", name="uq_correlation_runs_id_tenant"),
+    )
     id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
     tenant_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), ForeignKey("tenants.id"))
-    incident_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), ForeignKey("incidents.id"))
+    incident_id: Mapped[UUID | None] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("incidents.id")
+    )
     rule_code: Mapped[str] = mapped_column(String, nullable=False)
     rule_version: Mapped[str] = mapped_column(String, nullable=False)
+    rule_definition_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    grouping_key_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    score: Mapped[int] = mapped_column(Integer, nullable=False)
+    threshold: Mapped[int] = mapped_column(Integer, nullable=False)
+    window_start: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    window_end: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    claim_id: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True))
+    result_type: Mapped[str] = mapped_column(String(32), nullable=False, default="MATCHED")
+    schema_version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     explanation: Mapped[str] = mapped_column(Text, nullable=False)
     input_fingerprint: Mapped[str] = mapped_column(String, nullable=False)
     is_simulated: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)

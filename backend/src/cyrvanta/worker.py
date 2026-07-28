@@ -3,11 +3,23 @@ import logging
 
 import aio_pika
 
+from cyrvanta.modules.claims.application.correlation import ClaimCorrelationAdapter
 from cyrvanta.modules.claims.application.service import (
     CLAIM_ASSESSED_EVENT,
     CLAIM_CREATED_EVENT,
     CLAIM_PRESENTATION_CREATED_EVENT,
     CLAIM_RELATED_EVENT,
+)
+from cyrvanta.modules.correlation.application.service import (
+    CORRELATION_MATCHED_EVENT,
+    CORRELATION_MEMBER_ADDED_EVENT,
+    CorrelationService,
+)
+from cyrvanta.modules.correlation.infrastructure.repository import (
+    SqlCorrelationRepository,
+)
+from cyrvanta.modules.incident.application.correlation import (
+    IncidentCorrelationAdapter,
 )
 from cyrvanta.modules.integrations.application.finding_ingestion import (
     FINDING_NORMALIZED_EVENT,
@@ -30,10 +42,13 @@ async def handle_traceability_probe(event: DomainEvent) -> None:
         raise ValueError("unexpected traceability event")
 
 
-async def handle_normalized_finding(event: DomainEvent) -> None:
-    # Later stages attach correlation handlers; durable inbox is the current effect.
+async def handle_normalized_finding(
+    event: DomainEvent,
+    service: CorrelationService,
+) -> None:
     if event.event_name != FINDING_NORMALIZED_EVENT:
         raise ValueError("unexpected normalized finding event")
+    await service.handle_normalized_finding(event)
 
 
 async def handle_claim_event(event: DomainEvent) -> None:
@@ -45,6 +60,14 @@ async def handle_claim_event(event: DomainEvent) -> None:
     }
     if event.event_name not in expected:
         raise ValueError("unexpected claim event")
+
+
+async def handle_correlation_event(event: DomainEvent) -> None:
+    if event.event_name not in {
+        CORRELATION_MATCHED_EVENT,
+        CORRELATION_MEMBER_ADDED_EVENT,
+    }:
+        raise ValueError("unexpected correlation event")
 
 
 async def run() -> None:
@@ -59,11 +82,23 @@ async def run() -> None:
         settings,
         {
             (TRACEABILITY_EVENT, 1): lambda _session: handle_traceability_probe,
-            (FINDING_NORMALIZED_EVENT, 1): lambda _session: handle_normalized_finding,
+            (FINDING_NORMALIZED_EVENT, 1): lambda session: (
+                lambda event: handle_normalized_finding(
+                    event,
+                    CorrelationService(
+                        SqlCorrelationRepository(session),
+                        IncidentCorrelationAdapter(session),
+                        ClaimCorrelationAdapter(session),
+                        store.recorder(session),
+                    ),
+                )
+            ),
             (CLAIM_CREATED_EVENT, 1): lambda _session: handle_claim_event,
             (CLAIM_ASSESSED_EVENT, 1): lambda _session: handle_claim_event,
             (CLAIM_RELATED_EVENT, 1): lambda _session: handle_claim_event,
             (CLAIM_PRESENTATION_CREATED_EVENT, 1): lambda _session: handle_claim_event,
+            (CORRELATION_MATCHED_EVENT, 1): lambda _session: handle_correlation_event,
+            (CORRELATION_MEMBER_ADDED_EVENT, 1): lambda _session: handle_correlation_event,
         },
     )
     try:

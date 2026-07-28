@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { getClaims, getIncidents, getPlaybooks, login } from "../src/api";
+import { getClaims, getCorrelations, getIncidents, getPlaybooks, login } from "../src/api";
 
 describe("bounded list requests", () => {
   afterEach(() => {
@@ -140,6 +140,64 @@ describe("bounded list requests", () => {
     expect(fetchMock).toHaveBeenNthCalledWith(
       2,
       `/api/v1/incidents/${incidentId}/claims?limit=25`,
+      expect.objectContaining({ credentials: "include" }),
+    );
+  });
+
+  it("validates a bounded deterministic correlation projection", async () => {
+    const incidentId = "00000000-0000-0000-0000-000000000020";
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            access_token: "synthetic-access-token",
+            token_type: "bearer",
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify([
+            {
+              id: "00000000-0000-0000-0000-000000000021",
+              incident_id: incidentId,
+              rule_code: "credential-attack",
+              rule_version: "2",
+              score: 85,
+              threshold: 85,
+              result_type: "MATCHED",
+              explanation: "deterministic",
+              is_simulated: true,
+              window_start: "2026-07-28T12:00:00Z",
+              window_end: "2026-07-28T12:10:00Z",
+              claim_id: "00000000-0000-0000-0000-000000000022",
+              created_at: "2026-07-28T12:05:00Z",
+              members: [],
+              factors: [
+                {
+                  factor_code: "exact_source_ip",
+                  matched: true,
+                  weight: 40,
+                  contribution: 40,
+                  explanation_code: "correlation.factor.exact_source_ip",
+                },
+              ],
+            },
+          ]),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        ),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await login("tenant-demo", "demo@example.invalid", "not-a-real-password", false);
+    const correlations = await getCorrelations(incidentId);
+
+    expect(correlations[0].score).toBe(85);
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      `/api/v1/incidents/${incidentId}/correlations?limit=25`,
       expect.objectContaining({ credentials: "include" }),
     );
   });

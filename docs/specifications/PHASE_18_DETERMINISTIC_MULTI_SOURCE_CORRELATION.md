@@ -1,9 +1,10 @@
 # Fase 18 — Correlación determinista multi-fuente
 
-**Estado:** DRAFT PARA REVISIÓN HUMANA
+**Estado:** IMPLEMENTADO Y VALIDADO
+el 2026-07-28.
 
 **Fecha:** 2026-07-28
-**Implementación autorizada:** no.
+**Implementación autorizada:** sí; completada el 2026-07-28.
 
 ## 1. Objetivo
 
@@ -756,8 +757,8 @@ Se recomienda resolver los puntos anteriores de la siguiente forma:
     correlación real; no se crean nuevas filas directas de demo en las
     relaciones de Etapa 4.
 
-Este paquete continúa siendo una recomendación DRAFT. Sus números y semántica
-no son vinculantes hasta aprobación humana explícita.
+El paquete fue aprobado por instrucción humana el 2026-07-28 y queda registrado
+en ADR 0012.
 
 ## 29. Criterios de aprobación
 
@@ -776,5 +777,33 @@ Para autorizar implementación se debe confirmar o enmendar:
 11. seguridad, pruebas y rollback;
 12. decisiones y paquete recomendado de sección 28.
 
-Hasta registrar aprobación humana, no se crean modelos, migraciones, endpoints,
-permisos, eventos, handlers ni UI para esta etapa.
+La aprobación humana fue registrada el 2026-07-28. La implementación debe
+respetar el paquete completo y documentar cualquier enmienda técnica antes de
+aplicarla.
+
+## 30. Resultado de implementación
+
+La Etapa 4 fue implementada y validada el 2026-07-28:
+
+- el motor puro aplica matching exacto por IP, bucket UTC de diez minutos,
+  factores, threshold y límites aprobados, sin imports de proveedor;
+- las migraciones `0012_deterministic_correlation` y
+  `0013_correlation_tenant_fks` evolucionan la raíz histórica, agregan reglas,
+  miembros y factores, habilitan RLS y refuerzan relaciones con claves foráneas
+  tenant-scoped;
+- el worker consume `security.finding.normalized`, conserva idempotencia y
+  confirma match, incidente, timeline, claim y outbox en la misma unidad de
+  trabajo PostgreSQL;
+- la API y la UI bilingüe permiten consultar explicación, miembros y factores;
+- el escenario `credential-attack-v2` atraviesa la ingesta canónica y permanece
+  marcado como simulado;
+- la secuencia Wazuh versionada usa el mismo contrato normalizado y el mismo
+  motor, sin presentar fixtures como telemetría real;
+- se verificaron Ruff, mypy estricto, 71 pruebas backend, formato, ESLint,
+  TypeScript, 6 pruebas frontend y build de producción;
+- Docker Compose quedó saludable y PostgreSQL confirmó la revisión
+  `0013_correlation_tenant_fks`.
+
+No forman parte de este cierre el polling periódico Wazuh, la política de
+retención ni replay administrativo: conservan sus puertas de aprobación
+independientes.

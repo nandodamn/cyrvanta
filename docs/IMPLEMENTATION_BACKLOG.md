@@ -27,11 +27,11 @@
 - [x] Especificar Etapa 4 — correlación determinista multi-fuente.
 - [x] Preparar paquete recomendado para resolver las decisiones materiales de
   Etapa 4 sin autorizar implementación.
-- [ ] GATE: aprobar
+- [x] GATE: aprobar
   `PHASE_18_DETERMINISTIC_MULTI_SOURCE_CORRELATION.md`.
-- [ ] Resolver ventanas, factores, límites, política de incidentes y
+- [x] Resolver ventanas, factores, límites, política de incidentes y
   persistencia física de Etapa 4.
-- [ ] Implementar Etapa 4 solo después de aprobar contrato y pendientes
+- [x] Implementar Etapa 4 solo después de aprobar contrato y pendientes
   materiales.
 
 ## Gobernanza

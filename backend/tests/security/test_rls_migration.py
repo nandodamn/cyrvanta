@@ -122,3 +122,43 @@ def test_claim_type_specific_invariants_are_database_enforced() -> None:
     assert "ck_claim_hypothesis_missing" in migration
     assert "cardinality(missing_evidence) > 0" in migration
     assert "ck_claim_nondeterministic_explanation" in migration
+
+
+def test_correlation_migration_is_tenant_scoped_bounded_and_non_destructive() -> None:
+    migration = (
+        Path(__file__).parents[2]
+        / "alembic"
+        / "versions"
+        / "0012_deterministic_correlation.py"
+    ).read_text(encoding="utf-8")
+    for table in (
+        "correlation_runs",
+        "correlation_members",
+        "correlation_factors",
+    ):
+        assert table in migration
+    assert "FORCE ROW LEVEL SECURITY" in migration
+    assert "app.current_tenant_id" in migration
+    assert "fk_correlation_member_revision_tenant" in migration
+    assert "uq_correlation_member_revision" in migration
+    assert "candidate_limit" in migration
+    assert "member_limit" in migration
+    assert "correlation history exists" in migration
+    assert "REVOKE UPDATE, DELETE ON correlation_runs" in migration
+    assert "GRANT UPDATE (incident_id, claim_id)" in migration
+    assert "correlation.replay" in migration
+    assert "'correlation.read','correlation.evaluate'" in migration
+
+
+def test_correlation_incident_links_use_composite_tenant_foreign_keys() -> None:
+    migration = (
+        Path(__file__).parents[2]
+        / "alembic"
+        / "versions"
+        / "0013_correlation_tenant_fks.py"
+    ).read_text(encoding="utf-8")
+    assert "fk_correlation_run_incident_tenant" in migration
+    assert "fk_incident_alert_incident_tenant" in migration
+    assert "fk_incident_alert_alert_tenant" in migration
+    assert "FOREIGN KEY (incident_id, tenant_id)" in migration
+    assert "FOREIGN KEY (alert_id, tenant_id)" in migration

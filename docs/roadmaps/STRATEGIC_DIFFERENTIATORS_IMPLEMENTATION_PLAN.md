@@ -113,10 +113,12 @@ hecho y no puede cruzar tenants.
 
 **Resultado:** correlaciones versionadas, explicables y validables.
 
-**Estado de especificación:** DRAFT PARA REVISIÓN HUMANA el 2026-07-28. Ver
+**Estado de especificación:** APROBADA PARA IMPLEMENTACIÓN el 2026-07-28. Ver
 `docs/specifications/PHASE_18_DETERMINISTIC_MULTI_SOURCE_CORRELATION.md`.
 
-**Estado de implementación:** NO AUTORIZADA.
+**Estado de implementación:** COMPLETADA el 2026-07-28. Incluye motor
+determinista, persistencia tenant-scoped, incidentes y claims idempotentes,
+eventos durables, API, UI bilingüe y escenario canónico v2.
 
 **Trabajo:**
 
@@ -248,9 +250,6 @@ API/eventos, permisos, auditoría, RLS, i18n, observabilidad, pruebas y rollback
 
 ## Próxima decisión humana
 
-Revisar, enmendar o aprobar el contrato DRAFT de Etapa 4 en
-`docs/specifications/PHASE_18_DETERMINISTIC_MULTI_SOURCE_CORRELATION.md`,
-incluido su paquete recomendado de 18 decisiones. No crear todavía tablas,
-contratos, handlers o endpoints. Las puertas
-independientes de retención por tenant y polling periódico Wazuh continúan
-abiertas.
+Revisar y aprobar la especificación de Etapa 5 antes de diseñar MITRE, riesgo y
+explicabilidad. Las puertas independientes de retención por tenant y polling
+periódico Wazuh continúan abiertas.

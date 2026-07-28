@@ -930,6 +930,24 @@ nav a.active {
   margin: 10px 0;
 }
 
+.correlation-card strong {
+  color: var(--text);
+}
+
+.correlation-factors {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.correlation-factors span {
+  padding: 5px 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
 .claim-badges {
   display: flex;
   flex-wrap: wrap;

@@ -13,10 +13,11 @@ import {
   directoryLogin,
   downloadIncidentReport,
   executeDemoAutomation,
-  generateDemoScenario,
+  generateCanonicalDemoScenario,
   getAlerts,
   getAuditEvents,
   getClaims,
+  getCorrelations,
   getDirectoryConfiguration,
   getIncident,
   getIncidents,
@@ -363,12 +364,16 @@ function Overview() {
     queryFn: () => getAlerts({ pageSize: 100 }),
   });
   const demo = useMutation({
-    mutationFn: generateDemoScenario,
+    mutationFn: generateCanonicalDemoScenario,
     onSuccess: async () => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["incidents"] }),
         queryClient.invalidateQueries({ queryKey: ["alerts"] }),
       ]);
+      window.setTimeout(() => {
+        void queryClient.invalidateQueries({ queryKey: ["incidents"] });
+        void queryClient.invalidateQueries({ queryKey: ["alerts"] });
+      }, 2500);
     },
   });
   const open = incidents.data?.filter((item) => item.status !== "closed") ?? [];
@@ -386,7 +391,7 @@ function Overview() {
           <h1>{t("overview")}</h1>
         </div>
         <button disabled={demo.isPending} onClick={() => demo.mutate()}>
-          {demo.isPending ? t("loading") : t("runDemo")}
+          {demo.isPending ? t("loading") : t("runCanonicalDemo")}
         </button>
       </div>
       <section className="metrics">
@@ -481,7 +486,7 @@ function Overview() {
       </section>
       {demo.data && (
         <p className="demo-badge">
-          {demo.data.idempotent_replay ? t("demoReplay") : t("demoCreated")}
+          {demo.data.correlation_queued ? t("canonicalDemoQueued") : t("canonicalDemoReplay")}
         </p>
       )}
     </>
@@ -601,6 +606,10 @@ function IncidentDetailPage() {
   const incident = useQuery({ queryKey: ["incident", id], queryFn: () => getIncident(id) });
   const timeline = useQuery({ queryKey: ["timeline", id], queryFn: () => getTimeline(id) });
   const claims = useQuery({ queryKey: ["claims", id], queryFn: () => getClaims(id) });
+  const correlations = useQuery({
+    queryKey: ["correlations", id],
+    queryFn: () => getCorrelations(id),
+  });
   const transition = useMutation({
     mutationFn: (target: string) => transitionIncident(id, incident.data!.version, target),
     onSuccess: async () => {
@@ -744,9 +753,13 @@ function IncidentDetailPage() {
             return (
               <article className="claim-card" key={claim.id}>
                 <div className="claim-badges">
-                  <span>{t(`claimTypes.${claim.claim_type}`, { defaultValue: claim.claim_type })}</span>
+                  <span>
+                    {t(`claimTypes.${claim.claim_type}`, { defaultValue: claim.claim_type })}
+                  </span>
                   <span>{t(`claimStates.${claim.state}`, { defaultValue: claim.state })}</span>
-                  <span>{t(`claimOrigins.${claim.origin_type}`, { defaultValue: claim.origin_type })}</span>
+                  <span>
+                    {t(`claimOrigins.${claim.origin_type}`, { defaultValue: claim.origin_type })}
+                  </span>
                   {claim.is_simulated && <span>{t("simulated")}</span>}
                 </div>
                 <p>{statement}</p>
@@ -762,6 +775,52 @@ function IncidentDetailPage() {
             loading={claims.isLoading}
             error={claims.isError}
             empty={!claims.isLoading && !claims.isError && claims.data?.length === 0}
+          />
+        </div>
+      </section>
+      <section className="panel claim-panel">
+        <div>
+          <p className="eyebrow">{t("traceability")}</p>
+          <h2>{t("correlations")}</h2>
+          <p>{t("correlationIntro")}</p>
+        </div>
+        <div className="claim-grid">
+          {correlations.data?.map((match) => (
+            <article className="claim-card correlation-card" key={match.id}>
+              <div className="claim-badges">
+                <span>
+                  {t("rule")}: {match.rule_code} v{match.rule_version}
+                </span>
+                <span>{match.result_type}</span>
+                {match.is_simulated && <span>{t("simulated")}</span>}
+              </div>
+              <strong>
+                {t("correlationScore")}: {match.score}/100 · {t("threshold")}: {match.threshold}
+              </strong>
+              <p>
+                {t("members")}: {match.members.length}
+              </p>
+              {match.result_type === "LEGACY_SIMULATED_V0" && (
+                <small>{t("legacyCorrelation")}</small>
+              )}
+              <div className="correlation-factors">
+                {match.factors.map((factor) => (
+                  <span key={factor.factor_code}>
+                    {t(`correlationFactors.${factor.factor_code}`, {
+                      defaultValue: factor.factor_code,
+                    })}
+                    : {factor.contribution}/{factor.weight}
+                  </span>
+                ))}
+              </div>
+            </article>
+          ))}
+          <PageState
+            loading={correlations.isLoading}
+            error={correlations.isError}
+            empty={
+              !correlations.isLoading && !correlations.isError && correlations.data?.length === 0
+            }
           />
         </div>
       </section>

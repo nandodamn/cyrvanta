@@ -1,3 +1,6 @@
+from uuid import uuid4
+
+from cyrvanta.modules.decision.application.service import DECISION_EVENT_NAMES
 from cyrvanta.modules.decision.domain.models import (
     ActionImpact,
     EvaluationOutcome,
@@ -6,6 +9,7 @@ from cyrvanta.modules.decision.domain.models import (
     evaluate_policy,
     validate_target_limit,
 )
+from cyrvanta.shared.domain.events import DomainEvent
 
 
 def test_policy_requires_dual_control_for_high_impact() -> None:
@@ -63,3 +67,29 @@ def test_target_limits_fail_closed() -> None:
         assert "limit" in str(exc).lower()
     else:
         raise AssertionError("moderate action accepted too many targets")
+
+
+def test_decision_event_catalog_matches_approved_contract() -> None:
+    assert DECISION_EVENT_NAMES == {
+        "security.action_proposal.created",
+        "security.policy_evaluation.completed",
+        "security.approval.requested",
+        "security.approval.decided",
+        "security.authorization.issued",
+        "security.authorization.revoked",
+        "security.authorization.expired",
+    }
+
+
+def test_decision_event_names_are_valid_event_envelope_codes() -> None:
+    for event_name in DECISION_EVENT_NAMES:
+        event = DomainEvent.create(
+            event_name=event_name,
+            tenant_id=uuid4(),
+            aggregate_type="response_decision",
+            aggregate_id=uuid4(),
+            correlation_id=uuid4(),
+            producer="decision",
+            payload={},
+        )
+        assert event.event_name == event_name

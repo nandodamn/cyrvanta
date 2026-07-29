@@ -323,8 +323,8 @@ calculado como autoridad.
 
 ## 16. Eventos candidatos
 
-- `security.action-proposal.created` v1;
-- `security.policy-evaluation.completed` v1;
+- `security.action_proposal.created` v1;
+- `security.policy_evaluation.completed` v1;
 - `security.approval.requested` v1;
 - `security.approval.decided` v1;
 - `security.authorization.issued` v1;
@@ -601,3 +601,15 @@ Validación ejecutada:
 
 Los workflows, callbacks y consumo efectivo de la autorización permanecen
 fuera de alcance hasta que la especificación de Etapa 7 sea aprobada.
+
+Corrección de trazabilidad del 2026-07-29:
+
+- se normalizaron `action_proposal` y `policy_evaluation` con guion bajo para
+  cumplir el patrón vinculante de `EventEnvelopeV1`;
+- se completó la emisión transaccional de
+  `security.policy_evaluation.completed`,
+  `security.approval.requested`, `security.authorization.issued` y
+  `security.authorization.revoked`;
+- `security.authorization.expired` queda reservado para el proceso durable de
+  expiración de Etapa 7; `expires_at` continúa invalidando sincrónicamente el
+  uso de la autorización y el modo `live` permanece bloqueado.

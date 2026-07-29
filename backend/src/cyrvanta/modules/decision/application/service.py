@@ -36,6 +36,25 @@ from cyrvanta.shared.database import SessionFactory, tenant_session
 from cyrvanta.shared.domain.events import DomainEvent
 from cyrvanta.shared.infrastructure.event_store import SqlEventStore
 
+EVENT_ACTION_PROPOSAL_CREATED = "security.action_proposal.created"
+EVENT_POLICY_EVALUATION_COMPLETED = "security.policy_evaluation.completed"
+EVENT_APPROVAL_REQUESTED = "security.approval.requested"
+EVENT_APPROVAL_DECIDED = "security.approval.decided"
+EVENT_AUTHORIZATION_ISSUED = "security.authorization.issued"
+EVENT_AUTHORIZATION_REVOKED = "security.authorization.revoked"
+EVENT_AUTHORIZATION_EXPIRED = "security.authorization.expired"
+DECISION_EVENT_NAMES = frozenset(
+    {
+        EVENT_ACTION_PROPOSAL_CREATED,
+        EVENT_POLICY_EVALUATION_COMPLETED,
+        EVENT_APPROVAL_REQUESTED,
+        EVENT_APPROVAL_DECIDED,
+        EVENT_AUTHORIZATION_ISSUED,
+        EVENT_AUTHORIZATION_REVOKED,
+        EVENT_AUTHORIZATION_EXPIRED,
+    }
+)
+
 
 class DecisionConflict(ValueError):
     pass
@@ -95,9 +114,7 @@ class DecisionService:
             }
             fingerprint = canonical_fingerprint(material)
             existing = await session.scalar(
-                select(ActionProposalModel).where(
-                    ActionProposalModel.fingerprint == fingerprint
-                )
+                select(ActionProposalModel).where(ActionProposalModel.fingerprint == fingerprint)
             )
             if existing is not None:
                 return await self._response(session, existing)
@@ -125,9 +142,7 @@ class DecisionService:
                 is_simulated=incident.is_simulated,
                 fingerprint=fingerprint,
                 status=(
-                    "DENIED"
-                    if result.outcome is EvaluationOutcome.DENIED
-                    else "AWAITING_APPROVAL"
+                    "DENIED" if result.outcome is EvaluationOutcome.DENIED else "AWAITING_APPROVAL"
                 ),
             )
             session.add(proposal)
@@ -174,7 +189,7 @@ class DecisionService:
                 session,
                 tenant_id,
                 correlation_id,
-                "security.action_proposal.created",
+                EVENT_ACTION_PROPOSAL_CREATED,
                 proposal.id,
                 {
                     "proposal_id": str(proposal.id),
@@ -185,6 +200,37 @@ class DecisionService:
                     "outcome": result.outcome.value,
                 },
             )
+            await self._event(
+                session,
+                tenant_id,
+                correlation_id,
+                EVENT_POLICY_EVALUATION_COMPLETED,
+                evaluation.id,
+                {
+                    "evaluation_id": str(evaluation.id),
+                    "proposal_id": str(proposal.id),
+                    "policy_version_id": str(policy.id),
+                    "fingerprint": fingerprint,
+                    "outcome": result.outcome.value,
+                    "required_approvals": result.required_approvals,
+                    "reason_codes": list(result.reason_codes),
+                },
+            )
+            if request is not None:
+                await self._event(
+                    session,
+                    tenant_id,
+                    correlation_id,
+                    EVENT_APPROVAL_REQUESTED,
+                    request.id,
+                    {
+                        "approval_request_id": str(request.id),
+                        "proposal_id": str(proposal.id),
+                        "fingerprint": fingerprint,
+                        "required_approvals": request.required_approvals,
+                        "expires_at": request.expires_at.isoformat(),
+                    },
+                )
             return await self._response(session, proposal)
 
     async def list_proposals(
@@ -281,6 +327,7 @@ class DecisionService:
             )
             session.add(decision)
             await session.flush()
+            authorization: ActionAuthorizationModel | None = None
             if payload.decision == "REJECT":
                 request.status = "REJECTED"
                 proposal.status = "REJECTED"
@@ -297,16 +344,16 @@ class DecisionService:
                 if approvals >= request.required_approvals:
                     request.status = "APPROVED"
                     proposal.status = "AUTHORIZED"
-                    session.add(
-                        ActionAuthorizationModel(
-                            tenant_id=tenant_id,
-                            proposal_id=proposal.id,
-                            approval_request_id=request.id,
-                            proposal_fingerprint=proposal.fingerprint,
-                            status="ACTIVE",
-                            expires_at=now + timedelta(minutes=5),
-                        )
+                    authorization = ActionAuthorizationModel(
+                        tenant_id=tenant_id,
+                        proposal_id=proposal.id,
+                        approval_request_id=request.id,
+                        proposal_fingerprint=proposal.fingerprint,
+                        status="ACTIVE",
+                        expires_at=now + timedelta(minutes=5),
                     )
+                    session.add(authorization)
+                    await session.flush()
             await self._record(
                 session,
                 tenant_id,
@@ -325,7 +372,7 @@ class DecisionService:
                 session,
                 tenant_id,
                 correlation_id,
-                "security.approval.decided",
+                EVENT_APPROVAL_DECIDED,
                 request.id,
                 {
                     "approval_request_id": str(request.id),
@@ -335,6 +382,21 @@ class DecisionService:
                     "fingerprint": proposal.fingerprint,
                 },
             )
+            if authorization is not None:
+                await self._event(
+                    session,
+                    tenant_id,
+                    correlation_id,
+                    EVENT_AUTHORIZATION_ISSUED,
+                    authorization.id,
+                    {
+                        "authorization_id": str(authorization.id),
+                        "approval_request_id": str(request.id),
+                        "proposal_id": str(proposal.id),
+                        "fingerprint": proposal.fingerprint,
+                        "expires_at": authorization.expires_at.isoformat(),
+                    },
+                )
             await session.flush()
             return await self._response(session, proposal)
 
@@ -376,6 +438,19 @@ class DecisionService:
                 authorization.id,
                 {"proposal_id": str(proposal.id), "fingerprint": proposal.fingerprint},
             )
+            await self._event(
+                session,
+                tenant_id,
+                correlation_id,
+                EVENT_AUTHORIZATION_REVOKED,
+                authorization.id,
+                {
+                    "authorization_id": str(authorization.id),
+                    "proposal_id": str(proposal.id),
+                    "fingerprint": proposal.fingerprint,
+                    "revoked_at": now.isoformat(),
+                },
+            )
             return await self._response(session, proposal)
 
     async def _response(
@@ -390,9 +465,7 @@ class DecisionService:
         if evaluation is None:
             raise RuntimeError("Proposal evaluation is missing")
         request = await session.scalar(
-            select(ApprovalRequestModel).where(
-                ApprovalRequestModel.proposal_id == proposal.id
-            )
+            select(ApprovalRequestModel).where(ApprovalRequestModel.proposal_id == proposal.id)
         )
         decisions: list[ApprovalDecisionModel] = []
         authorization = None

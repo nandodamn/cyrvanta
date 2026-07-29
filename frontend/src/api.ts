@@ -271,6 +271,50 @@ const playbookManagementSchema = z.object({
   local_only: z.boolean(),
   api_sync_configured: z.boolean(),
 });
+const responseDecisionSchema = z.object({
+  id: z.string().uuid(),
+  incident_id: z.string().uuid(),
+  requester_user_id: z.string().uuid(),
+  action_type: z.string(),
+  impact: z.string(),
+  requested_mode: z.string(),
+  workflow_id: z.string(),
+  workflow_version: z.string(),
+  targets: z.array(z.string()),
+  parameters: z.record(z.unknown()),
+  evidence_refs: z.array(z.string().uuid()),
+  incident_version: z.number().int(),
+  is_simulated: z.boolean(),
+  fingerprint: z.string(),
+  status: z.string(),
+  evaluation_outcome: z.string(),
+  reason_codes: z.array(z.string()),
+  approval_request_id: z.string().uuid().nullable(),
+  required_approvals: z.number().int(),
+  approval_status: z.string().nullable(),
+  approval_expires_at: z.string().nullable(),
+  decisions: z.array(
+    z.object({
+      id: z.string().uuid(),
+      actor_user_id: z.string().uuid(),
+      decision: z.string(),
+      reason: z.string(),
+      created_at: z.string(),
+    }),
+  ),
+  authorization: z
+    .object({
+      id: z.string().uuid(),
+      status: z.string(),
+      expires_at: z.string(),
+    })
+    .nullable(),
+  created_at: z.string(),
+});
+const responseDecisionListSchema = z.object({
+  items: z.array(responseDecisionSchema),
+  total: z.number().int().nonnegative(),
+});
 export type IntegrationHealth = z.infer<typeof integrationHealthSchema>;
 export type Analysis = z.infer<typeof analysisSchema>;
 export type Claim = z.infer<typeof claimSchema>;
@@ -278,6 +322,7 @@ export type Correlation = z.infer<typeof correlationSchema>;
 export type Enrichment = z.infer<typeof enrichmentSchema>;
 export type PlaybookCatalog = z.infer<typeof playbookCatalogSchema>;
 export type PlaybookManagement = z.infer<typeof playbookManagementSchema>;
+export type ResponseDecision = z.infer<typeof responseDecisionSchema>;
 export type ListQuery = {
   query?: string;
   page?: number;
@@ -594,6 +639,38 @@ export async function executeDemoAutomation(id: string) {
         idempotency_key: `demo-${id}`,
       }),
     );
+}
+
+export async function getResponseDecisions(incidentId: string): Promise<ResponseDecision[]> {
+  const params = new URLSearchParams({ incident_id: incidentId, limit: "25", offset: "0" });
+  return responseDecisionListSchema.parse(
+    await authorized(`/api/v1/response-proposals?${params.toString()}`),
+  ).items;
+}
+
+export async function createDemoResponseProposal(id: string): Promise<ResponseDecision> {
+  return responseDecisionSchema.parse(
+    await checked(
+      await authenticatedFetch("/api/v1/response-proposals", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Idempotency-Key": `demo-proposal-${id}`,
+        },
+        body: JSON.stringify({
+          incident_id: id,
+          action_type: "simulate-user-block",
+          impact: "MODERATE",
+          requested_mode: "HUMAN_APPROVAL",
+          workflow_id: "cyrvanta-demo-response",
+          workflow_version: "provisional-demo-1",
+          targets: ["synthetic-demo-user"],
+          parameters: { execution_mode: "demo" },
+          evidence_refs: [],
+        }),
+      }),
+    ),
+  );
 }
 
 export async function downloadIncidentReport(id: string, code: string): Promise<void> {

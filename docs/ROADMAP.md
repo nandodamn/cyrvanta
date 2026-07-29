@@ -16,12 +16,15 @@
   `docs/specifications/PHASE_18_DETERMINISTIC_MULTI_SOURCE_CORRELATION.md`.
 - Contrato aprobado e implementado de Etapa 5:
   `docs/specifications/PHASE_19_MITRE_RISK_EXPLAINABILITY.md`.
+- Contrato aprobado e implementado de Etapa 6:
+  `docs/specifications/PHASE_20_SAFE_DECISION_APPROVAL.md`.
 
-Las decisiones D-001 a D-012 están aprobadas. Las Etapas estratégicas 1 a 4
+Las decisiones D-001 a D-012 están aprobadas. Las Etapas estratégicas 1 a 6
 están implementadas y validadas. La correlación determinista multi-fuente de
 Etapa 4 conserva el paquete aprobado de 18 decisiones.
 Retención y polling periódico Wazuh conservan puertas operativas independientes.
-La Etapa 5 está implementada y validada conforme al ADR 0013.
+La Etapa 5 está implementada y validada conforme al ADR 0013. La Etapa 6 está
+implementada y validada conforme al ADR 0014.
 
 Cada fase requiere aprobación de sus especificaciones y criterios antes de
 autorizar contratos o implementación de la siguiente.

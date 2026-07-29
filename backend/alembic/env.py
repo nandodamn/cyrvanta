@@ -6,6 +6,7 @@ from sqlalchemy import pool
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from alembic import context
+from cyrvanta.modules.decision.infrastructure import models as decision_models  # noqa: F401
 from cyrvanta.modules.directory.infrastructure import models as directory_models  # noqa: F401
 from cyrvanta.modules.identity.infrastructure import models  # noqa: F401
 from cyrvanta.modules.incident.infrastructure import models as incident_models  # noqa: F401

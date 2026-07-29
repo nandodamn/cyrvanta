@@ -42,8 +42,11 @@
   persistencia física de Etapa 5.
 - [x] Implementar Etapa 5 conforme al contrato aprobado y ADR 0013.
 - [x] Registrar requisitos humanos de workflows n8n como código para Etapa 7.
-- [ ] GATE: aprobar modelo de decisión y doble aprobación de Etapa 6 antes de
+- [x] GATE: aprobar modelo de decisión y doble aprobación de Etapa 6 antes de
   `request-dual-approval`.
+- [x] Especificar Etapa 6 en
+  `docs/specifications/PHASE_20_SAFE_DECISION_APPROVAL.md`.
+- [x] Implementar y validar Etapa 6 conforme al ADR 0014.
 - [ ] Especificar Etapa 7 incorporando
   `N8N_WORKFLOWS_AS_CODE_REQUIREMENTS.md`.
 - [ ] Implementar workflows n8n, scripts y callbacks únicamente después de
@@ -72,7 +75,7 @@
 - [ ] GATE: aprobar evidencia, cadena de custodia, auditoría y retención.
 - [x] Definir riesgo, confianza y versionado mediante aprobación de
   `PHASE_19_MITRE_RISK_EXPLAINABILITY.md`.
-- [ ] Definir modos de respuesta y clasificación de impacto.
+- [x] Definir modos de respuesta y clasificación de impacto.
 
 ## Datos y contratos — no iniciar antes de los GATE
 

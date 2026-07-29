@@ -1,0 +1,504 @@
+from __future__ import annotations
+
+import json
+from datetime import UTC, datetime, timedelta
+from uuid import UUID
+
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from cyrvanta.modules.decision.application.schemas import (
+    ActionProposalCreate,
+    ActionProposalList,
+    ActionProposalResponse,
+    ApprovalDecisionCreate,
+    ApprovalDecisionResponse,
+    AuthorizationResponse,
+)
+from cyrvanta.modules.decision.domain.models import (
+    EvaluationOutcome,
+    canonical_fingerprint,
+    evaluate_policy,
+    validate_target_limit,
+)
+from cyrvanta.modules.decision.infrastructure.models import (
+    ActionAuthorizationModel,
+    ActionProposalModel,
+    ApprovalDecisionModel,
+    ApprovalRequestModel,
+    PolicyEvaluationModel,
+    ResponsePolicyVersionModel,
+)
+from cyrvanta.modules.identity.infrastructure.models import AuditEventModel, UserModel
+from cyrvanta.modules.incident.infrastructure.models import IncidentModel
+from cyrvanta.shared.config import get_settings
+from cyrvanta.shared.database import SessionFactory, tenant_session
+from cyrvanta.shared.domain.events import DomainEvent
+from cyrvanta.shared.infrastructure.event_store import SqlEventStore
+
+
+class DecisionConflict(ValueError):
+    pass
+
+
+class DecisionNotFound(LookupError):
+    pass
+
+
+class DecisionService:
+    async def create_proposal(
+        self,
+        *,
+        tenant_id: UUID,
+        requester_user_id: UUID,
+        payload: ActionProposalCreate,
+        correlation_id: UUID,
+        idempotency_key: str,
+    ) -> ActionProposalResponse:
+        validate_target_limit(payload.impact, len(payload.targets))
+        if len(json.dumps(payload.parameters, ensure_ascii=False).encode()) > 32 * 1024:
+            raise DecisionConflict("Parameters exceed the approved size limit")
+        now = datetime.now(UTC)
+        async with tenant_session(tenant_id) as session:
+            incident = await session.scalar(
+                select(IncidentModel).where(IncidentModel.id == payload.incident_id)
+            )
+            requester = await session.scalar(
+                select(UserModel).where(
+                    UserModel.id == requester_user_id,
+                    UserModel.is_active.is_(True),
+                )
+            )
+            policy = await session.scalar(
+                select(ResponsePolicyVersionModel)
+                .where(ResponsePolicyVersionModel.status == "ACTIVE")
+                .order_by(ResponsePolicyVersionModel.created_at.desc())
+                .limit(1)
+            )
+            if incident is None or requester is None or policy is None:
+                raise DecisionNotFound("Required tenant resource was not found")
+            material = {
+                "tenant_id": str(tenant_id),
+                "incident_id": str(incident.id),
+                "incident_version": incident.version,
+                "requester_user_id": str(requester_user_id),
+                "action_type": payload.action_type,
+                "impact": payload.impact.value,
+                "requested_mode": payload.requested_mode.value,
+                "workflow_id": payload.workflow_id,
+                "workflow_version": payload.workflow_version,
+                "targets": payload.targets,
+                "parameters": payload.parameters,
+                "evidence_refs": sorted(str(item) for item in payload.evidence_refs),
+                "policy_version_id": str(policy.id),
+                "idempotency_key": idempotency_key,
+            }
+            fingerprint = canonical_fingerprint(material)
+            existing = await session.scalar(
+                select(ActionProposalModel).where(
+                    ActionProposalModel.fingerprint == fingerprint
+                )
+            )
+            if existing is not None:
+                return await self._response(session, existing)
+            result = evaluate_policy(
+                impact=payload.impact,
+                requested_mode=payload.requested_mode,
+                global_kill_switch=get_settings().automation_kill_switch,
+                tenant_kill_switch=policy.kill_switch,
+                is_simulated=incident.is_simulated,
+            )
+            proposal = ActionProposalModel(
+                tenant_id=tenant_id,
+                incident_id=incident.id,
+                requester_user_id=requester_user_id,
+                policy_version_id=policy.id,
+                action_type=payload.action_type,
+                impact=payload.impact.value,
+                requested_mode=payload.requested_mode.value,
+                workflow_id=payload.workflow_id,
+                workflow_version=payload.workflow_version,
+                targets=payload.targets,
+                parameters=payload.parameters,
+                evidence_refs=[str(item) for item in payload.evidence_refs],
+                incident_version=incident.version,
+                is_simulated=incident.is_simulated,
+                fingerprint=fingerprint,
+                status=(
+                    "DENIED"
+                    if result.outcome is EvaluationOutcome.DENIED
+                    else "AWAITING_APPROVAL"
+                ),
+            )
+            session.add(proposal)
+            await session.flush()
+            evaluation = PolicyEvaluationModel(
+                tenant_id=tenant_id,
+                proposal_id=proposal.id,
+                policy_version_id=policy.id,
+                outcome=result.outcome.value,
+                required_approvals=result.required_approvals,
+                reason_codes=list(result.reason_codes),
+                input_fingerprint=fingerprint,
+            )
+            session.add(evaluation)
+            await session.flush()
+            request: ApprovalRequestModel | None = None
+            if result.required_approvals:
+                request = ApprovalRequestModel(
+                    tenant_id=tenant_id,
+                    proposal_id=proposal.id,
+                    evaluation_id=evaluation.id,
+                    required_approvals=result.required_approvals,
+                    status="PENDING",
+                    expires_at=now + timedelta(minutes=30),
+                )
+                session.add(request)
+                await session.flush()
+            await self._record(
+                session,
+                tenant_id,
+                requester_user_id,
+                correlation_id,
+                "response.proposal.created",
+                proposal.id,
+                {
+                    "action_type": proposal.action_type,
+                    "impact": proposal.impact,
+                    "outcome": result.outcome.value,
+                    "fingerprint": fingerprint,
+                    "simulated": incident.is_simulated,
+                },
+            )
+            await self._event(
+                session,
+                tenant_id,
+                correlation_id,
+                "security.action_proposal.created",
+                proposal.id,
+                {
+                    "proposal_id": str(proposal.id),
+                    "incident_id": str(proposal.incident_id),
+                    "fingerprint": fingerprint,
+                    "action_type": proposal.action_type,
+                    "impact": proposal.impact,
+                    "outcome": result.outcome.value,
+                },
+            )
+            return await self._response(session, proposal)
+
+    async def list_proposals(
+        self, tenant_id: UUID, *, incident_id: UUID | None, limit: int, offset: int
+    ) -> ActionProposalList:
+        async with tenant_session(tenant_id) as session:
+            statement = select(ActionProposalModel)
+            count_statement = select(func.count(ActionProposalModel.id))
+            if incident_id is not None:
+                statement = statement.where(ActionProposalModel.incident_id == incident_id)
+                count_statement = count_statement.where(
+                    ActionProposalModel.incident_id == incident_id
+                )
+            proposals = list(
+                (
+                    await session.scalars(
+                        statement.order_by(ActionProposalModel.created_at.desc())
+                        .limit(limit)
+                        .offset(offset)
+                    )
+                ).all()
+            )
+            total = int(await session.scalar(count_statement) or 0)
+            return ActionProposalList(
+                items=[await self._response(session, item) for item in proposals],
+                total=total,
+            )
+
+    async def get_proposal(self, tenant_id: UUID, proposal_id: UUID) -> ActionProposalResponse:
+        async with tenant_session(tenant_id) as session:
+            proposal = await session.scalar(
+                select(ActionProposalModel).where(ActionProposalModel.id == proposal_id)
+            )
+            if proposal is None:
+                raise DecisionNotFound("Proposal was not found")
+            return await self._response(session, proposal)
+
+    async def decide(
+        self,
+        *,
+        tenant_id: UUID,
+        actor_user_id: UUID,
+        approval_request_id: UUID,
+        payload: ApprovalDecisionCreate,
+        correlation_id: UUID,
+    ) -> ActionProposalResponse:
+        now = datetime.now(UTC)
+        async with tenant_session(tenant_id) as session:
+            request = await session.scalar(
+                select(ApprovalRequestModel)
+                .where(ApprovalRequestModel.id == approval_request_id)
+                .with_for_update()
+            )
+            if request is None:
+                raise DecisionNotFound("Approval request was not found")
+            proposal = await session.scalar(
+                select(ActionProposalModel).where(ActionProposalModel.id == request.proposal_id)
+            )
+            actor = await session.scalar(
+                select(UserModel).where(
+                    UserModel.id == actor_user_id,
+                    UserModel.is_active.is_(True),
+                )
+            )
+            if proposal is None or actor is None:
+                raise DecisionNotFound("Required tenant resource was not found")
+            if request.status != "PENDING":
+                raise DecisionConflict("Approval request is not pending")
+            if request.expires_at <= now:
+                request.status = "EXPIRED"
+                proposal.status = "EXPIRED"
+                raise DecisionConflict("Approval request has expired")
+            if proposal.fingerprint != payload.expected_proposal_fingerprint:
+                raise DecisionConflict("Proposal fingerprint no longer matches")
+            if actor_user_id == proposal.requester_user_id:
+                raise DecisionConflict("Requester cannot approve the proposal")
+            existing = await session.scalar(
+                select(ApprovalDecisionModel).where(
+                    ApprovalDecisionModel.approval_request_id == request.id,
+                    ApprovalDecisionModel.actor_user_id == actor_user_id,
+                )
+            )
+            if existing is not None:
+                if existing.decision == payload.decision:
+                    return await self._response(session, proposal)
+                raise DecisionConflict("Actor already decided this request")
+            decision = ApprovalDecisionModel(
+                tenant_id=tenant_id,
+                approval_request_id=request.id,
+                actor_user_id=actor_user_id,
+                decision=payload.decision,
+                reason=payload.reason.strip(),
+                proposal_fingerprint=proposal.fingerprint,
+            )
+            session.add(decision)
+            await session.flush()
+            if payload.decision == "REJECT":
+                request.status = "REJECTED"
+                proposal.status = "REJECTED"
+            else:
+                approvals = int(
+                    await session.scalar(
+                        select(func.count(ApprovalDecisionModel.id)).where(
+                            ApprovalDecisionModel.approval_request_id == request.id,
+                            ApprovalDecisionModel.decision == "APPROVE",
+                        )
+                    )
+                    or 0
+                )
+                if approvals >= request.required_approvals:
+                    request.status = "APPROVED"
+                    proposal.status = "AUTHORIZED"
+                    session.add(
+                        ActionAuthorizationModel(
+                            tenant_id=tenant_id,
+                            proposal_id=proposal.id,
+                            approval_request_id=request.id,
+                            proposal_fingerprint=proposal.fingerprint,
+                            status="ACTIVE",
+                            expires_at=now + timedelta(minutes=5),
+                        )
+                    )
+            await self._record(
+                session,
+                tenant_id,
+                actor_user_id,
+                correlation_id,
+                "response.approval.decided",
+                request.id,
+                {
+                    "proposal_id": str(proposal.id),
+                    "decision": payload.decision,
+                    "status": request.status,
+                    "fingerprint": proposal.fingerprint,
+                },
+            )
+            await self._event(
+                session,
+                tenant_id,
+                correlation_id,
+                "security.approval.decided",
+                request.id,
+                {
+                    "approval_request_id": str(request.id),
+                    "proposal_id": str(proposal.id),
+                    "decision": payload.decision,
+                    "status": request.status,
+                    "fingerprint": proposal.fingerprint,
+                },
+            )
+            await session.flush()
+            return await self._response(session, proposal)
+
+    async def revoke(
+        self,
+        *,
+        tenant_id: UUID,
+        actor_user_id: UUID,
+        authorization_id: UUID,
+        correlation_id: UUID,
+    ) -> ActionProposalResponse:
+        now = datetime.now(UTC)
+        async with tenant_session(tenant_id) as session:
+            authorization = await session.scalar(
+                select(ActionAuthorizationModel)
+                .where(ActionAuthorizationModel.id == authorization_id)
+                .with_for_update()
+            )
+            if authorization is None:
+                raise DecisionNotFound("Authorization was not found")
+            if authorization.status != "ACTIVE":
+                raise DecisionConflict("Authorization is not active")
+            authorization.status = "REVOKED"
+            authorization.revoked_at = now
+            proposal = await session.scalar(
+                select(ActionProposalModel).where(
+                    ActionProposalModel.id == authorization.proposal_id
+                )
+            )
+            if proposal is None:
+                raise DecisionNotFound("Proposal was not found")
+            proposal.status = "REVOKED"
+            await self._record(
+                session,
+                tenant_id,
+                actor_user_id,
+                correlation_id,
+                "response.authorization.revoked",
+                authorization.id,
+                {"proposal_id": str(proposal.id), "fingerprint": proposal.fingerprint},
+            )
+            return await self._response(session, proposal)
+
+    async def _response(
+        self, session: AsyncSession, proposal: ActionProposalModel
+    ) -> ActionProposalResponse:
+        evaluation = await session.scalar(
+            select(PolicyEvaluationModel)
+            .where(PolicyEvaluationModel.proposal_id == proposal.id)
+            .order_by(PolicyEvaluationModel.created_at.desc())
+            .limit(1)
+        )
+        if evaluation is None:
+            raise RuntimeError("Proposal evaluation is missing")
+        request = await session.scalar(
+            select(ApprovalRequestModel).where(
+                ApprovalRequestModel.proposal_id == proposal.id
+            )
+        )
+        decisions: list[ApprovalDecisionModel] = []
+        authorization = None
+        if request is not None:
+            decisions = list(
+                (
+                    await session.scalars(
+                        select(ApprovalDecisionModel)
+                        .where(ApprovalDecisionModel.approval_request_id == request.id)
+                        .order_by(ApprovalDecisionModel.created_at)
+                    )
+                ).all()
+            )
+            authorization = await session.scalar(
+                select(ActionAuthorizationModel).where(
+                    ActionAuthorizationModel.approval_request_id == request.id
+                )
+            )
+        return ActionProposalResponse(
+            id=proposal.id,
+            incident_id=proposal.incident_id,
+            requester_user_id=proposal.requester_user_id,
+            action_type=proposal.action_type,
+            impact=proposal.impact,
+            requested_mode=proposal.requested_mode,
+            workflow_id=proposal.workflow_id,
+            workflow_version=proposal.workflow_version,
+            targets=list(proposal.targets),
+            parameters=dict(proposal.parameters),
+            evidence_refs=[UUID(item) for item in proposal.evidence_refs],
+            incident_version=proposal.incident_version,
+            is_simulated=proposal.is_simulated,
+            fingerprint=proposal.fingerprint,
+            status=proposal.status,
+            evaluation_outcome=evaluation.outcome,
+            reason_codes=list(evaluation.reason_codes),
+            approval_request_id=request.id if request else None,
+            required_approvals=evaluation.required_approvals,
+            approval_status=request.status if request else None,
+            approval_expires_at=request.expires_at if request else None,
+            decisions=[
+                ApprovalDecisionResponse(
+                    id=item.id,
+                    actor_user_id=item.actor_user_id,
+                    decision=item.decision,
+                    reason=item.reason,
+                    created_at=item.created_at,
+                )
+                for item in decisions
+            ],
+            authorization=(
+                AuthorizationResponse(
+                    id=authorization.id,
+                    status=authorization.status,
+                    expires_at=authorization.expires_at,
+                )
+                if authorization
+                else None
+            ),
+            created_at=proposal.created_at,
+        )
+
+    async def _event(
+        self,
+        session: AsyncSession,
+        tenant_id: UUID,
+        correlation_id: UUID,
+        event_name: str,
+        aggregate_id: UUID,
+        payload: dict[str, object],
+    ) -> None:
+        store = SqlEventStore(
+            session_factory=SessionFactory,
+            max_payload_bytes=get_settings().event_max_payload_bytes,
+        )
+        await store.recorder(session).add(
+            DomainEvent.create(
+                event_name=event_name,
+                tenant_id=tenant_id,
+                aggregate_type="response_decision",
+                aggregate_id=aggregate_id,
+                correlation_id=correlation_id,
+                producer="decision",
+                payload=payload,
+            )
+        )
+
+    @staticmethod
+    async def _record(
+        session: AsyncSession,
+        tenant_id: UUID,
+        actor_user_id: UUID,
+        correlation_id: UUID,
+        action: str,
+        resource_id: UUID,
+        details: dict[str, object],
+    ) -> None:
+        session.add(
+            AuditEventModel(
+                tenant_id=tenant_id,
+                actor_user_id=actor_user_id,
+                action=action,
+                resource_type="response_decision",
+                resource_id=resource_id,
+                outcome="success",
+                correlation_id=correlation_id,
+                details=details,
+            )
+        )

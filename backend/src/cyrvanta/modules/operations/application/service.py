@@ -446,12 +446,8 @@ class OperationsService:
             raise ValueError("Explicit approval is required")
         digest = sha256(payload.idempotency_key.encode()).hexdigest()[:20]
         if self.settings.n8n_mode == "live":
-            await self._n8n_execute(payload)
-            return AutomationResponse(
-                execution_id=f"n8n-{digest}",
-                status="completed",
-                mode="live",
-                workflow_id=payload.workflow_id,
+            raise ValueError(
+                "Live automation requires a durable Stage 7 authorization and callback"
             )
         if self.settings.n8n_mode != "simulated":
             raise ValueError("Automation adapter is disabled")

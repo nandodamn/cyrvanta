@@ -9,10 +9,10 @@ import { z } from "zod";
 import {
   createRole,
   createUser,
+  createDemoResponseProposal,
   analyzeIncident,
   directoryLogin,
   downloadIncidentReport,
-  executeDemoAutomation,
   generateCanonicalDemoScenario,
   generateIncidentExplanation,
   getAlerts,
@@ -29,6 +29,7 @@ import {
   getPlaybookManagement,
   getPlaybooks,
   getRolePermissions,
+  getResponseDecisions,
   getRoles,
   getTenant,
   getTimeline,
@@ -618,6 +619,11 @@ function IncidentDetailPage() {
     queryFn: () => getIncidentEnrichment(id),
     retry: false,
   });
+  const responseDecisions = useQuery({
+    queryKey: ["response-decisions", id],
+    queryFn: () => getResponseDecisions(id),
+    retry: false,
+  });
   const transition = useMutation({
     mutationFn: (target: string) => transitionIncident(id, incident.data!.version, target),
     onSuccess: async () => {
@@ -646,7 +652,12 @@ function IncidentDetailPage() {
       await queryClient.invalidateQueries({ queryKey: ["enrichment", id] });
     },
   });
-  const automation = useMutation({ mutationFn: () => executeDemoAutomation(id) });
+  const responseProposal = useMutation({
+    mutationFn: () => createDemoResponseProposal(id),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["response-decisions", id] });
+    },
+  });
   const next: Record<string, string> = {
     new: "triaged",
     triaged: "investigating",
@@ -723,10 +734,10 @@ function IncidentDetailPage() {
           </button>
           <button
             className="ghost"
-            disabled={automation.isPending}
-            onClick={() => automation.mutate()}
+            disabled={responseProposal.isPending}
+            onClick={() => responseProposal.mutate()}
           >
-            {t("simulateResponse")}
+            {t("proposeSafeResponse")}
           </button>
           <button
             className="ghost"
@@ -747,12 +758,48 @@ function IncidentDetailPage() {
               <small>{analysis.data.techniques.map((item) => item.external_id).join(" · ")}</small>
             </div>
           )}
-          {automation.data && <p className="demo-badge">{automation.data.status}</p>}
-          {(transition.isError || analysis.isError || automation.isError) && (
+          {responseProposal.data && <p className="demo-badge">{t("proposalCreated")}</p>}
+          {(transition.isError || analysis.isError || responseProposal.isError) && (
             <p className="status-message status-error" role="alert">
               {t("actionError")}
             </p>
           )}
+        </div>
+      </section>
+      <section className="panel claim-panel">
+        <div>
+          <p className="eyebrow">{t("safeResponse")}</p>
+          <h2>{t("decisionsAndApprovals")}</h2>
+          <p>{t("decisionsIntro")}</p>
+        </div>
+        <div className="claim-grid">
+          {responseDecisions.data?.map((decision) => (
+            <article className="claim-card" key={decision.id}>
+              <div className="claim-badges">
+                <span>{decision.status}</span>
+                <span>{decision.impact}</span>
+                {decision.is_simulated && <span>{t("simulated")}</span>}
+              </div>
+              <strong>{decision.action_type}</strong>
+              <p>
+                {t("approvalProgress")}: {decision.decisions.length}/{decision.required_approvals}
+              </p>
+              <small>
+                {t("policyOutcome")}: {decision.evaluation_outcome}
+              </small>
+              <br />
+              <small>{decision.reason_codes.join(" · ")}</small>
+            </article>
+          ))}
+          <PageState
+            loading={responseDecisions.isLoading}
+            error={responseDecisions.isError}
+            empty={
+              !responseDecisions.isLoading &&
+              !responseDecisions.isError &&
+              responseDecisions.data?.length === 0
+            }
+          />
         </div>
       </section>
       <section className="panel claim-panel">

@@ -180,3 +180,26 @@ def test_attack_risk_migration_is_tenant_scoped_bounded_and_append_only() -> Non
     assert "cardinality(selector_codes) BETWEEN 1 AND 32" in migration
     assert "GRANT SELECT, INSERT ON incident_attack_mappings" in migration
     assert "ATT&CK or risk data exists" in migration
+
+
+def test_safe_decision_migration_enforces_rls_separation_and_append_only_history() -> None:
+    migration = (
+        Path(__file__).parents[2] / "alembic" / "versions" / "0015_safe_decision_approval.py"
+    ).read_text(encoding="utf-8")
+    for table in (
+        "response_policy_versions",
+        "action_proposals",
+        "response_policy_evaluations",
+        "approval_requests",
+        "approval_decisions",
+        "action_authorizations",
+    ):
+        assert table in migration
+    assert "FORCE ROW LEVEL SECURITY" in migration
+    assert "app.current_tenant_id" in migration
+    assert "fk_action_proposal_incident_tenant" in migration
+    assert "fk_approval_decision_actor_tenant" in migration
+    assert "requester cannot approve the proposal" in migration
+    assert "UNIQUE (tenant_id, approval_request_id, actor_user_id)" in migration
+    assert "REVOKE UPDATE, DELETE ON approval_decisions" in migration
+    assert "response decision history exists" in migration

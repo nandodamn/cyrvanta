@@ -7,6 +7,7 @@ from redis.asyncio import Redis
 
 from cyrvanta.modules.claims.presentation.router import router as claims_router
 from cyrvanta.modules.correlation.presentation.router import router as correlation_router
+from cyrvanta.modules.decision.presentation.router import router as decision_router
 from cyrvanta.modules.directory.presentation.authentication_router import (
     router as directory_auth_router,
 )
@@ -58,6 +59,7 @@ app.add_middleware(
         "X-CSRF-Guard",
         "X-Request-ID",
         "X-Correlation-ID",
+        "Idempotency-Key",
     ],
 )
 app.add_middleware(RequestContextMiddleware)
@@ -71,5 +73,6 @@ app.include_router(incident_router, prefix="/api/v1")
 app.include_router(operations_router, prefix="/api/v1")
 app.include_router(claims_router, prefix="/api/v1")
 app.include_router(correlation_router, prefix="/api/v1")
+app.include_router(decision_router, prefix="/api/v1")
 app.include_router(threat_knowledge_router, prefix="/api/v1")
 install_problem_handlers(app)

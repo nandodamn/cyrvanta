@@ -49,25 +49,19 @@ def test_mitre_catalog_uses_stable_ids() -> None:
     }
 
 
-async def test_live_automation_calls_adapter(monkeypatch: MonkeyPatch) -> None:
+async def test_live_automation_requires_stage7_durable_authorization(
+    monkeypatch: MonkeyPatch,
+) -> None:
     service = OperationsService()
     monkeypatch.setattr(service.settings, "n8n_mode", "live")
-    calls: list[AutomationRequest] = []
-
-    async def adapter(payload: AutomationRequest) -> None:
-        calls.append(payload)
-
-    monkeypatch.setattr(service, "_n8n_execute", adapter)
     payload = AutomationRequest(
         incident_id="00000000-0000-0000-0000-000000000001",
         workflow_id="cyrvanta-demo-response",
         approved=True,
         idempotency_key="approved-live-key",
     )
-    result = await service.execute(payload)
-    assert calls == [payload]
-    assert result.mode == "live"
-    assert result.status == "completed"
+    with pytest.raises(ValueError, match="Stage 7 authorization"):
+        await service.execute(payload)
 
 
 async def test_disabled_automation_fails_closed(monkeypatch: MonkeyPatch) -> None:

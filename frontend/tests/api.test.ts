@@ -1,6 +1,13 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { getClaims, getCorrelations, getIncidents, getPlaybooks, login } from "../src/api";
+import {
+  createDemoResponseProposal,
+  getClaims,
+  getCorrelations,
+  getIncidents,
+  getPlaybooks,
+  login,
+} from "../src/api";
 
 describe("bounded list requests", () => {
   afterEach(() => {
@@ -200,5 +207,62 @@ describe("bounded list requests", () => {
       `/api/v1/incidents/${incidentId}/correlations?limit=25`,
       expect.objectContaining({ credentials: "include" }),
     );
+  });
+
+  it("creates a tenant-scoped proposal with an idempotency key", async () => {
+    const incidentId = "00000000-0000-0000-0000-000000000030";
+    const proposalId = "00000000-0000-0000-0000-000000000031";
+    const requesterId = "00000000-0000-0000-0000-000000000032";
+    const approvalId = "00000000-0000-0000-0000-000000000033";
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            access_token: "synthetic-access-token",
+            token_type: "bearer",
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            id: proposalId,
+            incident_id: incidentId,
+            requester_user_id: requesterId,
+            action_type: "simulate-user-block",
+            impact: "MODERATE",
+            requested_mode: "HUMAN_APPROVAL",
+            workflow_id: "cyrvanta-demo-response",
+            workflow_version: "provisional-demo-1",
+            targets: ["synthetic-demo-user"],
+            parameters: { execution_mode: "demo" },
+            evidence_refs: [],
+            incident_version: 1,
+            is_simulated: true,
+            fingerprint: "a".repeat(64),
+            status: "AWAITING_APPROVAL",
+            evaluation_outcome: "APPROVAL_REQUIRED",
+            reason_codes: ["SYNTHETIC_APPROVAL_REQUIRED"],
+            approval_request_id: approvalId,
+            required_approvals: 1,
+            approval_status: "PENDING",
+            approval_expires_at: "2026-07-29T12:30:00Z",
+            decisions: [],
+            authorization: null,
+            created_at: "2026-07-29T12:00:00Z",
+          }),
+          { status: 201, headers: { "Content-Type": "application/json" } },
+        ),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await login("tenant-demo", "demo@example.invalid", "not-a-real-password", false);
+    const proposal = await createDemoResponseProposal(incidentId);
+
+    expect(proposal.status).toBe("AWAITING_APPROVAL");
+    const request = fetchMock.mock.calls[1][1] as RequestInit;
+    expect(new Headers(request.headers).get("Idempotency-Key")).toBe(`demo-proposal-${incidentId}`);
   });
 });

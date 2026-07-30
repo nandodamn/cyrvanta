@@ -25,6 +25,10 @@ from cyrvanta.modules.incident.application.correlation import (
 from cyrvanta.modules.integrations.application.finding_ingestion import (
     FINDING_NORMALIZED_EVENT,
 )
+from cyrvanta.modules.playbooks.infrastructure.dispatcher import (
+    DISPATCH_REQUESTED_EVENT,
+    N8nPlaybookDispatcher,
+)
 from cyrvanta.modules.threat_knowledge.application.service import (
     EXPLANATION_FAILED_EVENT,
     EXPLANATION_GENERATED_EVENT,
@@ -141,6 +145,9 @@ async def run() -> None:
             (RISK_ASSESSED_EVENT, 1): lambda _session: handle_enrichment_event,
             (EXPLANATION_GENERATED_EVENT, 1): lambda _session: handle_enrichment_event,
             (EXPLANATION_FAILED_EVENT, 1): lambda _session: handle_enrichment_event,
+            (DISPATCH_REQUESTED_EVENT, 1): lambda _session: N8nPlaybookDispatcher(
+                settings
+            ).handle,
         },
     )
     try:

@@ -18,7 +18,7 @@
   `docs/specifications/PHASE_19_MITRE_RISK_EXPLAINABILITY.md`.
 - Contrato aprobado e implementado de Etapa 6:
   `docs/specifications/PHASE_20_SAFE_DECISION_APPROVAL.md`.
-- Propuesta de contrato de Etapa 7 pendiente de aprobación:
+- Contrato aprobado de Etapa 7:
   `docs/specifications/PHASE_21_N8N_WORKFLOWS_EXECUTION.md`.
 
 Las decisiones D-001 a D-012 están aprobadas. Las Etapas estratégicas 1 a 6
@@ -27,8 +27,8 @@ Etapa 4 conserva el paquete aprobado de 18 decisiones.
 Retención y polling periódico Wazuh conservan puertas operativas independientes.
 La Etapa 5 está implementada y validada conforme al ADR 0013. La Etapa 6 está
 implementada y validada conforme al ADR 0014.
-La Etapa 7 está especificada como propuesta; ADR 0015 permanece `Propuesto` y
-no autoriza implementación ni modo `live`.
+La Etapa 7 está aprobada para implementación conforme al ADR 0015. El modo
+`live` continúa sujeto a una aprobación operativa separada.
 
 Cada fase requiere aprobación de sus especificaciones y criterios antes de
 autorizar contratos o implementación de la siguiente.

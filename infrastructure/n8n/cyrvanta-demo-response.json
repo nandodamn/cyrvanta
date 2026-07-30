@@ -1,63 +1,97 @@
 [
-{
-  "id": "cyrvanta-demo-response",
-  "name": "Cyrvanta Demo Response",
-  "active": false,
-  "nodes": [
-    {
-      "parameters": {
-        "httpMethod": "POST",
-        "path": "cyrvanta-demo-response",
-        "responseMode": "responseNode",
-        "options": {}
+  {
+    "id": "cyrvanta-demo-response",
+    "name": "Cyrvanta — Simulate User Block",
+    "active": false,
+    "nodes": [
+      {
+        "parameters": {
+          "httpMethod": "POST",
+          "path": "cyrvanta-demo-response",
+          "responseMode": "responseNode",
+          "options": {}
+        },
+        "id": "967025cf-35ab-479f-82b4-5652220d3938",
+        "name": "Authorized Dispatch",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 2,
+        "position": [240, 300],
+        "webhookId": "7bd4d34a-90d0-49ec-9c6e-ae10d650d93a"
       },
-      "id": "1d788842-99f4-4f98-a434-1355a4fe4b4e",
-      "name": "Approved Cyrvanta Request",
-      "type": "n8n-nodes-base.webhook",
-      "typeVersion": 2,
-      "position": [
-        260,
-        300
-      ],
-      "webhookId": "8ec1ed03-8523-4d17-b30b-b20997ad4b06"
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "={{ $node[\"Authorized Dispatch\"].json.body.claim.url }}",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {"name": "Content-Type", "value": "application/json"},
+              {"name": "X-Cyrvanta-Key-Id", "value": "={{ $node[\"Authorized Dispatch\"].json.body.claim.headers[\"X-Cyrvanta-Key-Id\"] }}"},
+              {"name": "X-Cyrvanta-Timestamp", "value": "={{ $node[\"Authorized Dispatch\"].json.body.claim.headers[\"X-Cyrvanta-Timestamp\"] }}"},
+              {"name": "X-Cyrvanta-Nonce", "value": "={{ $node[\"Authorized Dispatch\"].json.body.claim.headers[\"X-Cyrvanta-Nonce\"] }}"},
+              {"name": "X-Cyrvanta-Signature", "value": "={{ $node[\"Authorized Dispatch\"].json.body.claim.headers[\"X-Cyrvanta-Signature\"] }}"}
+            ]
+          },
+          "sendBody": true,
+          "contentType": "raw",
+          "rawContentType": "application/json",
+          "body": "={{ $node[\"Authorized Dispatch\"].json.body.claim.body }}",
+          "options": {}
+        },
+        "id": "31bfb025-493f-44e1-856e-ce89d1e8d6e4",
+        "name": "Claim Before Effect",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [480, 300]
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "={{ $node[\"Authorized Dispatch\"].json.body.terminal_callback.url }}",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {"name": "Content-Type", "value": "application/json"},
+              {"name": "X-Cyrvanta-Key-Id", "value": "={{ $node[\"Authorized Dispatch\"].json.body.terminal_callback.headers[\"X-Cyrvanta-Key-Id\"] }}"},
+              {"name": "X-Cyrvanta-Timestamp", "value": "={{ $node[\"Authorized Dispatch\"].json.body.terminal_callback.headers[\"X-Cyrvanta-Timestamp\"] }}"},
+              {"name": "X-Cyrvanta-Nonce", "value": "={{ $node[\"Authorized Dispatch\"].json.body.terminal_callback.headers[\"X-Cyrvanta-Nonce\"] }}"},
+              {"name": "X-Cyrvanta-Signature", "value": "={{ $node[\"Authorized Dispatch\"].json.body.terminal_callback.headers[\"X-Cyrvanta-Signature\"] }}"}
+            ]
+          },
+          "sendBody": true,
+          "contentType": "raw",
+          "rawContentType": "application/json",
+          "body": "={{ $node[\"Authorized Dispatch\"].json.body.terminal_callback.body }}",
+          "options": {}
+        },
+        "id": "47b9616f-31dc-43d7-b9ad-a5f6146113f9",
+        "name": "Report Synthetic Result",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [720, 300]
+      },
+      {
+        "parameters": {
+          "respondWith": "json",
+          "responseBody": "={{ { \"accepted\": true, \"status\": \"callback_sent\", \"workflow_id\": \"cyrvanta-demo-response\", \"dispatch_id\": $node[\"Authorized Dispatch\"].json.body.dispatch_id } }}",
+          "options": {"responseCode": 200}
+        },
+        "id": "9937196a-ad44-4073-bb21-9f3ac3b69c26",
+        "name": "Acknowledge Dispatch",
+        "type": "n8n-nodes-base.respondToWebhook",
+        "typeVersion": 1.4,
+        "position": [960, 300]
+      }
+    ],
+    "connections": {
+      "Authorized Dispatch": {"main": [[{"node": "Claim Before Effect", "type": "main", "index": 0}]]},
+      "Claim Before Effect": {"main": [[{"node": "Report Synthetic Result", "type": "main", "index": 0}]]},
+      "Report Synthetic Result": {"main": [[{"node": "Acknowledge Dispatch", "type": "main", "index": 0}]]}
     },
-    {
-      "parameters": {
-        "respondWith": "json",
-        "responseBody": "={{ { \"accepted\": true, \"status\": \"completed\", \"workflow_id\": \"cyrvanta-demo-response\", \"incident_id\": $json.body.incident_id, \"idempotency_key\": $json.body.idempotency_key } }}",
-        "options": {
-          "responseCode": 200
-        }
-      },
-      "id": "ce346a12-ce85-4ec5-a2d4-b2857e81b3cd",
-      "name": "Return Safe Demo Result",
-      "type": "n8n-nodes-base.respondToWebhook",
-      "typeVersion": 1.4,
-      "position": [
-        500,
-        300
-      ]
-    }
-  ],
-  "connections": {
-    "Approved Cyrvanta Request": {
-      "main": [
-        [
-          {
-            "node": "Return Safe Demo Result",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    }
-  },
-  "settings": {
-    "executionOrder": "v1"
-  },
-  "staticData": null,
-  "pinData": {},
-  "versionId": "7ec19835-0138-4ed7-bce0-fcd038aaac28",
-  "tags": []
-}
+    "settings": {"executionOrder": "v1"},
+    "staticData": null,
+    "pinData": {},
+    "versionId": "68378eb2-8494-40ee-8799-215072e576c2",
+    "tags": []
+  }
 ]

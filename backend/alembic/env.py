@@ -10,6 +10,7 @@ from cyrvanta.modules.decision.infrastructure import models as decision_models  
 from cyrvanta.modules.directory.infrastructure import models as directory_models  # noqa: F401
 from cyrvanta.modules.identity.infrastructure import models  # noqa: F401
 from cyrvanta.modules.incident.infrastructure import models as incident_models  # noqa: F401
+from cyrvanta.modules.playbooks.infrastructure import models as playbook_models  # noqa: F401
 from cyrvanta.shared.config import get_settings
 from cyrvanta.shared.database import Base
 

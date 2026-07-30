@@ -1,6 +1,6 @@
 # ADR 0015 — Playbooks versionados y n8n como adaptador
 
-**Estado:** Propuesto
+**Estado:** Aceptado
 **Fecha:** 2026-07-29
 
 ## Contexto
@@ -56,6 +56,4 @@ Adoptar, sujeto a aprobación humana, el contrato de
 
 ## Estado de aprobación
 
-Este ADR no es vinculante mientras permanezca `Propuesto`. Al aprobar la
-especificación de Etapa 7 debe cambiar a `Aceptado` antes de crear contratos
-físicos o implementar workflows.
+Aceptado por instrucción humana el 2026-07-29.

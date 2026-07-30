@@ -49,7 +49,7 @@
 - [x] Implementar y validar Etapa 6 conforme al ADR 0014.
 - [x] Especificar Etapa 7 incorporando
   `N8N_WORKFLOWS_AS_CODE_REQUIREMENTS.md`.
-- [ ] GATE: aprobar
+- [x] GATE: aprobar
   `PHASE_21_N8N_WORKFLOWS_EXECUTION.md` y aceptar ADR 0015.
 - [ ] Implementar workflows n8n, scripts y callbacks únicamente después de
   aprobar Etapas 5, 6 y 7.

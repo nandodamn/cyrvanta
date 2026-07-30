@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:cyrvanta:n8n:dispatch:v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "dispatch_id", "execution_id", "incident_id",
+    "workflow_code", "workflow_version", "execution_mode", "inputs",
+    "claim", "terminal_callback"
+  ],
+  "properties": {
+    "schema_version": {"const": 1},
+    "dispatch_id": {"type": "string", "format": "uuid"},
+    "execution_id": {"type": "string", "format": "uuid"},
+    "incident_id": {"type": "string", "format": "uuid"},
+    "workflow_code": {"type": "string", "minLength": 1, "maxLength": 120},
+    "workflow_version": {"type": "string", "minLength": 1, "maxLength": 80},
+    "execution_mode": {"const": "SYNTHETIC"},
+    "inputs": {"type": "object"},
+    "claim": {"$ref": "#/$defs/signedPackage"},
+    "terminal_callback": {"$ref": "#/$defs/signedPackage"}
+  },
+  "$defs": {
+    "signedPackage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["url", "body", "headers"],
+      "properties": {
+        "url": {"type": "string", "format": "uri"},
+        "body": {"type": "string"},
+        "headers": {
+          "type": "object",
+          "required": [
+            "Content-Type", "X-Cyrvanta-Key-Id", "X-Cyrvanta-Timestamp",
+            "X-Cyrvanta-Nonce", "X-Cyrvanta-Signature"
+          ]
+        }
+      }
+    }
+  }
+}

@@ -71,6 +71,26 @@ CATALOG = {
     ),
 }
 
+PLAYBOOK_METADATA = {
+    "cyrvanta-demo-response": ("Cyrvanta — Simulate User Block", ()),
+    "notify-critical-incident": (
+        "Cyrvanta — Notify Critical Incident",
+        ("notification-channel",),
+    ),
+    "create-security-ticket": (
+        "Cyrvanta — Create Security Ticket",
+        ("ticketing-system",),
+    ),
+    "request-dual-approval": (
+        "Cyrvanta — Request Dual Approval",
+        ("notification-channel",),
+    ),
+    "incident-report-email": (
+        "Cyrvanta — Incident Report Email",
+        ("smtp-outbound",),
+    ),
+}
+
 
 class OperationsService:
     def __init__(
@@ -172,7 +192,14 @@ class OperationsService:
                     for node in workflow.nodes
                 ]
                 if workflow is not None
-                else []
+                else [
+                    PlaybookConnector(
+                        node_type="credential-alias",
+                        name=alias,
+                        credential_names=[],
+                    )
+                    for alias in PLAYBOOK_METADATA.get(workflow_id, (workflow_id, ()))[1]
+                ]
             )
             items.append(
                 PlaybookSummary(
@@ -212,9 +239,7 @@ class OperationsService:
 
     @staticmethod
     def _fallback_playbook_name(workflow_id: str) -> str:
-        if workflow_id == "cyrvanta-demo-response":
-            return "Cyrvanta Demo Response"
-        return workflow_id
+        return PLAYBOOK_METADATA.get(workflow_id, (workflow_id, ()))[0]
 
     async def analyze(
         self,

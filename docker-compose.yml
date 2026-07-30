@@ -163,8 +163,10 @@ services:
     entrypoint: ["tini", "--", "/bin/sh", "-c"]
     command:
       - >-
-        n8n import:workflow
-        --input=/opt/cyrvanta/workflows/cyrvanta-demo-response.json
+        for workflow in /opt/cyrvanta/n8n/workflows/*.json;
+        do n8n import:workflow --input="$$workflow" || exit 1; done
+        && n8n import:workflow
+        --input=/opt/cyrvanta/n8n/cyrvanta-demo-response.json
         && n8n update:workflow --id=cyrvanta-demo-response --active=true
         && exec n8n start
     environment:
@@ -183,7 +185,7 @@ services:
       NODES_EXCLUDE: '["n8n-nodes-base.executeCommand","n8n-nodes-base.readWriteFile"]'
     volumes:
       - n8n_data:/home/node/.n8n
-      - ./infrastructure/n8n/cyrvanta-demo-response.json:/opt/cyrvanta/workflows/cyrvanta-demo-response.json:ro
+      - ./infrastructure/n8n:/opt/cyrvanta/n8n:ro
     ports: ["127.0.0.1:5678:5678"]
     networks: [internal, host-access]
     healthcheck:

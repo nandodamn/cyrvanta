@@ -1,9 +1,9 @@
 # Fase 21 — Playbooks versionados y ejecución n8n segura
 
 **Etapa estratégica:** 7
-**Estado:** DRAFT — propuesta para revisión humana
+**Estado:** APROBADO PARA IMPLEMENTACIÓN — autorizado por instrucción humana
 **Fecha:** 2026-07-29
-**Implementación autorizada:** no
+**Implementación autorizada:** sí
 
 ## 1. Objetivo
 
@@ -904,7 +904,7 @@ Después de aprobación:
 
 ## 34. Decisiones materiales para aprobación
 
-La implementación queda bloqueada hasta aprobar o enmendar:
+La instrucción humana del 2026-07-29 aprobó sin enmiendas:
 
 1. lenguaje de dominio y ownership;
 2. seis conceptos persistentes;

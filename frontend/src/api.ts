@@ -315,6 +315,29 @@ const responseDecisionListSchema = z.object({
   items: z.array(responseDecisionSchema),
   total: z.number().int().nonnegative(),
 });
+const playbookExecutionSchema = z.object({
+  id: z.string().uuid(),
+  authorization_id: z.string().uuid().nullable(),
+  source_event_id: z.string().uuid().nullable(),
+  proposal_id: z.string().uuid().nullable(),
+  incident_id: z.string().uuid(),
+  playbook_version_id: z.string().uuid(),
+  origin: z.string(),
+  execution_mode: z.string(),
+  status: z.string(),
+  inputs: z.record(z.unknown()),
+  result: z.record(z.unknown()).nullable(),
+  error_code: z.string().nullable(),
+  adapter_execution_id: z.string().nullable(),
+  claimed_at: z.string().nullable(),
+  deadline_at: z.string(),
+  completed_at: z.string().nullable(),
+  created_at: z.string(),
+});
+const playbookExecutionListSchema = z.object({
+  items: z.array(playbookExecutionSchema),
+  total: z.number().int().nonnegative(),
+});
 export type IntegrationHealth = z.infer<typeof integrationHealthSchema>;
 export type Analysis = z.infer<typeof analysisSchema>;
 export type Claim = z.infer<typeof claimSchema>;
@@ -323,6 +346,7 @@ export type Enrichment = z.infer<typeof enrichmentSchema>;
 export type PlaybookCatalog = z.infer<typeof playbookCatalogSchema>;
 export type PlaybookManagement = z.infer<typeof playbookManagementSchema>;
 export type ResponseDecision = z.infer<typeof responseDecisionSchema>;
+export type PlaybookExecution = z.infer<typeof playbookExecutionSchema>;
 export type ListQuery = {
   query?: string;
   page?: number;
@@ -623,24 +647,6 @@ export async function analyzeIncident(id: string): Promise<Analysis> {
     await authorizedMutation(`/api/v1/incidents/${id}/analysis`, "POST", {}),
   );
 }
-export async function executeDemoAutomation(id: string) {
-  return z
-    .object({
-      execution_id: z.string(),
-      status: z.string(),
-      mode: z.string(),
-      workflow_id: z.string(),
-    })
-    .parse(
-      await authorizedMutation("/api/v1/automations/execute", "POST", {
-        incident_id: id,
-        workflow_id: "cyrvanta-demo-response",
-        approved: true,
-        idempotency_key: `demo-${id}`,
-      }),
-    );
-}
-
 export async function getResponseDecisions(incidentId: string): Promise<ResponseDecision[]> {
   const params = new URLSearchParams({ incident_id: incidentId, limit: "25", offset: "0" });
   return responseDecisionListSchema.parse(
@@ -669,6 +675,52 @@ export async function createDemoResponseProposal(id: string): Promise<ResponseDe
           evidence_refs: [],
         }),
       }),
+    ),
+  );
+}
+
+export async function getPlaybookExecutions(incidentId: string): Promise<PlaybookExecution[]> {
+  const params = new URLSearchParams({ incident_id: incidentId, limit: "25", offset: "0" });
+  return playbookExecutionListSchema.parse(
+    await authorized(`/api/v1/playbook-executions?${params.toString()}`),
+  ).items;
+}
+
+export async function executeAuthorizedResponse(
+  authorizationId: string,
+): Promise<PlaybookExecution> {
+  return playbookExecutionSchema.parse(
+    await checked(
+      await authenticatedFetch(
+        `/api/v1/response-authorizations/${authorizationId}/executions`,
+        {
+          method: "POST",
+          headers: {
+            "Idempotency-Key": `authorized-execution-${authorizationId}`,
+          },
+        },
+      ),
+    ),
+  );
+}
+
+export async function decideResponse(
+  approvalRequestId: string,
+  decision: "APPROVE" | "REJECT",
+  fingerprint: string,
+): Promise<ResponseDecision> {
+  return responseDecisionSchema.parse(
+    await authorizedMutation(
+      `/api/v1/approval-requests/${approvalRequestId}/decisions`,
+      "POST",
+      {
+        decision,
+        reason:
+          decision === "APPROVE"
+            ? "Independent demo approval after reviewing the synthetic scope"
+            : "Independent demo rejection",
+        expected_proposal_fingerprint: fingerprint,
+      },
     ),
   );
 }

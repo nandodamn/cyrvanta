@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:cyrvanta:n8n:callback:v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["adapter_event_id", "sequence", "status", "occurred_at"],
+  "properties": {
+    "adapter_event_id": {"type": "string", "format": "uuid"},
+    "sequence": {"type": "integer", "minimum": 1, "maximum": 32767},
+    "status": {
+      "enum": ["RUNNING", "SUCCEEDED", "FAILED", "TIMED_OUT", "CANCELLED"]
+    },
+    "result": {"type": ["object", "null"]},
+    "error_code": {"type": ["string", "null"], "maxLength": 80},
+    "safe_detail": {"type": ["string", "null"], "maxLength": 2000},
+    "occurred_at": {"type": "string", "format": "date-time"}
+  }
+}

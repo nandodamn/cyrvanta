@@ -10,9 +10,11 @@ import {
   createRole,
   createUser,
   createDemoResponseProposal,
+  decideResponse,
   analyzeIncident,
   directoryLogin,
   downloadIncidentReport,
+  executeAuthorizedResponse,
   generateCanonicalDemoScenario,
   generateIncidentExplanation,
   getAlerts,
@@ -27,6 +29,7 @@ import {
   getMe,
   getPermissions,
   getPlaybookManagement,
+  getPlaybookExecutions,
   getPlaybooks,
   getRolePermissions,
   getResponseDecisions,
@@ -608,6 +611,7 @@ function IncidentDetailPage() {
   const { t, i18n } = useTranslation();
   const queryClient = useQueryClient();
   const incident = useQuery({ queryKey: ["incident", id], queryFn: () => getIncident(id) });
+  const currentUser = useQuery({ queryKey: ["me"], queryFn: getMe, retry: false });
   const timeline = useQuery({ queryKey: ["timeline", id], queryFn: () => getTimeline(id) });
   const claims = useQuery({ queryKey: ["claims", id], queryFn: () => getClaims(id) });
   const correlations = useQuery({
@@ -622,6 +626,11 @@ function IncidentDetailPage() {
   const responseDecisions = useQuery({
     queryKey: ["response-decisions", id],
     queryFn: () => getResponseDecisions(id),
+    retry: false,
+  });
+  const playbookExecutions = useQuery({
+    queryKey: ["playbook-executions", id],
+    queryFn: () => getPlaybookExecutions(id),
     retry: false,
   });
   const transition = useMutation({
@@ -654,6 +663,29 @@ function IncidentDetailPage() {
   });
   const responseProposal = useMutation({
     mutationFn: () => createDemoResponseProposal(id),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["response-decisions", id] });
+    },
+  });
+  const executeResponse = useMutation({
+    mutationFn: (authorizationId: string) => executeAuthorizedResponse(authorizationId),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["response-decisions", id] }),
+        queryClient.invalidateQueries({ queryKey: ["playbook-executions", id] }),
+      ]);
+    },
+  });
+  const approvalDecision = useMutation({
+    mutationFn: ({
+      requestId,
+      decision,
+      fingerprint,
+    }: {
+      requestId: string;
+      decision: "APPROVE" | "REJECT";
+      fingerprint: string;
+    }) => decideResponse(requestId, decision, fingerprint),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["response-decisions", id] });
     },
@@ -789,6 +821,47 @@ function IncidentDetailPage() {
               </small>
               <br />
               <small>{decision.reason_codes.join(" · ")}</small>
+              {decision.approval_request_id &&
+                decision.approval_status === "PENDING" &&
+                currentUser.data?.id !== decision.requester_user_id && (
+                  <div>
+                    <button
+                      className="ghost"
+                      disabled={approvalDecision.isPending}
+                      onClick={() =>
+                        approvalDecision.mutate({
+                          requestId: decision.approval_request_id!,
+                          decision: "APPROVE",
+                          fingerprint: decision.fingerprint,
+                        })
+                      }
+                    >
+                      {t("approveResponse")}
+                    </button>
+                    <button
+                      className="ghost"
+                      disabled={approvalDecision.isPending}
+                      onClick={() =>
+                        approvalDecision.mutate({
+                          requestId: decision.approval_request_id!,
+                          decision: "REJECT",
+                          fingerprint: decision.fingerprint,
+                        })
+                      }
+                    >
+                      {t("rejectResponse")}
+                    </button>
+                  </div>
+                )}
+              {decision.authorization?.status === "ACTIVE" && (
+                <button
+                  className="ghost"
+                  disabled={executeResponse.isPending}
+                  onClick={() => executeResponse.mutate(decision.authorization!.id)}
+                >
+                  {t("simulateResponse")}
+                </button>
+              )}
             </article>
           ))}
           <PageState
@@ -798,6 +871,29 @@ function IncidentDetailPage() {
               !responseDecisions.isLoading &&
               !responseDecisions.isError &&
               responseDecisions.data?.length === 0
+            }
+          />
+        </div>
+        <div className="claim-grid">
+          <h3>{t("executionHistory")}</h3>
+          {playbookExecutions.data?.map((execution) => (
+            <article className="claim-card" key={execution.id}>
+              <div className="claim-badges">
+                <span>{execution.status}</span>
+                <span>{execution.execution_mode}</span>
+              </div>
+              <strong>{execution.id}</strong>
+              <small>{new Date(execution.created_at).toLocaleString(i18n.language)}</small>
+              {execution.error_code && <p>{execution.error_code}</p>}
+            </article>
+          ))}
+          <PageState
+            loading={playbookExecutions.isLoading}
+            error={playbookExecutions.isError || executeResponse.isError}
+            empty={
+              !playbookExecutions.isLoading &&
+              !playbookExecutions.isError &&
+              playbookExecutions.data?.length === 0
             }
           />
         </div>

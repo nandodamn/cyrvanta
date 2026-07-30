@@ -43,7 +43,15 @@ class Settings(BaseSettings):
     n8n_base_url: str = "http://n8n:5678"
     n8n_editor_url: str = "http://localhost:5678"
     n8n_api_key: str = ""
-    n8n_allowed_workflow_ids: str = "cyrvanta-demo-response"
+    n8n_allowed_workflow_ids: str = (
+        "cyrvanta-demo-response,notify-critical-incident,create-security-ticket,"
+        "request-dual-approval,incident-report-email"
+    )
+    n8n_dispatch_key: str = ""
+    n8n_callback_key: str = ""
+    n8n_key_id: str = "local-demo-v1"
+    playbook_dispatch_enabled: bool = False
+    internal_api_url: str = "http://backend:8000"
     automation_kill_switch: bool = False
     directory_demo_enabled: bool = False
     directory_demo_username: str = "ldap-demo"

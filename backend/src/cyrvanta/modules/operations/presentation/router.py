@@ -91,26 +91,15 @@ async def analyze(
     return result
 
 
-@router.post("/automations/execute", response_model=AutomationResponse)
+@router.post("/automations/execute", response_model=AutomationResponse, deprecated=True)
 async def execute(
     payload: AutomationRequest, request: Request, context: ResponseExecutor
 ) -> AutomationResponse:
-    await IncidentService().get_incident(context.tenant_id, payload.incident_id)
-    service = OperationsService()
-    try:
-        result = await service.execute(payload)
-    except ValueError as exc:
-        raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
-    await service.audit(
-        context.tenant_id,
-        context.user_id,
-        correlation_id(request),
-        "response.execution.requested",
-        "incident",
-        payload.incident_id,
-        {"workflow_id": result.workflow_id, "mode": result.mode, "status": result.status},
+    del payload, request, context
+    raise HTTPException(
+        status.HTTP_410_GONE,
+        "Legacy boolean approval is retired; use a durable response authorization",
     )
-    return result
 
 
 @router.get("/incidents/{incident_id}/report")

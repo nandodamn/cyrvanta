@@ -1,0 +1,42 @@
+[
+  {
+    "id": "cyrvanta-incident-report-email",
+    "name": "Cyrvanta — Incident Report Email",
+    "active": false,
+    "nodes": [
+      {
+        "parameters": {
+          "httpMethod": "POST",
+          "path": "incident-report-email",
+          "responseMode": "responseNode",
+          "options": {}
+        },
+        "id": "008b2a23-86d9-4b59-bc01-1e772449b172",
+        "name": "Inactive Managed Entry",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 2,
+        "position": [260, 300]
+      },
+      {
+        "parameters": {
+          "respondWith": "json",
+          "responseBody": "={{ { \"accepted\": false, \"reason\": \"workflow_inactive_pending_connector\" } }}",
+          "options": {"responseCode": 503}
+        },
+        "id": "e03c5163-4968-485c-80b5-76c8ef12c33a",
+        "name": "Fail Closed",
+        "type": "n8n-nodes-base.respondToWebhook",
+        "typeVersion": 1.4,
+        "position": [500, 300]
+      }
+    ],
+    "connections": {
+      "Inactive Managed Entry": {"main": [[{"node": "Fail Closed", "type": "main", "index": 0}]]}
+    },
+    "settings": {"executionOrder": "v1"},
+    "staticData": null,
+    "pinData": {},
+    "versionId": "95bf22ec-e225-465a-ad3e-5ad4bda48178",
+    "tags": []
+  }
+]

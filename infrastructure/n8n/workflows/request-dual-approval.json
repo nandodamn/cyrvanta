@@ -1,0 +1,42 @@
+[
+  {
+    "id": "cyrvanta-request-dual-approval",
+    "name": "Cyrvanta — Request Dual Approval",
+    "active": false,
+    "nodes": [
+      {
+        "parameters": {
+          "httpMethod": "POST",
+          "path": "request-dual-approval",
+          "responseMode": "responseNode",
+          "options": {}
+        },
+        "id": "15f50bd1-ccf8-4715-903d-ae55596f83c1",
+        "name": "Inactive Managed Entry",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 2,
+        "position": [260, 300]
+      },
+      {
+        "parameters": {
+          "respondWith": "json",
+          "responseBody": "={{ { \"accepted\": false, \"reason\": \"workflow_inactive_pending_connector\" } }}",
+          "options": {"responseCode": 503}
+        },
+        "id": "69520070-b54f-42d3-873c-c98832393c69",
+        "name": "Fail Closed",
+        "type": "n8n-nodes-base.respondToWebhook",
+        "typeVersion": 1.4,
+        "position": [500, 300]
+      }
+    ],
+    "connections": {
+      "Inactive Managed Entry": {"main": [[{"node": "Fail Closed", "type": "main", "index": 0}]]}
+    },
+    "settings": {"executionOrder": "v1"},
+    "staticData": null,
+    "pinData": {},
+    "versionId": "132e1e98-7db2-401b-a0d4-366ea521e25a",
+    "tags": []
+  }
+]

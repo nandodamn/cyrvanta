@@ -1,0 +1,61 @@
+{
+  "schema_version": 1,
+  "managed_by": "cyrvanta",
+  "workflows": [
+    {
+      "code": "notify-critical-incident",
+      "n8n_id": "cyrvanta-notify-critical-incident",
+      "version": "1.0.0",
+      "file": "workflows/notify-critical-incident.json",
+      "input_schema": "schemas/synthetic-input.schema.json",
+      "result_schema": "schemas/synthetic-result.schema.json",
+      "classification": "synthetic",
+      "activate_by_default": false,
+      "credential_aliases": ["notification-channel"]
+    },
+    {
+      "code": "create-security-ticket",
+      "n8n_id": "cyrvanta-create-security-ticket",
+      "version": "1.0.0",
+      "file": "workflows/create-security-ticket.json",
+      "input_schema": "schemas/synthetic-input.schema.json",
+      "result_schema": "schemas/synthetic-result.schema.json",
+      "classification": "synthetic",
+      "activate_by_default": false,
+      "credential_aliases": ["ticketing-system"]
+    },
+    {
+      "code": "request-dual-approval",
+      "n8n_id": "cyrvanta-request-dual-approval",
+      "version": "1.0.0",
+      "file": "workflows/request-dual-approval.json",
+      "input_schema": "schemas/synthetic-input.schema.json",
+      "result_schema": "schemas/synthetic-result.schema.json",
+      "classification": "synthetic",
+      "activate_by_default": false,
+      "credential_aliases": ["notification-channel"]
+    },
+    {
+      "code": "simulate-user-block",
+      "n8n_id": "cyrvanta-demo-response",
+      "version": "provisional-demo-1",
+      "file": "cyrvanta-demo-response.json",
+      "input_schema": "schemas/synthetic-input.schema.json",
+      "result_schema": "schemas/synthetic-result.schema.json",
+      "classification": "synthetic",
+      "activate_by_default": true,
+      "credential_aliases": []
+    },
+    {
+      "code": "incident-report-email",
+      "n8n_id": "cyrvanta-incident-report-email",
+      "version": "1.0.0",
+      "file": "workflows/incident-report-email.json",
+      "input_schema": "schemas/synthetic-input.schema.json",
+      "result_schema": "schemas/synthetic-result.schema.json",
+      "classification": "synthetic",
+      "activate_by_default": false,
+      "credential_aliases": ["smtp-outbound"]
+    }
+  ]
+}

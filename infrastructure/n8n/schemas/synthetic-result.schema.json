@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:cyrvanta:playbook:synthetic-result:v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["simulated", "effect", "workflow_code"],
+  "properties": {
+    "simulated": {"const": true},
+    "effect": {"const": "none"},
+    "workflow_code": {"type": "string", "minLength": 1, "maxLength": 120}
+  }
+}

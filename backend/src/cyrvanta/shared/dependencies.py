@@ -50,7 +50,29 @@ def require_permission(
     return dependency
 
 
+def require_any_permission(
+    *permission_codes: str,
+) -> Callable[..., Coroutine[Any, Any, SecurityContext]]:
+    if not permission_codes:
+        raise ValueError("At least one permission code is required")
+
+    async def dependency(
+        context: SecurityContext = Depends(get_security_context),
+    ) -> SecurityContext:
+        for permission_code in permission_codes:
+            if await is_authorized(context, permission_code):
+                return context
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Permission denied")
+
+    return dependency
+
+
 async def authorize(context: SecurityContext, permission_code: str) -> None:
+    if not await is_authorized(context, permission_code):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Permission denied")
+
+
+async def is_authorized(context: SecurityContext, permission_code: str) -> bool:
     async with tenant_session(context.tenant_id) as session:
         granted = await session.scalar(
             select(PermissionModel.id)
@@ -65,5 +87,4 @@ async def authorize(context: SecurityContext, permission_code: str) -> None:
             )
             .limit(1)
         )
-    if granted is None:
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "Permission denied")
+    return granted is not None

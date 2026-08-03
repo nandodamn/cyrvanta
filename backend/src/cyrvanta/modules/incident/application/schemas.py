@@ -10,6 +10,13 @@ IncidentStatus = Literal[
 ]
 
 
+TriageStatus = Literal["UNREVIEWED", "RELEVANT", "DISCARDED"]
+
+
+class AlertTriageUpdate(BaseModel):
+    triage_status: TriageStatus
+
+
 class AlertResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: UUID
@@ -24,6 +31,10 @@ class AlertResponse(BaseModel):
     indicator_summary: str | None
     provenance: str
     is_simulated: bool
+    triage_status: str = "UNREVIEWED"
+    reviewed_by_user_id: UUID | None = None
+    reviewed_at: datetime | None = None
+    reviewer_display_name: str | None = None
 
 
 class IncidentCreate(BaseModel):

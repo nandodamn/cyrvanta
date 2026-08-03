@@ -18,15 +18,9 @@ from cyrvanta.shared.dependencies import SecurityContext, require_permission
 
 router = APIRouter(tags=["response-decisions"])
 ResponseReader = Annotated[SecurityContext, Depends(require_permission("response.read"))]
-ResponseRequester = Annotated[
-    SecurityContext, Depends(require_permission("response.request"))
-]
-ResponseApprover = Annotated[
-    SecurityContext, Depends(require_permission("response.approve"))
-]
-ResponseRevoker = Annotated[
-    SecurityContext, Depends(require_permission("response.revoke"))
-]
+ResponseRequester = Annotated[SecurityContext, Depends(require_permission("response.request"))]
+ResponseApprover = Annotated[SecurityContext, Depends(require_permission("response.approve"))]
+ResponseRevoker = Annotated[SecurityContext, Depends(require_permission("response.revoke"))]
 
 
 def correlation_id(request: Request) -> UUID:
@@ -75,9 +69,7 @@ async def list_proposals(
 
 
 @router.get("/response-proposals/{proposal_id}", response_model=ActionProposalResponse)
-async def get_proposal(
-    proposal_id: UUID, context: ResponseReader
-) -> ActionProposalResponse:
+async def get_proposal(proposal_id: UUID, context: ResponseReader) -> ActionProposalResponse:
     try:
         return await DecisionService().get_proposal(context.tenant_id, proposal_id)
     except DecisionNotFound as exc:

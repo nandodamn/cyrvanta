@@ -7,6 +7,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from cyrvanta.modules.identity.infrastructure.models import AuditEventModel, UserModel
 from cyrvanta.modules.incident.application.schemas import (
+    AlertResponse,
+    AlertTriageUpdate,
     DemoScenarioResponse,
     IncidentAssign,
     IncidentCreate,
@@ -44,16 +46,19 @@ TRANSITIONS: dict[str, set[str]] = {
     "contained": {"investigating", "resolved"},
     "resolved": {"closed", "reopened"},
     "closed": {"reopened"},
-    "reopened": {"triaged", "investigating"},
+    "reopened": {"investigating", "contained", "resolved", "closed"},
 }
 
 
 class IncidentService:
     async def list_alerts(
         self, tenant_id: UUID, limit: int, offset: int = 0, search: str | None = None
-    ) -> list[AlertReferenceModel]:
+    ) -> list[AlertResponse]:
         async with tenant_session(tenant_id) as session:
-            statement = select(AlertReferenceModel)
+            statement = (
+                select(AlertReferenceModel, UserModel.email, UserModel.display_name)
+                .outerjoin(UserModel, AlertReferenceModel.reviewed_by_user_id == UserModel.id)
+            )
             if pattern := self._search_pattern(search):
                 statement = statement.where(
                     or_(
@@ -63,25 +68,87 @@ class IncidentService:
                         AlertReferenceModel.external_id.ilike(pattern, escape="\\"),
                     )
                 )
-            return list(
-                (
-                    await session.scalars(
-                        statement.order_by(
-                            AlertReferenceModel.observed_at.desc(),
-                            AlertReferenceModel.id.desc(),
-                        )
-                        .offset(offset)
-                        .limit(limit)
+            rows = (
+                await session.execute(
+                    statement.order_by(
+                        AlertReferenceModel.observed_at.desc(),
+                        AlertReferenceModel.id.desc(),
                     )
-                ).all()
-            )
+                    .offset(offset)
+                    .limit(limit)
+                )
+            ).all()
+            result: list[AlertResponse] = []
+            for alert, email, display_name in rows:
+                dto = AlertResponse.model_validate(alert)
+                dto.reviewer_display_name = display_name or email
+                result.append(dto)
+            return result
 
-    async def get_alert(self, tenant_id: UUID, alert_id: UUID) -> AlertReferenceModel:
+    async def get_alert(self, tenant_id: UUID, alert_id: UUID) -> AlertResponse:
+        async with tenant_session(tenant_id) as session:
+            row = (
+                await session.execute(
+                    select(AlertReferenceModel, UserModel.email, UserModel.display_name)
+                    .outerjoin(UserModel, AlertReferenceModel.reviewed_by_user_id == UserModel.id)
+                    .where(AlertReferenceModel.id == alert_id)
+                )
+            ).first()
+            if row is None:
+                raise IncidentNotFound
+            alert, email, display_name = row
+            dto = AlertResponse.model_validate(alert)
+            dto.reviewer_display_name = display_name or email
+            return dto
+
+    async def list_incident_alerts(
+        self, tenant_id: UUID, incident_id: UUID
+    ) -> list[AlertResponse]:
+        async with tenant_session(tenant_id) as session:
+            await self._get(session, incident_id)
+            statement = (
+                select(AlertReferenceModel, UserModel.email, UserModel.display_name)
+                .join(
+                    IncidentAlertModel,
+                    AlertReferenceModel.id == IncidentAlertModel.alert_id,
+                )
+                .outerjoin(UserModel, AlertReferenceModel.reviewed_by_user_id == UserModel.id)
+                .where(IncidentAlertModel.incident_id == incident_id)
+                .order_by(
+                    AlertReferenceModel.observed_at.desc(),
+                    AlertReferenceModel.id.desc(),
+                )
+            )
+            rows = (await session.execute(statement)).all()
+            result: list[AlertResponse] = []
+            for alert, email, display_name in rows:
+                dto = AlertResponse.model_validate(alert)
+                dto.reviewer_display_name = display_name or email
+                result.append(dto)
+            return result
+
+    async def triage_alert(
+        self,
+        tenant_id: UUID,
+        actor_id: UUID,
+        alert_id: UUID,
+        payload: AlertTriageUpdate,
+        correlation_id: UUID,
+    ) -> AlertResponse:
+        now = datetime.now(UTC)
         async with tenant_session(tenant_id) as session:
             alert = await session.get(AlertReferenceModel, alert_id)
             if alert is None:
                 raise IncidentNotFound
-            return alert
+            alert.triage_status = payload.triage_status
+            alert.reviewed_by_user_id = actor_id
+            alert.reviewed_at = now
+            alert.updated_at = now
+            self._audit(
+                session, tenant_id, actor_id, "alert.triage.updated", alert.id, correlation_id
+            )
+            await session.flush()
+        return await self.get_alert(tenant_id, alert_id)
 
     async def list_incidents(
         self, tenant_id: UUID, limit: int, offset: int = 0, search: str | None = None

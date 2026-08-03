@@ -8,6 +8,10 @@ from cyrvanta.modules.incident.application.service import IncidentService
 from cyrvanta.modules.integrations.infrastructure.composition import (
     configured_wazuh_connector,
 )
+from cyrvanta.modules.operations.application.activity import (
+    OperationalActivity24h,
+    OperationalActivityService,
+)
 from cyrvanta.modules.operations.application.schemas import (
     AnalysisResponse,
     AutomationRequest,
@@ -20,7 +24,7 @@ from cyrvanta.modules.operations.application.schemas import (
 from cyrvanta.modules.operations.application.service import OperationsService
 from cyrvanta.modules.operations.infrastructure.n8n_catalog import N8nWorkflowCatalog
 from cyrvanta.shared.config import get_settings
-from cyrvanta.shared.dependencies import SecurityContext, require_permission
+from cyrvanta.shared.dependencies import SecurityContext, authorize, require_permission
 
 router = APIRouter(tags=["operations"])
 IncidentReader = Annotated[SecurityContext, Depends(require_permission("incident.read"))]
@@ -37,6 +41,12 @@ def correlation_id(request: Request) -> UUID:
 @router.get("/integrations/health", response_model=list[IntegrationHealth])
 async def integration_health(context: IncidentReader) -> list[IntegrationHealth]:
     return await OperationsService(configured_wazuh_connector(context.tenant_id)).health()
+
+
+@router.get("/operations/activity-24h", response_model=OperationalActivity24h)
+async def operational_activity_24h(context: IncidentReader) -> OperationalActivity24h:
+    await authorize(context, "alert.read")
+    return await OperationalActivityService().get(context.tenant_id)
 
 
 @router.get("/mitre/techniques", response_model=list[Technique])

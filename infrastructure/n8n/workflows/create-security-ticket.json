@@ -1,7 +1,7 @@
 [
   {
     "id": "cyrvanta-create-security-ticket",
-    "name": "Cyrvanta — Create Security Ticket",
+    "name": "Cyrvanta â€” Create Security Ticket",
     "active": false,
     "nodes": [
       {
@@ -15,6 +15,7 @@
         "name": "Inactive Managed Entry",
         "type": "n8n-nodes-base.webhook",
         "typeVersion": 2,
+        "webhookId": "bf2e8f2a-6a3e-4538-97a8-df7892209558",
         "position": [260, 300]
       },
       {

@@ -40,17 +40,28 @@ class Settings(BaseSettings):
     ollama_model: str = "gemma4:e4b"
     ai_request_timeout_seconds: int = 120
     n8n_mode: str = "simulated"
+    n8n_enabled: bool = False
     n8n_base_url: str = "http://n8n:5678"
     n8n_editor_url: str = "http://localhost:5678"
     n8n_api_key: str = ""
     n8n_allowed_workflow_ids: str = (
-        "cyrvanta-demo-response,notify-critical-incident,create-security-ticket,"
+        "cyrvanta-simulate-user-block,simulate-user-block,block-ip-address,isolate-endpoint,"
+        "revoke-user-sessions,notify-critical-incident,create-security-ticket,"
         "request-dual-approval,incident-report-email"
     )
     n8n_dispatch_key: str = ""
     n8n_callback_key: str = ""
     n8n_key_id: str = "local-demo-v1"
+    n8n_internal_key_version: int = Field(default=1, ge=1, le=1_000_000)
+    playbook_native_engine_enabled: bool = True
+    playbook_native_enabled_tenants: str = ""
+    playbook_live_enabled: bool = False
     playbook_dispatch_enabled: bool = False
+    memory_influence_enabled: bool = False
+    memory_max_validity_days: int = Field(default=90, ge=1, le=365)
+    memory_minimum_sample_size: int = Field(default=20, ge=1, le=10_000)
+    memory_max_reason_length: int = Field(default=1000, ge=64, le=4000)
+    memory_max_explanation_length: int = Field(default=2000, ge=128, le=8000)
     internal_api_url: str = "http://backend:8000"
     automation_kill_switch: bool = False
     directory_demo_enabled: bool = False
@@ -60,6 +71,12 @@ class Settings(BaseSettings):
     @property
     def allowed_workflow_ids(self) -> set[str]:
         return {item.strip() for item in self.n8n_allowed_workflow_ids.split(",") if item.strip()}
+
+    @property
+    def native_enabled_tenant_ids(self) -> set[str]:
+        return {
+            item.strip() for item in self.playbook_native_enabled_tenants.split(",") if item.strip()
+        }
 
     @property
     def allowed_origins(self) -> list[str]:
@@ -84,4 +101,6 @@ class Settings(BaseSettings):
 @lru_cache
 def get_settings() -> Settings:
     # BaseSettings resolves required values from the environment at runtime.
-    return Settings()
+    # The empty dynamic kwargs preserve environment lookup without adding
+    # insecure source-code defaults for required secrets.
+    return Settings(**{})

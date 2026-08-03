@@ -165,9 +165,9 @@ services:
       - >-
         for workflow in /opt/cyrvanta/n8n/workflows/*.json;
         do n8n import:workflow --input="$$workflow" || exit 1; done
-        && n8n import:workflow
-        --input=/opt/cyrvanta/n8n/cyrvanta-demo-response.json
-        && n8n update:workflow --id=cyrvanta-demo-response --active=true
+        && n8n update:workflow --id=cyrvanta-simulate-user-block --active=true
+        && (n8n update:workflow --id=cyrvanta-demo-response --active=false
+        || true)
         && exec n8n start
     environment:
       N8N_HOST: n8n

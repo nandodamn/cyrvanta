@@ -78,6 +78,10 @@ const alertSchema = z.object({
   indicator_summary: z.string().nullable(),
   provenance: z.string(),
   is_simulated: z.boolean(),
+  triage_status: z.enum(["UNREVIEWED", "RELEVANT", "DISCARDED"]).default("UNREVIEWED"),
+  reviewed_by_user_id: z.string().uuid().nullable().optional(),
+  reviewed_at: z.string().nullable().optional(),
+  reviewer_display_name: z.string().nullable().optional(),
 });
 const incidentSchema = z.object({
   id: z.string().uuid(),
@@ -111,6 +115,23 @@ const timelineSchema = z.object({
 export type Alert = z.infer<typeof alertSchema>;
 export type Incident = z.infer<typeof incidentSchema>;
 export type TimelineEntry = z.infer<typeof timelineSchema>;
+const activityBucketSchema = z.object({
+  bucket_start: z.string(),
+  bucket_end: z.string(),
+  alerts: z.number().int().nonnegative(),
+  incidents: z.number().int().nonnegative(),
+});
+const operationalActivity24hSchema = z.object({
+  window_start: z.string(),
+  window_end: z.string(),
+  updated_at: z.string(),
+  source_mode: z.enum(["EMPTY", "SIMULATED", "LIVE", "MIXED"]),
+  totals: z.object({
+    alerts: z.number().int().nonnegative(),
+    incidents: z.number().int().nonnegative(),
+  }),
+  series: z.array(activityBucketSchema).length(12),
+});
 const integrationHealthSchema = z.object({
   code: z.string(),
   mode: z.string(),
@@ -266,6 +287,34 @@ const playbookCatalogSchema = z.object({
   sync_detail: z.string(),
   mode: z.string(),
 });
+const playbookDefinitionSchema = z.object({
+  id: z.string().uuid(),
+  code: z.string(),
+  title_i18n: z.object({ es: z.string(), en: z.string() }),
+  description_i18n: z.object({ es: z.string(), en: z.string() }),
+  created_at: z.string(),
+  latest_version: z.string().nullable(),
+  publication_status: z.string().nullable(),
+  engine_type: z.enum(["NATIVE", "N8N"]).nullable(),
+  binding_status: z.string().nullable(),
+  binding_active: z.boolean(),
+  execution_mode: z.enum(["SIMULATED", "LIVE"]).nullable(),
+  impact: z.string().nullable(),
+  required_parameters: z.array(z.string()),
+  credential_aliases: z.array(z.string()),
+  target_incident_types: z.array(z.string()).default([]),
+  mitre_codes: z.array(z.string()).default([]),
+  rollback_supported: z.boolean().default(true),
+  rollback_target_code: z.string().nullable().default(null),
+  rollback_guidance_i18n: z.object({ es: z.string(), en: z.string() }).nullable().default(null),
+  automation_policy_i18n: z.object({ es: z.string(), en: z.string() }).nullable().default(null),
+  last_execution_status: z.string().nullable(),
+  last_executed_at: z.string().nullable(),
+});
+const playbookDefinitionListSchema = z.object({
+  items: z.array(playbookDefinitionSchema),
+  total: z.number().int().nonnegative(),
+});
 const playbookManagementSchema = z.object({
   editor_url: z.string().url(),
   local_only: z.boolean(),
@@ -339,11 +388,13 @@ const playbookExecutionListSchema = z.object({
   total: z.number().int().nonnegative(),
 });
 export type IntegrationHealth = z.infer<typeof integrationHealthSchema>;
+export type OperationalActivity24h = z.infer<typeof operationalActivity24hSchema>;
 export type Analysis = z.infer<typeof analysisSchema>;
 export type Claim = z.infer<typeof claimSchema>;
 export type Correlation = z.infer<typeof correlationSchema>;
 export type Enrichment = z.infer<typeof enrichmentSchema>;
 export type PlaybookCatalog = z.infer<typeof playbookCatalogSchema>;
+export type PlaybookDefinition = z.infer<typeof playbookDefinitionSchema>;
 export type PlaybookManagement = z.infer<typeof playbookManagementSchema>;
 export type ResponseDecision = z.infer<typeof responseDecisionSchema>;
 export type PlaybookExecution = z.infer<typeof playbookExecutionSchema>;
@@ -353,6 +404,66 @@ export type ListQuery = {
   pageSize?: number;
   includeLookahead?: boolean;
 };
+
+const memoryReviewSchema = z.object({
+  id: z.string().uuid(),
+  reviewer_user_id: z.string().uuid(),
+  decision: z.string(),
+  reason: z.string(),
+  created_at: z.string(),
+});
+const memoryStateSchema = z.object({
+  id: z.string().uuid(),
+  actor_user_id: z.string().uuid().nullable(),
+  from_status: z.string().nullable(),
+  to_status: z.string(),
+  reason: z.string(),
+  occurred_at: z.string(),
+});
+const memoryCandidateSchema = z.object({
+  id: z.string().uuid(),
+  version_id: z.string().uuid(),
+  version: z.number().int().positive(),
+  kind: z.string(),
+  source_type: z.string(),
+  created_by_user_id: z.string().uuid(),
+  title_es: z.string(),
+  title_en: z.string(),
+  statement_es: z.string(),
+  statement_en: z.string(),
+  conditions: z.record(z.unknown()),
+  evidence_refs: z.array(z.string().uuid()),
+  is_synthetic: z.boolean(),
+  valid_from: z.string(),
+  valid_until: z.string(),
+  status: z.string(),
+  reviews: z.array(memoryReviewSchema),
+  state_history: z.array(memoryStateSchema),
+  created_at: z.string(),
+});
+const memoryCandidateListSchema = z.object({
+  items: z.array(memoryCandidateSchema),
+  total: z.number().int().nonnegative(),
+});
+const memoryMetricSchema = z.object({
+  id: z.string().uuid(),
+  code: z.string(),
+  version: z.number().int(),
+  window_start: z.string(),
+  window_end: z.string(),
+  sample_size: z.number().int().nonnegative(),
+  numerator: z.number().int().nonnegative(),
+  denominator: z.number().int().positive(),
+  value: z.coerce.number(),
+  sufficient_sample: z.boolean(),
+  input_fingerprint: z.string(),
+});
+const memoryMetricListSchema = z.object({
+  items: z.array(memoryMetricSchema),
+  total: z.number().int().nonnegative(),
+});
+export type MemoryCandidate = z.infer<typeof memoryCandidateSchema>;
+export type MemoryMetric = z.infer<typeof memoryMetricSchema>;
 
 const tokenSchema = z.object({
   access_token: z.string(),
@@ -567,11 +678,25 @@ export async function testDirectoryConfiguration(): Promise<{
 export async function getAlerts(options?: ListQuery): Promise<Alert[]> {
   return z.array(alertSchema).parse(await authorized(listPath("/api/v1/alerts", options)));
 }
+
+export async function updateAlertTriage(
+  alertId: string,
+  triageStatus: "UNREVIEWED" | "RELEVANT" | "DISCARDED",
+): Promise<Alert> {
+  return alertSchema.parse(
+    await authorizedMutation(`/api/v1/alerts/${alertId}/triage`, "POST", {
+      triage_status: triageStatus,
+    }),
+  );
+}
 export async function getIncidents(options?: ListQuery): Promise<Incident[]> {
   return z.array(incidentSchema).parse(await authorized(listPath("/api/v1/incidents", options)));
 }
 export async function getIncident(id: string): Promise<Incident> {
   return incidentSchema.parse(await authorized(`/api/v1/incidents/${id}`));
+}
+export async function getIncidentAlerts(id: string): Promise<AlertReference[]> {
+  return z.array(alertSchema).parse(await authorized(`/api/v1/incidents/${id}/alerts`));
 }
 export async function getTimeline(id: string): Promise<TimelineEntry[]> {
   return z.array(timelineSchema).parse(await authorized(`/api/v1/incidents/${id}/timeline`));
@@ -633,9 +758,35 @@ export async function transitionIncident(
     }),
   );
 }
+export async function getOperationalActivity24h(): Promise<OperationalActivity24h> {
+  return operationalActivity24hSchema.parse(await authorized("/api/v1/operations/activity-24h"));
+}
+
 export async function getIntegrationHealth(): Promise<IntegrationHealth[]> {
   return z.array(integrationHealthSchema).parse(await authorized("/api/v1/integrations/health"));
 }
+export async function getPlaybookDefinitions(): Promise<{
+  items: PlaybookDefinition[];
+  total: number;
+}> {
+  return playbookDefinitionListSchema.parse(
+    await authorized("/api/v1/playbook-definitions?limit=100&offset=0"),
+  );
+}
+
+export async function togglePlaybookBinding(
+  definitionId: string,
+  input: { active?: boolean; engine_type?: "NATIVE" | "N8N" },
+): Promise<PlaybookDefinition> {
+  return playbookDefinitionSchema.parse(
+    await authorizedMutation(
+      `/api/v1/playbook-definitions/${definitionId}/toggle-binding`,
+      "POST",
+      input,
+    ),
+  );
+}
+
 export async function getPlaybooks(options?: ListQuery): Promise<PlaybookCatalog> {
   return playbookCatalogSchema.parse(await authorized(listPath("/api/v1/playbooks", options)));
 }
@@ -668,8 +819,8 @@ export async function createDemoResponseProposal(id: string): Promise<ResponseDe
           action_type: "simulate-user-block",
           impact: "MODERATE",
           requested_mode: "HUMAN_APPROVAL",
-          workflow_id: "cyrvanta-demo-response",
-          workflow_version: "provisional-demo-1",
+          workflow_id: "simulate-user-block",
+          workflow_version: "1.0.0",
           targets: ["synthetic-demo-user"],
           parameters: { execution_mode: "demo" },
           evidence_refs: [],
@@ -691,15 +842,12 @@ export async function executeAuthorizedResponse(
 ): Promise<PlaybookExecution> {
   return playbookExecutionSchema.parse(
     await checked(
-      await authenticatedFetch(
-        `/api/v1/response-authorizations/${authorizationId}/executions`,
-        {
-          method: "POST",
-          headers: {
-            "Idempotency-Key": `authorized-execution-${authorizationId}`,
-          },
+      await authenticatedFetch(`/api/v1/response-authorizations/${authorizationId}/executions`, {
+        method: "POST",
+        headers: {
+          "Idempotency-Key": `authorized-execution-${authorizationId}`,
         },
-      ),
+      }),
     ),
   );
 }
@@ -710,18 +858,14 @@ export async function decideResponse(
   fingerprint: string,
 ): Promise<ResponseDecision> {
   return responseDecisionSchema.parse(
-    await authorizedMutation(
-      `/api/v1/approval-requests/${approvalRequestId}/decisions`,
-      "POST",
-      {
-        decision,
-        reason:
-          decision === "APPROVE"
-            ? "Independent demo approval after reviewing the synthetic scope"
-            : "Independent demo rejection",
-        expected_proposal_fingerprint: fingerprint,
-      },
-    ),
+    await authorizedMutation(`/api/v1/approval-requests/${approvalRequestId}/decisions`, "POST", {
+      decision,
+      reason:
+        decision === "APPROVE"
+          ? "Independent demo approval after reviewing the synthetic scope"
+          : "Independent demo rejection",
+      expected_proposal_fingerprint: fingerprint,
+    }),
   );
 }
 
@@ -734,6 +878,69 @@ export async function downloadIncidentReport(id: string, code: string): Promise<
   anchor.download = `${code}.html`;
   anchor.click();
   URL.revokeObjectURL(url);
+}
+
+async function governedMutation(path: string, body: unknown): Promise<unknown> {
+  return checked(
+    await authenticatedFetch(path, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Idempotency-Key": globalThis.crypto.randomUUID(),
+      },
+      body: JSON.stringify(body),
+    }),
+  );
+}
+
+export async function getMemoryCandidates(): Promise<MemoryCandidate[]> {
+  return memoryCandidateListSchema.parse(
+    await authorized("/api/v1/memory-candidates?limit=100&offset=0"),
+  ).items;
+}
+
+export async function getActiveMemory(): Promise<MemoryCandidate[]> {
+  return memoryCandidateListSchema.parse(
+    await authorized("/api/v1/memory/active?limit=100&offset=0"),
+  ).items;
+}
+
+export async function getMemoryMetrics(): Promise<MemoryMetric[]> {
+  return memoryMetricListSchema.parse(await authorized("/api/v1/memory/metrics?limit=100&offset=0"))
+    .items;
+}
+
+export async function createFeedback(input: Record<string, unknown>): Promise<void> {
+  await governedMutation("/api/v1/feedback", input);
+}
+
+export async function createMemoryCandidate(
+  input: Record<string, unknown>,
+): Promise<MemoryCandidate> {
+  return memoryCandidateSchema.parse(await governedMutation("/api/v1/memory-candidates", input));
+}
+
+export async function transitionMemoryVersion(
+  versionId: string,
+  action: "review-request" | "activate" | "disable",
+  reason: string,
+): Promise<MemoryCandidate> {
+  return memoryCandidateSchema.parse(
+    await governedMutation(`/api/v1/memory-versions/${versionId}/${action}`, { reason }),
+  );
+}
+
+export async function reviewMemoryVersion(
+  versionId: string,
+  decision: "APPROVE" | "REJECT" | "REQUEST_CHANGES",
+  reason: string,
+): Promise<MemoryCandidate> {
+  return memoryCandidateSchema.parse(
+    await governedMutation(`/api/v1/memory-versions/${versionId}/reviews`, {
+      decision,
+      reason,
+    }),
+  );
 }
 
 export async function clearSession(): Promise<void> {

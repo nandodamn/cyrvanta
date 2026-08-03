@@ -52,12 +52,14 @@ ALLOWED_TRANSITIONS = {
         ExecutionStatus.FAILED,
         ExecutionStatus.TIMED_OUT,
         ExecutionStatus.UNKNOWN,
+        ExecutionStatus.CANCELLED,
     },
     ExecutionStatus.UNKNOWN: {
         ExecutionStatus.RUNNING,
         ExecutionStatus.SUCCEEDED,
         ExecutionStatus.FAILED,
         ExecutionStatus.TIMED_OUT,
+        ExecutionStatus.CANCELLED,
     },
 }
 

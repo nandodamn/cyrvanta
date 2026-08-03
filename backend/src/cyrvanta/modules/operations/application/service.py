@@ -72,7 +72,12 @@ CATALOG = {
 }
 
 PLAYBOOK_METADATA = {
+    "cyrvanta-simulate-user-block": ("Cyrvanta — Simulate User Block", ()),
     "cyrvanta-demo-response": ("Cyrvanta — Simulate User Block", ()),
+    "simulate-user-block": ("Cyrvanta — Simulate User Block", ()),
+    "block-ip-address": ("Cyrvanta — Block IP Address", ("firewall-gateway",)),
+    "isolate-endpoint": ("Cyrvanta — Isolate Host Endpoint", ("edr-agent",)),
+    "revoke-user-sessions": ("Cyrvanta — Revoke Active User Sessions", ("identity-provider",)),
     "notify-critical-incident": (
         "Cyrvanta — Notify Critical Incident",
         ("notification-channel",),

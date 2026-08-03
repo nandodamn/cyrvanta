@@ -17,20 +17,28 @@ from cyrvanta.modules.playbooks.application.service import (
     PlaybookSecurityError,
 )
 from cyrvanta.modules.playbooks.domain.models import (
+    ExecutionStatus,
     body_sha256,
     canonical_signature_material,
     validate_timestamp,
     verify_signature,
 )
+from cyrvanta.modules.playbooks.infrastructure.deployment_secrets import (
+    resolve_internal_secret,
+)
 from cyrvanta.shared.config import get_settings
-from cyrvanta.shared.dependencies import SecurityContext, require_permission
+from cyrvanta.shared.dependencies import (
+    SecurityContext,
+    require_any_permission,
+    require_permission,
+)
 
 router = APIRouter(tags=["playbook-executions"])
-ExecutionReader = Annotated[
-    SecurityContext, Depends(require_permission("playbook.execution.read"))
-]
-ExecutionRunner = Annotated[
-    SecurityContext, Depends(require_permission("response.execute"))
+ExecutionReader = Annotated[SecurityContext, Depends(require_permission("playbook.execution.read"))]
+ExecutionRunner = Annotated[SecurityContext, Depends(require_permission("response.execute"))]
+ExecutionCanceller = Annotated[
+    SecurityContext,
+    Depends(require_any_permission("playbook.cancel", "response.cancel")),
 ]
 
 
@@ -90,9 +98,7 @@ async def execute_authorization(
     authorization_id: UUID,
     request: Request,
     context: ExecutionRunner,
-    idempotency_key: Annotated[
-        str, Header(alias="Idempotency-Key", min_length=8, max_length=128)
-    ],
+    idempotency_key: Annotated[str, Header(alias="Idempotency-Key", min_length=8, max_length=128)],
 ) -> PlaybookExecutionResponse:
     try:
         return await PlaybookExecutionService().create_from_authorization(
@@ -122,12 +128,32 @@ async def list_executions(
     "/playbook-executions/{execution_id}",
     response_model=PlaybookExecutionResponse,
 )
-async def get_execution(
-    execution_id: UUID, context: ExecutionReader
-) -> PlaybookExecutionResponse:
+async def get_execution(execution_id: UUID, context: ExecutionReader) -> PlaybookExecutionResponse:
     try:
         return await PlaybookExecutionService().get(context.tenant_id, execution_id)
     except PlaybookNotFound as exc:
+        raise _translate(exc) from exc
+
+
+@router.post(
+    "/playbook-executions/{execution_id}/cancel",
+    response_model=PlaybookExecutionResponse,
+)
+async def cancel_execution(
+    execution_id: UUID,
+    request: Request,
+    context: ExecutionCanceller,
+    expected_status: Annotated[str, Header(alias="If-Match", min_length=6, max_length=24)],
+) -> PlaybookExecutionResponse:
+    try:
+        return await PlaybookExecutionService().cancel(
+            tenant_id=context.tenant_id,
+            actor_user_id=context.user_id,
+            execution_id=execution_id,
+            expected_status=ExecutionStatus(expected_status),
+            correlation_id=UUID(request.state.correlation_id),
+        )
+    except (PlaybookConflict, PlaybookNotFound, ValueError) as exc:
         raise _translate(exc) from exc
 
 
@@ -153,7 +179,12 @@ async def claim_execution(
             timestamp=timestamp_value,
             nonce=nonce,
             signature=signature,
-            secret=get_settings().n8n_dispatch_key,
+            secret=resolve_internal_secret(
+                master_key=get_settings().integration_encryption_key,
+                version=get_settings().n8n_internal_key_version,
+                purpose="n8n-dispatch",
+                explicit_value=get_settings().n8n_dispatch_key,
+            ),
             max_body_bytes=65_536,
         )
         return await PlaybookExecutionService().claim(
@@ -191,7 +222,12 @@ async def update_execution(
             timestamp=timestamp_value,
             nonce=nonce,
             signature=signature,
-            secret=get_settings().n8n_callback_key,
+            secret=resolve_internal_secret(
+                master_key=get_settings().integration_encryption_key,
+                version=get_settings().n8n_internal_key_version,
+                purpose="n8n-callback",
+                explicit_value=get_settings().n8n_callback_key,
+            ),
             max_body_bytes=32_768,
         )
         return await PlaybookExecutionService().update(

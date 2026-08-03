@@ -1,0 +1,55 @@
+{
+  "schema_version": "1.0",
+  "code": "notify-critical-incident-native",
+  "version": "1.0.0",
+  "title_i18n": {
+    "es": "Notificar incidente crítico",
+    "en": "Notify critical incident"
+  },
+  "description_i18n": {
+    "es": "Fixture sintético y no destructivo del motor nativo.",
+    "en": "Synthetic, non-destructive native engine fixture."
+  },
+  "trigger_contract": "security.incident.critical.v1",
+  "execution_mode": "SIMULATED",
+  "impact_level": "LOW",
+  "input_schema_ref": "security/incident-notification-input-v1",
+  "result_schema_ref": "security/incident-notification-result-v1",
+  "steps": [
+    {
+      "id": "notify",
+      "type": "ACTION",
+      "action": "notification.send",
+      "action_version": "1.0.0",
+      "parameters": {
+        "template": "critical-incident"
+      },
+      "credential_aliases": []
+    },
+    {
+      "id": "delivered",
+      "type": "CONDITION",
+      "expression": {
+        "operator": "eq",
+        "path": "steps.notify.output.status",
+        "value": "DELIVERED"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from_step": "notify",
+      "to_step": "delivered",
+      "outcome": "SUCCESS"
+    }
+  ],
+  "timeouts": {
+    "overall_seconds": 120,
+    "action_seconds": 30,
+    "max_attempts": 2
+  },
+  "credential_aliases": [],
+  "labels": {
+    "classification": "synthetic"
+  }
+}

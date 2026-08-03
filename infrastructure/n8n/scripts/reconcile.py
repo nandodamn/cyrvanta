@@ -9,7 +9,21 @@ from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
-RUNTIME_FIELDS = {"active", "createdAt", "id", "shared", "tags", "updatedAt", "versionId"}
+RUNTIME_FIELDS = {
+    "active",
+    "activeVersion",
+    "activeVersionId",
+    "createdAt",
+    "id",
+    "isArchived",
+    "meta",
+    "shared",
+    "tags",
+    "triggerCount",
+    "updatedAt",
+    "versionCounter",
+    "versionId",
+}
 
 
 def canonical_workflow(workflow: dict[str, Any]) -> bytes:
@@ -18,6 +32,11 @@ def canonical_workflow(workflow: dict[str, Any]) -> bytes:
         material, ensure_ascii=False, separators=(",", ":"), sort_keys=True
     ).encode()
 
+
+def comparable_installed_workflow(
+    source: dict[str, Any], installed: dict[str, Any]
+) -> dict[str, Any]:
+    return {key: installed[key] for key in source if key in installed}
 
 def request_json(
     base_url: str,
@@ -33,8 +52,8 @@ def request_json(
     )
     url = f"{base_url.rstrip('/')}{path}"
     if urllib.parse.urlsplit(url).scheme not in {"http", "https"}:
-        raise RuntimeError("N8N_BASE_URL must use http or https")
-    request = urllib.request.Request(  # noqa: S310 - scheme is restricted above
+        raise RuntimeError("N8N_API_URL must use http or https")
+    request = urllib.request.Request(
         url,
         data=body,
         method=method,
@@ -45,7 +64,7 @@ def request_json(
         },
     )
     try:
-        with urllib.request.urlopen(  # noqa: S310 - scheme is restricted above
+        with urllib.request.urlopen(
             request, timeout=15
         ) as response:
             raw = response.read()
@@ -55,8 +74,10 @@ def request_json(
 
 
 def reconcile(*, apply: bool) -> list[dict[str, object]]:
-    base_url = os.environ.get("N8N_BASE_URL", "http://localhost:5678")
+    base_url = os.environ.get("N8N_API_URL", "")
     api_key = os.environ.get("N8N_API_KEY", "")
+    if not base_url:
+        raise RuntimeError("N8N_API_URL is required for reconciliation")
     if not api_key:
         raise RuntimeError("N8N_API_KEY is required for reconciliation")
     manifest = json.loads((ROOT / "manifest.json").read_text(encoding="utf-8"))
@@ -86,6 +107,10 @@ def reconcile(*, apply: bool) -> list[dict[str, object]]:
         source = json.loads((ROOT / entry["file"]).read_text(encoding="utf-8"))[0]
         configured_id = entry["n8n_id"]
         desired = hashlib.sha256(canonical_workflow(source)).hexdigest()
+        if entry.get("sha256") != desired:
+            raise RuntimeError(
+                f"{entry['code']}: manifest digest does not match the artifact"
+            )
         current_summary = installed.get(configured_id) or installed_by_name.get(source["name"])
         if current_summary is None:
             workflow_id = configured_id
@@ -97,7 +122,9 @@ def reconcile(*, apply: bool) -> list[dict[str, object]]:
             current = request_json(
                 base_url, api_key, "GET", f"/api/v1/workflows/{workflow_id}"
             )
-            observed = hashlib.sha256(canonical_workflow(current)).hexdigest()
+            observed = hashlib.sha256(
+                canonical_workflow(comparable_installed_workflow(source, current))
+            ).hexdigest()
             action = "unchanged" if observed == desired else "update"
         if apply and action in {"create", "update"}:
             writable = {

@@ -14,9 +14,13 @@ from cyrvanta.modules.playbooks.domain.models import (
     canonical_signature_material,
     sign_request,
 )
+from cyrvanta.modules.playbooks.infrastructure.deployment_secrets import (
+    resolve_internal_secret,
+)
 from cyrvanta.modules.playbooks.infrastructure.models import (
     AutomationEngineBindingModel,
     PlaybookExecutionAttemptModel,
+    PlaybookExecutionAttemptOutcomeModel,
     PlaybookExecutionModel,
     PlaybookVersionModel,
 )
@@ -44,7 +48,9 @@ class N8nPlaybookDispatcher:
             raise ValueError("unexpected playbook dispatch event")
         if not self.settings.playbook_dispatch_enabled:
             return
-        await self.dispatch(event.tenant_id, event.aggregate_id, event.correlation_id)
+        outcome = await self.dispatch(event.tenant_id, event.aggregate_id, event.correlation_id)
+        if outcome is False:
+            raise RuntimeError("n8n dispatch failed")
 
     async def dispatch_pending(self, limit: int = 25) -> int:
         if not self.settings.playbook_dispatch_enabled:
@@ -64,10 +70,7 @@ class N8nPlaybookDispatcher:
                     (
                         await session.scalars(
                             select(PlaybookExecutionModel.id)
-                            .where(
-                                PlaybookExecutionModel.status
-                                == ExecutionStatus.QUEUED.value
-                            )
+                            .where(PlaybookExecutionModel.status == ExecutionStatus.QUEUED.value)
                             .order_by(PlaybookExecutionModel.created_at)
                             .limit(limit - dispatched)
                         )
@@ -91,9 +94,7 @@ class N8nPlaybookDispatcher:
         async with SessionFactory() as session:
             tenant_ids = list(
                 (
-                    await session.scalars(
-                        select(TenantModel.id).order_by(TenantModel.created_at)
-                    )
+                    await session.scalars(select(TenantModel.id).order_by(TenantModel.created_at))
                 ).all()
             )
         changed = 0
@@ -113,9 +114,7 @@ class N8nPlaybookDispatcher:
                         )
                     ).all()
                 )
-                store = SqlEventStore(
-                    SessionFactory, self.settings.event_max_payload_bytes
-                )
+                store = SqlEventStore(SessionFactory, self.settings.event_max_payload_bytes)
                 for execution in executions:
                     execution.status = ExecutionStatus.TIMED_OUT.value
                     execution.completed_at = now
@@ -141,13 +140,21 @@ class N8nPlaybookDispatcher:
 
     async def dispatch(
         self, tenant_id: UUID, execution_id: UUID, correlation_id: UUID
-    ) -> None:
-        if (
-            self.settings.automation_kill_switch
-            or not self.settings.n8n_dispatch_key
-            or not self.settings.n8n_callback_key
-        ):
-            return
+    ) -> bool | None:
+        if self.settings.automation_kill_switch or not self.settings.n8n_enabled:
+            return None
+        dispatch_secret = resolve_internal_secret(
+            master_key=self.settings.integration_encryption_key,
+            version=self.settings.n8n_internal_key_version,
+            purpose="n8n-dispatch",
+            explicit_value=self.settings.n8n_dispatch_key,
+        )
+        callback_secret = resolve_internal_secret(
+            master_key=self.settings.integration_encryption_key,
+            version=self.settings.n8n_internal_key_version,
+            purpose="n8n-callback",
+            explicit_value=self.settings.n8n_callback_key,
+        )
         dispatch_id = uuid4()
         async with tenant_session(tenant_id) as session:
             execution = await session.scalar(
@@ -156,12 +163,13 @@ class N8nPlaybookDispatcher:
                 .with_for_update(skip_locked=True)
             )
             if execution is None or execution.status != ExecutionStatus.QUEUED.value:
-                return
+                return None
             if execution.execution_mode != "SYNTHETIC":
-                return
+                return None
             binding = await session.scalar(
                 select(AutomationEngineBindingModel).where(
                     AutomationEngineBindingModel.id == execution.binding_id,
+                    AutomationEngineBindingModel.engine_type == "N8N",
                     AutomationEngineBindingModel.active.is_(True),
                     AutomationEngineBindingModel.sync_status == "SYNCHRONIZED",
                 )
@@ -177,15 +185,18 @@ class N8nPlaybookDispatcher:
                 or version is None
                 or binding.observed_digest != version.artifact_sha256
             ):
-                return
-            attempt_number = int(
-                await session.scalar(
-                    select(func.count(PlaybookExecutionAttemptModel.id)).where(
-                        PlaybookExecutionAttemptModel.execution_id == execution.id
+                return None
+            attempt_number = (
+                int(
+                    await session.scalar(
+                        select(func.count(PlaybookExecutionAttemptModel.id)).where(
+                            PlaybookExecutionAttemptModel.execution_id == execution.id
+                        )
                     )
+                    or 0
                 )
-                or 0
-            ) + 1
+                + 1
+            )
             attempt = PlaybookExecutionAttemptModel(
                 tenant_id=tenant_id,
                 execution_id=execution.id,
@@ -219,7 +230,7 @@ class N8nPlaybookDispatcher:
             tenant_id=tenant_id,
             path=claim_path,
             body=claim_body,
-            secret=self.settings.n8n_dispatch_key,
+            secret=dispatch_secret,
             key_id=str(snapshot["key_id"]),
         )
         terminal_body = self._json_bytes(
@@ -227,11 +238,7 @@ class N8nPlaybookDispatcher:
                 "adapter_event_id": str(uuid4()),
                 "sequence": 2,
                 "status": "SUCCEEDED",
-                "result": {
-                    "simulated": True,
-                    "effect": "none",
-                    "workflow_code": snapshot["workflow_code"],
-                },
+                "result": self.synthetic_result(str(snapshot["workflow_code"])),
                 "error_code": None,
                 "safe_detail": "Synthetic workflow completed without changing a target system",
                 "occurred_at": datetime.now(UTC).isoformat(),
@@ -242,7 +249,7 @@ class N8nPlaybookDispatcher:
             tenant_id=tenant_id,
             path=terminal_path,
             body=terminal_body,
-            secret=self.settings.n8n_callback_key,
+            secret=callback_secret,
             key_id=str(snapshot["key_id"]),
         )
         dispatch_body = self._json_bytes(
@@ -273,7 +280,7 @@ class N8nPlaybookDispatcher:
             tenant_id,
             webhook_path,
             dispatch_body,
-            self.settings.n8n_dispatch_key,
+            dispatch_secret,
             str(snapshot["key_id"]),
         )
         try:
@@ -284,14 +291,69 @@ class N8nPlaybookDispatcher:
                     headers={"Content-Type": "application/json", **headers},
                 )
                 response.raise_for_status()
-        except httpx.HTTPError:
-            await self._finish_dispatch(
-                tenant_id, execution_id, dispatch_id, correlation_id, "UNKNOWN"
-            )
-            return
+                self.validate_ack(response, execution_id=str(execution_id))
+        except (httpx.HTTPError, ValueError):
+            await self._fail_dispatch(tenant_id, execution_id, dispatch_id, correlation_id)
+            return False
         await self._finish_dispatch(
             tenant_id, execution_id, dispatch_id, correlation_id, "DISPATCHED"
         )
+        return True
+
+    async def _fail_dispatch(
+        self,
+        tenant_id: UUID,
+        execution_id: UUID,
+        dispatch_id: UUID,
+        correlation_id: UUID,
+    ) -> None:
+        now = datetime.now(UTC)
+        async with tenant_session(tenant_id) as session:
+            execution = await session.scalar(
+                select(PlaybookExecutionModel)
+                .where(PlaybookExecutionModel.id == execution_id)
+                .with_for_update()
+            )
+            attempt = await session.scalar(
+                select(PlaybookExecutionAttemptModel).where(
+                    PlaybookExecutionAttemptModel.dispatch_id == dispatch_id
+                )
+            )
+            if execution is None or attempt is None:
+                return
+            session.add(
+                PlaybookExecutionAttemptOutcomeModel(
+                    tenant_id=tenant_id,
+                    attempt_id=attempt.id,
+                    status=ExecutionStatus.UNKNOWN.value,
+                    error_code="N8N_DISPATCH_FAILED",
+                    occurred_at=now,
+                )
+            )
+            if execution.status != ExecutionStatus.DISPATCHING.value:
+                return
+            if attempt.attempt_number >= 10:
+                execution.status = ExecutionStatus.FAILED.value
+                execution.error_code = "N8N_DISPATCH_FAILED"
+                execution.completed_at = now
+                store = SqlEventStore(SessionFactory, self.settings.event_max_payload_bytes)
+                await store.recorder(session).add(
+                    DomainEvent.create(
+                        event_name="security.playbook_execution.failed",
+                        tenant_id=tenant_id,
+                        aggregate_type="playbook_execution",
+                        aggregate_id=execution_id,
+                        correlation_id=correlation_id,
+                        producer="playbooks",
+                        payload={
+                            "execution_id": str(execution_id),
+                            "dispatch_id": str(dispatch_id),
+                            "error_code": "N8N_DISPATCH_FAILED",
+                        },
+                    )
+                )
+                return
+            execution.status = ExecutionStatus.QUEUED.value
 
     async def _finish_dispatch(
         self,
@@ -314,7 +376,14 @@ class N8nPlaybookDispatcher:
             )
             if execution is None or attempt is None:
                 return
-            attempt.status = status
+            session.add(
+                PlaybookExecutionAttemptOutcomeModel(
+                    tenant_id=tenant_id,
+                    attempt_id=attempt.id,
+                    status=status,
+                    occurred_at=datetime.now(UTC),
+                )
+            )
             if execution.status == ExecutionStatus.DISPATCHING.value:
                 execution.status = status
             store = SqlEventStore(SessionFactory, self.settings.event_max_payload_bytes)
@@ -375,7 +444,51 @@ class N8nPlaybookDispatcher:
         }
 
     @staticmethod
+    def synthetic_result(workflow_code: str) -> dict[str, object]:
+        if workflow_code == "simulate-user-block":
+            return {
+                "execution_mode": "demo",
+                "action": "block_user",
+                "result": "simulated_success",
+            }
+        return {
+            "simulated": True,
+            "effect": "none",
+            "workflow_code": workflow_code,
+        }
+
+    @staticmethod
+    def validate_ack(response: httpx.Response, *, execution_id: str) -> None:
+        if len(response.content) > 4096:
+            raise ValueError("n8n ACK exceeds the allowed size")
+        material = response.json()
+        if not isinstance(material, dict) or set(material) != {
+            "schema_version",
+            "execution_id",
+            "adapter_execution_id",
+            "status",
+            "received_at",
+        }:
+            raise ValueError("n8n ACK does not match its schema")
+        if material["schema_version"] != 1:
+            raise ValueError("n8n ACK schema version is invalid")
+        if material["execution_id"] != execution_id:
+            raise ValueError("n8n ACK execution does not match")
+        adapter_execution_id = material["adapter_execution_id"]
+        if not isinstance(adapter_execution_id, str) or not 1 <= len(adapter_execution_id) <= 200:
+            raise ValueError("n8n ACK adapter execution ID is invalid")
+        if material["status"] != "accepted":
+            raise ValueError("n8n ACK status is invalid")
+        received_at = material["received_at"]
+        if not isinstance(received_at, str):
+            raise ValueError("n8n ACK timestamp is invalid")
+        try:
+            parsed = datetime.fromisoformat(received_at.replace("Z", "+00:00"))
+        except ValueError as exc:
+            raise ValueError("n8n ACK timestamp is invalid") from exc
+        if parsed.tzinfo is None:
+            raise ValueError("n8n ACK timestamp must include a timezone")
+
+    @staticmethod
     def _json_bytes(value: dict[str, object]) -> bytes:
-        return json.dumps(
-            value, ensure_ascii=False, separators=(",", ":"), sort_keys=True
-        ).encode()
+        return json.dumps(value, ensure_ascii=False, separators=(",", ":"), sort_keys=True).encode()

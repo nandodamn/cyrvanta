@@ -1,0 +1,372 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:cyrvanta:playbook:1.0",
+  "$defs": {
+    "ActionStep": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "pattern": "^[a-z][a-z0-9_-]{0,63}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "type": {
+          "const": "ACTION",
+          "title": "Type",
+          "type": "string"
+        },
+        "action": {
+          "pattern": "^[a-z][a-z0-9_.-]{2,95}$",
+          "title": "Action",
+          "type": "string"
+        },
+        "action_version": {
+          "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-[0-9A-Za-z.-]+)?$",
+          "title": "Action Version",
+          "type": "string"
+        },
+        "parameters": {
+          "additionalProperties": {
+            "$ref": "#/$defs/JsonValue"
+          },
+          "maxProperties": 64,
+          "title": "Parameters",
+          "type": "object"
+        },
+        "credential_aliases": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 16,
+          "title": "Credential Aliases",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "type",
+        "action",
+        "action_version"
+      ],
+      "title": "ActionStep",
+      "type": "object"
+    },
+    "ConditionExpression": {
+      "additionalProperties": false,
+      "properties": {
+        "operator": {
+          "enum": [
+            "eq",
+            "ne",
+            "gt",
+            "gte",
+            "lt",
+            "lte",
+            "in",
+            "exists",
+            "and",
+            "or",
+            "not"
+          ],
+          "title": "Operator",
+          "type": "string"
+        },
+        "path": {
+          "anyOf": [
+            {
+              "pattern": "^(?:input|steps\\.[a-z][a-z0-9_-]{0,63}\\.output)(?:\\.[A-Za-z][A-Za-z0-9_-]{0,63}){0,8}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Path"
+        },
+        "value": {
+          "$ref": "#/$defs/JsonValue",
+          "default": null
+        },
+        "operands": {
+          "items": {
+            "$ref": "#/$defs/ConditionExpression"
+          },
+          "maxItems": 8,
+          "title": "Operands",
+          "type": "array"
+        }
+      },
+      "required": [
+        "operator"
+      ],
+      "title": "ConditionExpression",
+      "type": "object"
+    },
+    "ConditionStep": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "pattern": "^[a-z][a-z0-9_-]{0,63}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "type": {
+          "const": "CONDITION",
+          "title": "Type",
+          "type": "string"
+        },
+        "expression": {
+          "$ref": "#/$defs/ConditionExpression"
+        }
+      },
+      "required": [
+        "id",
+        "type",
+        "expression"
+      ],
+      "title": "ConditionStep",
+      "type": "object"
+    },
+    "JsonValue": {},
+    "LocalizedDescription": {
+      "additionalProperties": false,
+      "properties": {
+        "es": {
+          "maxLength": 1000,
+          "minLength": 1,
+          "title": "Es",
+          "type": "string"
+        },
+        "en": {
+          "maxLength": 1000,
+          "minLength": 1,
+          "title": "En",
+          "type": "string"
+        }
+      },
+      "required": [
+        "es",
+        "en"
+      ],
+      "title": "LocalizedDescription",
+      "type": "object"
+    },
+    "LocalizedTitle": {
+      "additionalProperties": false,
+      "properties": {
+        "es": {
+          "maxLength": 120,
+          "minLength": 1,
+          "title": "Es",
+          "type": "string"
+        },
+        "en": {
+          "maxLength": 120,
+          "minLength": 1,
+          "title": "En",
+          "type": "string"
+        }
+      },
+      "required": [
+        "es",
+        "en"
+      ],
+      "title": "LocalizedTitle",
+      "type": "object"
+    },
+    "PlaybookEdge": {
+      "additionalProperties": false,
+      "properties": {
+        "from_step": {
+          "pattern": "^[a-z][a-z0-9_-]{0,63}$",
+          "title": "From Step",
+          "type": "string"
+        },
+        "to_step": {
+          "pattern": "^[a-z][a-z0-9_-]{0,63}$",
+          "title": "To Step",
+          "type": "string"
+        },
+        "outcome": {
+          "enum": [
+            "SUCCESS",
+            "FAILURE",
+            "TRUE",
+            "FALSE",
+            "ALWAYS"
+          ],
+          "title": "Outcome",
+          "type": "string"
+        }
+      },
+      "required": [
+        "from_step",
+        "to_step",
+        "outcome"
+      ],
+      "title": "PlaybookEdge",
+      "type": "object"
+    },
+    "PlaybookTimeouts": {
+      "additionalProperties": false,
+      "properties": {
+        "overall_seconds": {
+          "maximum": 900,
+          "minimum": 1,
+          "title": "Overall Seconds",
+          "type": "integer"
+        },
+        "action_seconds": {
+          "maximum": 300,
+          "minimum": 1,
+          "title": "Action Seconds",
+          "type": "integer"
+        },
+        "max_attempts": {
+          "default": 1,
+          "maximum": 3,
+          "minimum": 1,
+          "title": "Max Attempts",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "overall_seconds",
+        "action_seconds"
+      ],
+      "title": "PlaybookTimeouts",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "code": {
+      "pattern": "^[a-z][a-z0-9-]{2,63}$",
+      "title": "Code",
+      "type": "string"
+    },
+    "version": {
+      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-[0-9A-Za-z.-]+)?$",
+      "title": "Version",
+      "type": "string"
+    },
+    "title_i18n": {
+      "$ref": "#/$defs/LocalizedTitle"
+    },
+    "description_i18n": {
+      "$ref": "#/$defs/LocalizedDescription"
+    },
+    "trigger_contract": {
+      "anyOf": [
+        {
+          "pattern": "^[a-z0-9][a-z0-9._/-]{0,127}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Trigger Contract"
+    },
+    "execution_mode": {
+      "enum": [
+        "SIMULATED",
+        "LIVE"
+      ],
+      "title": "Execution Mode",
+      "type": "string"
+    },
+    "impact_level": {
+      "enum": [
+        "LOW",
+        "MEDIUM",
+        "HIGH",
+        "CRITICAL"
+      ],
+      "title": "Impact Level",
+      "type": "string"
+    },
+    "input_schema_ref": {
+      "pattern": "^[a-z0-9][a-z0-9._/-]{0,127}$",
+      "title": "Input Schema Ref",
+      "type": "string"
+    },
+    "result_schema_ref": {
+      "pattern": "^[a-z0-9][a-z0-9._/-]{0,127}$",
+      "title": "Result Schema Ref",
+      "type": "string"
+    },
+    "steps": {
+      "items": {
+        "discriminator": {
+          "mapping": {
+            "ACTION": "#/$defs/ActionStep",
+            "CONDITION": "#/$defs/ConditionStep"
+          },
+          "propertyName": "type"
+        },
+        "oneOf": [
+          {
+            "$ref": "#/$defs/ActionStep"
+          },
+          {
+            "$ref": "#/$defs/ConditionStep"
+          }
+        ]
+      },
+      "maxItems": 64,
+      "minItems": 1,
+      "title": "Steps",
+      "type": "array"
+    },
+    "edges": {
+      "items": {
+        "$ref": "#/$defs/PlaybookEdge"
+      },
+      "maxItems": 128,
+      "title": "Edges",
+      "type": "array"
+    },
+    "timeouts": {
+      "$ref": "#/$defs/PlaybookTimeouts"
+    },
+    "credential_aliases": {
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 32,
+      "title": "Credential Aliases",
+      "type": "array"
+    },
+    "labels": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "maxProperties": 32,
+      "title": "Labels",
+      "type": "object"
+    }
+  },
+  "required": [
+    "schema_version",
+    "code",
+    "version",
+    "title_i18n",
+    "description_i18n",
+    "execution_mode",
+    "impact_level",
+    "input_schema_ref",
+    "result_schema_ref",
+    "steps",
+    "timeouts"
+  ],
+  "title": "PortablePlaybookV1",
+  "type": "object"
+}

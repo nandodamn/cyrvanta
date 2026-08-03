@@ -170,6 +170,13 @@ Agregado tenant-owned creado al consumir una autorización. Fija:
 Registro append-only de cada intento técnico de entregar una ejecución al
 adaptador. Un retry no crea otra ejecución.
 
+El intento conserva la reserva previa al envío y nunca se actualiza. Su campo
+`status` registra el estado de creación `DISPATCHING`; el resultado técnico
+observado se agrega en un registro separado e inmutable de outcome. Un outcome
+puede ser `DISPATCHED`, `FAILED` o `UNKNOWN`. `UNKNOWN` no implica fracaso del
+efecto y debe conciliarse contra claims, updates y el estado autoritativo de la
+ejecución.
+
 ### 6.6 Claim de efecto
 
 Transición atómica y de un solo ganador por ejecución. n8n debe obtenerla de
@@ -199,14 +206,15 @@ Hecho autenticado e idempotente emitido por el adaptador. Puede registrar
 
 ## 8. Modelo lógico y físico candidato
 
-Se proponen seis conceptos persistentes:
+Se proponen siete conceptos persistentes:
 
 1. `playbook_definitions`;
 2. `playbook_versions`;
 3. `automation_engine_bindings`;
 4. `playbook_executions`;
 5. `playbook_execution_attempts`;
-6. `playbook_execution_updates`.
+6. `playbook_execution_attempt_outcomes`;
+7. `playbook_execution_updates`.
 
 Además se requiere un registro técnico de nonces/firma para anti-replay. No es
 un agregado de negocio y tiene retención corta y cleanup programado.
@@ -227,7 +235,8 @@ Invariantes candidatas:
   `SYSTEM_NOTIFICATION`;
 - una notificación referencia un event ID allowlisted y único;
 - authorization ID, proposal ID y fingerprint coinciden;
-- intentos y updates son append-only;
+- intentos, outcomes y updates son append-only;
+- un outcome técnico como máximo por intento;
 - update único por `(tenant_id, execution_id, adapter_event_id)`;
 - número de secuencia creciente por ejecución;
 - un solo claim de efecto;

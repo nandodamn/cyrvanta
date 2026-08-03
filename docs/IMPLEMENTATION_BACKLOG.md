@@ -51,8 +51,44 @@
   `N8N_WORKFLOWS_AS_CODE_REQUIREMENTS.md`.
 - [x] GATE: aprobar
   `PHASE_21_N8N_WORKFLOWS_EXECUTION.md` y aceptar ADR 0015.
-- [ ] Implementar workflows n8n, scripts y callbacks únicamente después de
+- [x] Implementar workflows n8n, scripts y callbacks únicamente después de
   aprobar Etapas 5, 6 y 7.
+  - [x] Validar E2E sintético, claim previo al efecto, callback exacto y retry
+    con outcomes append-only.
+  - [x] Incorporar `N8N_API_KEY` al secret store local y validar
+    diff/reconciliación mediante la API pública de n8n.
+- [x] Preparar borrador de Etapa 8 en
+  `PHASE_22_GOVERNED_FEEDBACK_MEMORY.md`.
+- [x] GATE: aprobar decisiones materiales, especificación y ADR de Etapa 8.
+- [x] Implementar la base local de Etapa 8 después de superar su GATE.
+- [ ] Completar E2E API multi-actor y snapshots métricos con evidencia real.
+- [x] Preparar propuesta Fase 21-A para `Cyrvanta Playbook Engine` nativo y n8n
+  opcional.
+- [x] GATE: aprobar las 20 decisiones de
+  `PHASE_21A_CYRVANTA_PLAYBOOK_ENGINE.md` y aceptar ADR 0017.
+- [ ] Cerrar integralmente el motor nativo después de superar su GATE:
+  - [x] Publicar schema portable v1 y fixtures.
+  - [x] GATE: ratificar `PHASE_21A_IMPLEMENTATION_CONTRACT.md` antes de crear
+    migración, API, eventos o puertos nativos.
+  - [x] Ampliar `engine_type` mediante la migración reversible `0020`.
+  - [x] Implementar puerto, runner, action registry y conectores simulados.
+  - [x] Implementar API, permisos, auditoría, eventos y biblioteca UI bilingüe.
+  - [x] Implementar cancelación nativa segura con `If-Match`, auditoría y
+    preservación append-only de outcomes tardíos.
+  - [ ] GATE: definir identidad de plataforma y alcance global antes de permitir
+    reemplazo, prueba o rotación de la API key externa de n8n desde UI.
+  - [x] Validar recovery, retry seguro, DLQ y `UNKNOWN` con fallos inyectados.
+  - [ ] Validar paridad concurrente sin doble efecto; selección exclusiva por
+    binding, RLS real e idempotencia durable ya están verificadas.
+  - [ ] Evaluar el retiro de n8n sólo mediante aprobación operativa separada.
+- [x] GATE: aprobar `PHASE_23_OPERATIONAL_PULSE_RESPONSIVE_UI.md`.
+- [ ] Cerrar Fase 23:
+  - [x] Implementar endpoint tenant-scoped de actividad móvil real de 24 horas.
+  - [x] Sustituir métricas estáticas por estados loading/error/empty y datos
+    reales con etiqueta de fuente.
+  - [x] Implementar layout responsive y pruebas de componentes.
+  - [ ] Validar visualmente 320 px, escritorio/4K y zoom 200 % cuando el
+    conector del navegador esté operativo.
 
 ## Gobernanza
 

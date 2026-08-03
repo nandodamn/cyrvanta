@@ -52,6 +52,19 @@ describe("protected application", () => {
     });
     vi.spyOn(api, "getIncidents").mockResolvedValue([]);
     vi.spyOn(api, "getAlerts").mockResolvedValue([]);
+    vi.spyOn(api, "getOperationalActivity24h").mockResolvedValue({
+      window_start: "2026-07-31T12:00:00Z",
+      window_end: "2026-08-01T12:00:00Z",
+      updated_at: "2026-08-01T12:00:00Z",
+      source_mode: "EMPTY",
+      totals: { alerts: 0, incidents: 0 },
+      series: Array.from({ length: 12 }, (_, index) => ({
+        bucket_start: new Date(Date.UTC(2026, 6, 31, 12 + index * 2)).toISOString(),
+        bucket_end: new Date(Date.UTC(2026, 6, 31, 14 + index * 2)).toISOString(),
+        alerts: 0,
+        incidents: 0,
+      })),
+    });
     render(
       <QueryClientProvider client={new QueryClient()}>
         <MemoryRouter initialEntries={["/"]}>

@@ -40,5 +40,7 @@ def test_execution_state_machine_separates_dispatch_from_success() -> None:
     validate_transition(ExecutionStatus.DISPATCHING, ExecutionStatus.DISPATCHED)
     validate_transition(ExecutionStatus.DISPATCHED, ExecutionStatus.RUNNING)
     validate_transition(ExecutionStatus.RUNNING, ExecutionStatus.SUCCEEDED)
+    validate_transition(ExecutionStatus.RUNNING, ExecutionStatus.CANCELLED)
+    validate_transition(ExecutionStatus.UNKNOWN, ExecutionStatus.CANCELLED)
     with pytest.raises(ValueError, match="Invalid"):
         validate_transition(ExecutionStatus.DISPATCHING, ExecutionStatus.SUCCEEDED)

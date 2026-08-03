@@ -24,6 +24,7 @@ Adoptar, sujeto a aprobación humana, el contrato de
 - claim durable antes de todo efecto;
 - dispatch y callback con HMAC, timestamp, nonce e idempotencia;
 - estado y resultado autoritativos en PostgreSQL;
+- intentos de dispatch inmutables y outcomes técnicos append-only separados;
 - reconciliación import/diff/update/deactivate sin borrado automático;
 - n8n como adaptador reemplazable;
 - modo `live` bloqueado hasta aprobación operativa separada.
@@ -57,3 +58,11 @@ Adoptar, sujeto a aprobación humana, el contrato de
 ## Estado de aprobación
 
 Aceptado por instrucción humana el 2026-07-29.
+
+## Aclaración de implementación append-only
+
+Aceptada por instrucción humana el 2026-07-30. El intento se crea antes del
+envío para que el claim pueda validarlo y no se modifica después. El ACK o el
+fallo observado se registra en `playbook_execution_attempt_outcomes` mediante
+`INSERT` únicamente. Un outcome `UNKNOWN` no revierte un claim ni un resultado
+terminal y requiere conciliación con los hechos posteriores de la ejecución.

@@ -207,10 +207,7 @@ def test_safe_decision_migration_enforces_rls_separation_and_append_only_history
 
 def test_playbook_execution_migration_is_tenant_scoped_and_replay_safe() -> None:
     migration = (
-        Path(__file__).parents[2]
-        / "alembic"
-        / "versions"
-        / "0016_versioned_playbook_execution.py"
+        Path(__file__).parents[2] / "alembic" / "versions" / "0016_versioned_playbook_execution.py"
     ).read_text(encoding="utf-8")
     for table in (
         "playbook_definitions",

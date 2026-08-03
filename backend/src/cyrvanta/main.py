@@ -15,6 +15,7 @@ from cyrvanta.modules.directory.presentation.identity_link_router import (
     router as directory_link_router,
 )
 from cyrvanta.modules.directory.presentation.router import router as directory_router
+from cyrvanta.modules.governed_memory.presentation.router import router as governed_memory_router
 from cyrvanta.modules.identity.presentation.administration_router import (
     router as administration_router,
 )
@@ -22,6 +23,9 @@ from cyrvanta.modules.identity.presentation.router import router as auth_router
 from cyrvanta.modules.incident.presentation.router import router as incident_router
 from cyrvanta.modules.operations.presentation.router import router as operations_router
 from cyrvanta.modules.platform.presentation.router import router as platform_router
+from cyrvanta.modules.playbooks.presentation.administration_router import (
+    router as playbook_administration_router,
+)
 from cyrvanta.modules.playbooks.presentation.router import router as playbooks_router
 from cyrvanta.modules.threat_knowledge.presentation.router import (
     router as threat_knowledge_router,
@@ -61,6 +65,7 @@ app.add_middleware(
         "X-Request-ID",
         "X-Correlation-ID",
         "Idempotency-Key",
+        "If-Match",
     ],
 )
 app.add_middleware(RequestContextMiddleware)
@@ -76,5 +81,7 @@ app.include_router(claims_router, prefix="/api/v1")
 app.include_router(correlation_router, prefix="/api/v1")
 app.include_router(decision_router, prefix="/api/v1")
 app.include_router(playbooks_router, prefix="/api/v1")
+app.include_router(playbook_administration_router, prefix="/api/v1")
+app.include_router(governed_memory_router, prefix="/api/v1")
 app.include_router(threat_knowledge_router, prefix="/api/v1")
 install_problem_handlers(app)

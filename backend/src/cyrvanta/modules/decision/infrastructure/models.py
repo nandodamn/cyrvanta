@@ -19,9 +19,7 @@ class ResponsePolicyVersionModel(Base):
     kill_switch: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     definition: Mapped[dict[str, object]] = mapped_column(JSONB, nullable=False)
     definition_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
 class ActionProposalModel(Base):
@@ -45,9 +43,7 @@ class ActionProposalModel(Base):
     is_simulated: Mapped[bool] = mapped_column(Boolean, nullable=False)
     fingerprint: Mapped[str] = mapped_column(String(64), nullable=False)
     status: Mapped[str] = mapped_column(String(24), nullable=False)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
 class PolicyEvaluationModel(Base):
@@ -62,9 +58,7 @@ class PolicyEvaluationModel(Base):
     required_approvals: Mapped[int] = mapped_column(SmallInteger, nullable=False)
     reason_codes: Mapped[list[str]] = mapped_column(JSONB, nullable=False)
     input_fingerprint: Mapped[str] = mapped_column(String(64), nullable=False)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
 class ApprovalRequestModel(Base):
@@ -76,9 +70,7 @@ class ApprovalRequestModel(Base):
     required_approvals: Mapped[int] = mapped_column(SmallInteger, nullable=False)
     status: Mapped[str] = mapped_column(String(24), nullable=False)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
 class ApprovalDecisionModel(Base):
@@ -90,9 +82,7 @@ class ApprovalDecisionModel(Base):
     decision: Mapped[str] = mapped_column(String(16), nullable=False)
     reason: Mapped[str] = mapped_column(Text, nullable=False)
     proposal_fingerprint: Mapped[str] = mapped_column(String(64), nullable=False)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
 class ActionAuthorizationModel(Base):
@@ -106,6 +96,4 @@ class ActionAuthorizationModel(Base):
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     consumed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

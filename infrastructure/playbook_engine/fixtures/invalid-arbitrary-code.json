@@ -1,0 +1,32 @@
+{
+  "schema_version": "1.0",
+  "code": "invalid-code-execution",
+  "version": "1.0.0",
+  "title_i18n": {
+    "es": "Inválido",
+    "en": "Invalid"
+  },
+  "description_i18n": {
+    "es": "Este fixture debe rechazarse.",
+    "en": "This fixture must be rejected."
+  },
+  "execution_mode": "SIMULATED",
+  "impact_level": "LOW",
+  "input_schema_ref": "security/input-v1",
+  "result_schema_ref": "security/result-v1",
+  "steps": [
+    {
+      "id": "run-code",
+      "type": "CODE",
+      "source": "echo forbidden"
+    }
+  ],
+  "edges": [],
+  "timeouts": {
+    "overall_seconds": 30,
+    "action_seconds": 10,
+    "max_attempts": 1
+  },
+  "credential_aliases": [],
+  "labels": {}
+}

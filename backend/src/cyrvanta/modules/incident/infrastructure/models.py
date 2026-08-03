@@ -39,6 +39,11 @@ class AlertReferenceModel(Base):
     snapshot_sha256: Mapped[str | None] = mapped_column(String)
     provenance: Mapped[str] = mapped_column(String, nullable=False)
     is_simulated: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    triage_status: Mapped[str] = mapped_column(String(32), nullable=False, default="UNREVIEWED")
+    reviewed_by_user_id: Mapped[UUID | None] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("users.id")
+    )
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 

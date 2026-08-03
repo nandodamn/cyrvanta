@@ -19,6 +19,10 @@ from cyrvanta.modules.playbooks.domain.models import (
     ExecutionStatus,
     validate_transition,
 )
+from cyrvanta.modules.playbooks.infrastructure.action_registry import (
+    ActionRegistry,
+    ActionUnavailableError,
+)
 from cyrvanta.modules.playbooks.infrastructure.models import (
     AutomationEngineBindingModel,
     AutomationReplayNonceModel,
@@ -26,6 +30,7 @@ from cyrvanta.modules.playbooks.infrastructure.models import (
     PlaybookExecutionAttemptModel,
     PlaybookExecutionModel,
     PlaybookExecutionUpdateModel,
+    PlaybookStepExecutionModel,
     PlaybookVersionModel,
 )
 from cyrvanta.shared.config import get_settings
@@ -121,10 +126,15 @@ class PlaybookExecutionService:
             if version.classification != "SYNTHETIC":
                 raise PlaybookConflict("LIVE playbook execution requires an operational approval")
             binding = await session.scalar(
-                select(AutomationEngineBindingModel).where(
+                select(AutomationEngineBindingModel)
+                .where(
                     AutomationEngineBindingModel.playbook_version_id == version.id,
                     AutomationEngineBindingModel.active.is_(True),
                     AutomationEngineBindingModel.sync_status == "SYNCHRONIZED",
+                )
+                .order_by(
+                    (AutomationEngineBindingModel.engine_type == "NATIVE").desc(),
+                    AutomationEngineBindingModel.created_at.desc(),
                 )
             )
             if binding is None or binding.observed_digest != version.artifact_sha256:
@@ -197,9 +207,7 @@ class PlaybookExecutionService:
             count_query = select(func.count(PlaybookExecutionModel.id))
             if incident_id is not None:
                 query = query.where(PlaybookExecutionModel.incident_id == incident_id)
-                count_query = count_query.where(
-                    PlaybookExecutionModel.incident_id == incident_id
-                )
+                count_query = count_query.where(PlaybookExecutionModel.incident_id == incident_id)
             items = list(
                 (
                     await session.scalars(
@@ -218,12 +226,113 @@ class PlaybookExecutionService:
     async def get(self, tenant_id: UUID, execution_id: UUID) -> PlaybookExecutionResponse:
         async with tenant_session(tenant_id) as session:
             execution = await session.scalar(
-                select(PlaybookExecutionModel).where(
-                    PlaybookExecutionModel.id == execution_id
-                )
+                select(PlaybookExecutionModel).where(PlaybookExecutionModel.id == execution_id)
             )
             if execution is None:
                 raise PlaybookNotFound("Execution was not found")
+            return self._response(execution)
+
+    async def cancel(
+        self,
+        *,
+        tenant_id: UUID,
+        actor_user_id: UUID,
+        execution_id: UUID,
+        expected_status: ExecutionStatus,
+        correlation_id: UUID,
+    ) -> PlaybookExecutionResponse:
+        now = datetime.now(UTC)
+        async with tenant_session(tenant_id) as session:
+            execution = await self._locked_execution(session, execution_id)
+            if execution.status != expected_status.value:
+                raise PlaybookConflict("Execution status changed; refresh and retry")
+            if expected_status is ExecutionStatus.CANCELLED:
+                return self._response(execution)
+            if expected_status in {
+                ExecutionStatus.SUCCEEDED,
+                ExecutionStatus.FAILED,
+                ExecutionStatus.TIMED_OUT,
+            }:
+                raise PlaybookConflict("A terminal execution cannot be cancelled")
+            binding = await session.scalar(
+                select(AutomationEngineBindingModel).where(
+                    AutomationEngineBindingModel.id == execution.binding_id
+                )
+            )
+            if binding is None:
+                raise PlaybookConflict("Execution binding is unavailable")
+            if binding.engine_type != "NATIVE":
+                raise PlaybookConflict(
+                    "External-engine cancellation requires adapter reconciliation"
+                )
+            active_steps = list(
+                (
+                    await session.scalars(
+                        select(PlaybookStepExecutionModel)
+                        .where(
+                            PlaybookStepExecutionModel.execution_id == execution.id,
+                            PlaybookStepExecutionModel.status.in_(
+                                ("PENDING", "READY", "CLAIMED", "RUNNING")
+                            ),
+                        )
+                        .with_for_update()
+                    )
+                ).all()
+            )
+            registry = ActionRegistry()
+            for step in active_steps:
+                if step.action_code is None:
+                    continue
+                try:
+                    descriptor = registry.get(
+                        step.action_code, step.action_version or ""
+                    ).describe()
+                except ActionUnavailableError as exc:
+                    raise PlaybookConflict(
+                        "An active step cannot be verified as safely cancellable"
+                    ) from exc
+                if not descriptor.cancellable:
+                    raise PlaybookConflict("An active step is not safely cancellable")
+            validate_transition(expected_status, ExecutionStatus.CANCELLED)
+            for step in active_steps:
+                step.status = "CANCELLED"
+                step.error_code = "PLAYBOOK_CANCELLED"
+                step.completed_at = now
+            execution.status = ExecutionStatus.CANCELLED.value
+            execution.error_code = "PLAYBOOK_CANCELLED"
+            execution.completed_at = now
+            session.add(
+                AuditEventModel(
+                    tenant_id=tenant_id,
+                    actor_user_id=actor_user_id,
+                    action="playbook.execution.cancelled",
+                    resource_type="playbook_execution",
+                    resource_id=execution.id,
+                    outcome="success",
+                    correlation_id=correlation_id,
+                    details={
+                        "engine_type": "NATIVE",
+                        "previous_status": expected_status.value,
+                        "cancelled_active_steps": len(active_steps),
+                    },
+                )
+            )
+            await self._event(
+                session,
+                execution,
+                correlation_id,
+                "security.playbook_execution.completed",
+                {
+                    "tenant_id": str(tenant_id),
+                    "resource_id": str(execution.id),
+                    "occurred_at": now.isoformat(),
+                    "status": ExecutionStatus.CANCELLED.value,
+                    "correlation_id": str(correlation_id),
+                    "causation_id": None,
+                    "engine_type": "NATIVE",
+                    "error_code": "PLAYBOOK_CANCELLED",
+                },
+            )
             return self._response(execution)
 
     async def claim(
@@ -240,9 +349,7 @@ class PlaybookExecutionService:
         async with tenant_session(tenant_id) as session:
             execution = await self._locked_execution(session, execution_id)
             binding = await self._binding(session, execution.binding_id, key_id)
-            replay_digest = await self._nonce_digest(
-                session, "DISPATCH", key_id, nonce
-            )
+            replay_digest = await self._nonce_digest(session, "DISPATCH", key_id, nonce)
             if replay_digest is not None:
                 if (
                     replay_digest == body_digest
@@ -317,9 +424,7 @@ class PlaybookExecutionService:
                 )
             )
             if duplicate is not None:
-                replay_digest = await self._nonce_digest(
-                    session, "CALLBACK", key_id, nonce
-                )
+                replay_digest = await self._nonce_digest(session, "CALLBACK", key_id, nonce)
                 if replay_digest == body_digest:
                     return self._response(execution)
                 raise PlaybookSecurityError("Callback event was replayed with different material")
@@ -407,6 +512,16 @@ class PlaybookExecutionService:
         if version is None:
             raise PlaybookSecurityError("Released playbook version is unavailable")
         if execution.execution_mode == "SYNTHETIC":
+            if version.workflow_code == "simulate-user-block":
+                if result != {
+                    "execution_mode": "demo",
+                    "action": "block_user",
+                    "result": "simulated_success",
+                }:
+                    raise PlaybookSecurityError(
+                        "Simulated user block result does not match its exact schema"
+                    )
+                return
             if result is None or set(result) != {
                 "simulated",
                 "effect",

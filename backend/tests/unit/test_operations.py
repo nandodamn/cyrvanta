@@ -15,7 +15,7 @@ async def test_demo_automation_is_idempotent(monkeypatch: MonkeyPatch) -> None:
     monkeypatch.setattr(service.settings, "n8n_mode", "simulated")
     payload = AutomationRequest(
         incident_id="00000000-0000-0000-0000-000000000001",
-        workflow_id="cyrvanta-demo-response",
+        workflow_id="cyrvanta-simulate-user-block",
         approved=True,
         idempotency_key="same-demo-key",
     )
@@ -29,7 +29,7 @@ async def test_unapproved_automation_fails_closed() -> None:
     service = OperationsService()
     payload = AutomationRequest(
         incident_id="00000000-0000-0000-0000-000000000001",
-        workflow_id="cyrvanta-demo-response",
+        workflow_id="cyrvanta-simulate-user-block",
         approved=False,
         idempotency_key="blocked-demo-key",
     )
@@ -56,7 +56,7 @@ async def test_live_automation_requires_stage7_durable_authorization(
     monkeypatch.setattr(service.settings, "n8n_mode", "live")
     payload = AutomationRequest(
         incident_id="00000000-0000-0000-0000-000000000001",
-        workflow_id="cyrvanta-demo-response",
+        workflow_id="cyrvanta-simulate-user-block",
         approved=True,
         idempotency_key="approved-live-key",
     )
@@ -69,7 +69,7 @@ async def test_disabled_automation_fails_closed(monkeypatch: MonkeyPatch) -> Non
     monkeypatch.setattr(service.settings, "n8n_mode", "disabled")
     payload = AutomationRequest(
         incident_id="00000000-0000-0000-0000-000000000001",
-        workflow_id="cyrvanta-demo-response",
+        workflow_id="cyrvanta-simulate-user-block",
         approved=True,
         idempotency_key="blocked-disabled-key",
     )
@@ -82,7 +82,7 @@ class FakeWorkflowCatalog:
         return WorkflowCatalogSnapshot(
             workflows=(
                 WorkflowSnapshot(
-                    workflow_id="cyrvanta-demo-response",
+                    workflow_id="cyrvanta-simulate-user-block",
                     name="Cyrvanta Demo Response",
                     active=True,
                     version_id="synthetic-version",
@@ -111,13 +111,15 @@ async def test_playbook_catalog_only_exposes_allowlisted_metadata(
     monkeypatch: MonkeyPatch,
 ) -> None:
     service = OperationsService(workflow_catalog=FakeWorkflowCatalog())
-    monkeypatch.setattr(service.settings, "n8n_allowed_workflow_ids", "cyrvanta-demo-response")
+    monkeypatch.setattr(
+        service.settings, "n8n_allowed_workflow_ids", "cyrvanta-simulate-user-block"
+    )
 
     result = await service.playbooks(limit=10, offset=0, query=None)
 
     assert result.synchronized is True
     assert result.total == 1
-    assert result.items[0].workflow_id == "cyrvanta-demo-response"
+    assert result.items[0].workflow_id == "cyrvanta-simulate-user-block"
     assert result.items[0].connectors[0].credential_names == ["Synthetic credential label"]
 
 
@@ -128,11 +130,11 @@ async def test_playbook_catalog_is_bounded_and_searchable(
     monkeypatch.setattr(
         service.settings,
         "n8n_allowed_workflow_ids",
-        "cyrvanta-demo-response,another-safe-workflow",
+        "cyrvanta-simulate-user-block,another-safe-workflow",
     )
 
-    result = await service.playbooks(limit=1, offset=0, query="demo")
+    result = await service.playbooks(limit=1, offset=0, query="simulate")
 
     assert result.total == 1
     assert len(result.items) == 1
-    assert result.items[0].workflow_id == "cyrvanta-demo-response"
+    assert result.items[0].workflow_id == "cyrvanta-simulate-user-block"

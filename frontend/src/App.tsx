@@ -28,9 +28,7 @@ import {
   getIntegrationHealth,
   getMe,
   getPermissions,
-  getPlaybookManagement,
   getPlaybookExecutions,
-  getPlaybooks,
   getRolePermissions,
   getResponseDecisions,
   getRoles,
@@ -46,16 +44,114 @@ import {
   testDirectoryConfiguration,
   transitionIncident,
 } from "./api";
+import { ApiKeysPage } from "./ApiKeysPage";
+import { GovernedMemoryPage } from "./GovernedMemoryPage";
+import { PlaybookLibraryPage } from "./PlaybookLibraryPage";
+import { OperationalPulse } from "./OperationalPulse";
 import { useAuth } from "./AuthContext";
 
-const NAV_ITEMS: ReadonlyArray<{ to: string; icon: string; key: string; end?: boolean }> = [
-  { to: "/", icon: "RE", key: "overview", end: true },
-  { to: "/incidents", icon: "IN", key: "incidents" },
-  { to: "/alerts", icon: "AL", key: "alerts" },
-  { to: "/playbooks", icon: "PB", key: "playbooks" },
-  { to: "/integrations", icon: "IG", key: "integrations" },
-  { to: "/audit", icon: "AU", key: "audit" },
-  { to: "/administration", icon: "AD", key: "administration" },
+const NAV_ITEMS: ReadonlyArray<{ to: string; icon: React.ReactNode; key: string; end?: boolean }> = [
+  {
+    to: "/",
+    key: "overview",
+    end: true,
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="3" y="3" width="7" height="7" rx="1.5" />
+        <rect x="14" y="3" width="7" height="7" rx="1.5" />
+        <rect x="14" y="14" width="7" height="7" rx="1.5" />
+        <rect x="3" y="14" width="7" height="7" rx="1.5" />
+      </svg>
+    ),
+  },
+  {
+    to: "/incidents",
+    key: "incidents",
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+        <line x1="12" y1="8" x2="12" y2="12" />
+        <line x1="12" y1="16" x2="12.01" y2="16" />
+      </svg>
+    ),
+  },
+  {
+    to: "/alerts",
+    key: "alerts",
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+        <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+      </svg>
+    ),
+  },
+  {
+    to: "/playbooks",
+    key: "playbooks",
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="3" y="3" width="6" height="6" rx="1.5" />
+        <rect x="15" y="15" width="6" height="6" rx="1.5" />
+        <path d="M6 9v3a3 3 0 0 0 3 3h6" />
+        <polyline points="14 12 17 15 14 18" />
+      </svg>
+    ),
+  },
+  {
+    to: "/integrations",
+    key: "integrations",
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M16 16v1a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h11a2 2 0 0 1 2 2v1" />
+        <path d="M18 8l4 4-4 4" />
+        <line x1="8" y1="12" x2="22" y2="12" />
+      </svg>
+    ),
+  },
+  {
+    to: "/memory",
+    key: "memory.navigation",
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <ellipse cx="12" cy="5" rx="9" ry="3" />
+        <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3" />
+        <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5" />
+      </svg>
+    ),
+  },
+  {
+    to: "/api-keys",
+    key: "apiKeys.navigation",
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="7.5" cy="15.5" r="5.5" />
+        <path d="M21 2l-9.6 9.6" />
+        <path d="M15.5 7.5l3 3" />
+      </svg>
+    ),
+  },
+  {
+    to: "/audit",
+    key: "audit",
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+        <polyline points="14 2 14 8 20 8" />
+        <line x1="16" y1="13" x2="8" y2="13" />
+        <line x1="16" y1="17" x2="8" y2="17" />
+      </svg>
+    ),
+  },
+  {
+    to: "/administration",
+    key: "administration",
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="12" r="3" />
+        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
+      </svg>
+    ),
+  },
 ];
 
 const loginSchema = z.object({
@@ -416,25 +512,7 @@ function Overview() {
         empty={false}
       />
       <section className="overview-visuals">
-        <article className="panel pulse-panel">
-          <div className="panel-heading">
-            <div>
-              <p className="eyebrow">{t("operationalPulse")}</p>
-              <h2>{t("operationalPulseTitle")}</h2>
-            </div>
-            <span className="preview-badge">{t("staticPreview")}</span>
-          </div>
-          <div className="signal-grid" role="img" aria-label={t("operationalPulsePreview")}>
-            {[64, 42, 78, 55, 88, 70, 49, 81, 61, 75, 92, 68].map((v, i) => (
-              <i key={i} style={{ height: `${v}%` }} />
-            ))}
-          </div>
-          <div className="pulse-legend">
-            <span>{t("telemetryIngestion")}</span>
-            <span>{t("detections")}</span>
-            <span>{t("incidentResponse")}</span>
-          </div>
-        </article>
+        <OperationalPulse />
 
         <article className="panel topology-panel">
           <div className="panel-heading">
@@ -502,7 +580,11 @@ function Overview() {
 
 function AlertsPage() {
   const { t, i18n } = useTranslation();
+  const queryClient = useQueryClient();
+  const [expandedId, setExpandedId] = useState<string | null>(null);
   const controls = useListControls();
+  const me = useQuery({ queryKey: ["me"], queryFn: getMe, retry: false });
+
   const alerts = useQuery({
     queryKey: ["alerts", controls.query, controls.page, controls.pageSize],
     queryFn: () =>
@@ -513,7 +595,45 @@ function AlertsPage() {
         includeLookahead: true,
       }),
   });
+
+  const triageMutation = useMutation({
+    mutationFn: ({
+      alertId,
+      status,
+    }: {
+      alertId: string;
+      status: "UNREVIEWED" | "RELEVANT" | "DISCARDED";
+    }) => updateAlertTriage(alertId, status),
+    onMutate: async ({ alertId, status }) => {
+      await queryClient.cancelQueries({ queryKey: ["alerts"] });
+      queryClient.setQueriesData(
+        { queryKey: ["alerts"] },
+        (oldData: Alert[] | undefined) => {
+          if (!oldData) return oldData;
+          return oldData.map((item) =>
+            item.id === alertId
+              ? {
+                  ...item,
+                  triage_status: status,
+                  reviewed_at: new Date().toISOString(),
+                  reviewer_display_name: me.data?.display_name ?? "Analyst",
+                }
+              : item,
+          );
+        },
+      );
+    },
+    onSettled: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["alerts"] }),
+        queryClient.invalidateQueries({ queryKey: ["incident-alerts"] }),
+        queryClient.invalidateQueries({ queryKey: ["audit-events"] }),
+      ]);
+    },
+  });
+
   const items = alerts.data?.slice(0, controls.pageSize) ?? [];
+
   return (
     <>
       <div className="page-title">
@@ -531,23 +651,245 @@ function AlertsPage() {
           hasNext={(alerts.data?.length ?? 0) > controls.pageSize}
         />
         <div className="data-list">
-          {items.map((alert) => (
-            <article key={alert.id}>
-              <span className={`severity ${alert.severity}`}>
-                {t(`severityCodes.${alert.severity}`, { defaultValue: alert.severity })}
-              </span>
-              <div>
-                <strong>{alert.title}</strong>
-                <small>
-                  {alert.source} · {alert.category}
-                </small>
-              </div>
-              {alert.is_simulated && <span className="demo-badge">{t("simulated")}</span>}
-              <time dateTime={alert.observed_at}>
-                {new Date(alert.observed_at).toLocaleString(i18n.language)}
-              </time>
-            </article>
-          ))}
+          {items.map((alert) => {
+            const isExpanded = expandedId === alert.id;
+            const isDimmed = alert.triage_status === "DISCARDED";
+            const isRelevant = alert.triage_status === "RELEVANT";
+
+            return (
+              <article
+                key={alert.id}
+                style={{
+                  cursor: "pointer",
+                  opacity: isDimmed ? 0.55 : 1,
+                  borderLeft: isRelevant
+                    ? "4px solid var(--accent)"
+                    : isDimmed
+                    ? "4px solid var(--muted)"
+                    : "1px solid var(--panel-border)",
+                  background: isRelevant ? "rgba(13, 209, 155, 0.05)" : "transparent",
+                  transition: "all 0.2s ease",
+                }}
+                onClick={() => setExpandedId(isExpanded ? null : alert.id)}
+              >
+                <span className={`severity ${alert.severity}`}>
+                  {t(`severityCodes.${alert.severity}`, { defaultValue: alert.severity })}
+                </span>
+                <div>
+                  <strong>
+                    {alert.title}
+                    {alert.triage_status !== "UNREVIEWED" && (
+                      <span
+                        className="demo-badge"
+                        style={{
+                          marginLeft: "8px",
+                          verticalAlign: "middle",
+                          background: isRelevant ? "var(--accent)" : "var(--panel-raised)",
+                          color: isRelevant ? "#041512" : "var(--text-soft)",
+                          fontWeight: 600,
+                        }}
+                      >
+                        {isRelevant ? "⭐ " : "✓ "}
+                        {t(`triageStatus.${alert.triage_status}`, {
+                          defaultValue: alert.triage_status,
+                        })}
+                      </span>
+                    )}
+                  </strong>
+                  <small>
+                    {alert.source} · {alert.category}
+                  </small>
+                </div>
+                {alert.is_simulated ? (
+                  <span className="demo-badge">{t("simulated")}</span>
+                ) : (
+                  <span />
+                )}
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px",
+                    justify: "flex-end",
+                    flexWrap: "wrap",
+                  }}
+                >
+                  <time dateTime={alert.observed_at}>
+                    {new Date(alert.observed_at).toLocaleString(i18n.language)}
+                  </time>
+
+                  {/* Quick Inline Triage Buttons */}
+                  <div style={{ display: "flex", gap: "4px" }}>
+                    <button
+                      type="button"
+                      className="ghost"
+                      title={t("markRelevant")}
+                      style={{
+                        minHeight: "auto",
+                        padding: "4px 8px",
+                        fontSize: "0.75rem",
+                        whiteSpace: "nowrap",
+                        background: isRelevant ? "var(--accent)" : "transparent",
+                        color: isRelevant ? "#041512" : "var(--text)",
+                      }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        triageMutation.mutate({
+                          alertId: alert.id,
+                          status: isRelevant ? "UNREVIEWED" : "RELEVANT",
+                        });
+                      }}
+                    >
+                      ⭐ {t("markRelevant")}
+                    </button>
+                    <button
+                      type="button"
+                      className="ghost"
+                      title={t("discardAlert")}
+                      style={{
+                        minHeight: "auto",
+                        padding: "4px 8px",
+                        fontSize: "0.75rem",
+                        whiteSpace: "nowrap",
+                        opacity: isDimmed ? 0.7 : 1,
+                      }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        triageMutation.mutate({
+                          alertId: alert.id,
+                          status: isDimmed ? "UNREVIEWED" : "DISCARDED",
+                        });
+                      }}
+                    >
+                      {isDimmed ? "↺ " + t("resetTriage") : "✓ " + t("discardAlert")}
+                    </button>
+                    <button
+                      type="button"
+                      className="ghost"
+                      style={{
+                        minHeight: "auto",
+                        padding: "4px 8px",
+                        fontSize: "0.75rem",
+                        whiteSpace: "nowrap",
+                      }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setExpandedId(isExpanded ? null : alert.id);
+                      }}
+                    >
+                      {isExpanded ? t("hideDetails") : t("showDetails")}
+                    </button>
+                  </div>
+                </div>
+
+                {isExpanded && (
+                  <div
+                    className="analysis-card"
+                    style={{ gridColumn: "1 / -1", marginTop: "12px", opacity: 1 }}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <div
+                      style={{
+                        display: "flex",
+                        justify: "space-between",
+                        alignItems: "center",
+                        marginBottom: "12px",
+                      }}
+                    >
+                      <strong>{t("alertDetails")}</strong>
+                      <button
+                        type="button"
+                        className="ghost"
+                        style={{ minHeight: "auto", padding: "4px 10px", fontSize: "0.8rem" }}
+                        onClick={() => setExpandedId(null)}
+                      >
+                        ✕ {t("close")}
+                      </button>
+                    </div>
+                    <div className="connector-grid">
+                      <div>
+                        <strong>{t("externalId")}</strong>
+                        <small>{alert.external_id || alert.id}</small>
+                      </div>
+                      <div>
+                        <strong>{t("provenance")}</strong>
+                        <small>{alert.provenance || alert.source}</small>
+                      </div>
+                      <div>
+                        <strong>{t("assetSummary")}</strong>
+                        <small>{alert.asset_summary || t("noParameters")}</small>
+                      </div>
+                      <div>
+                        <strong>{t("identitySummary")}</strong>
+                        <small>{alert.identity_summary || t("noParameters")}</small>
+                      </div>
+                      <div>
+                        <strong>{t("indicatorSummary")}</strong>
+                        <small>{alert.indicator_summary || t("noParameters")}</small>
+                      </div>
+                    </div>
+                    <div
+                      style={{
+                        marginTop: "1rem",
+                        display: "flex",
+                        gap: "10px",
+                        alignItems: "center",
+                        flexWrap: "wrap",
+                      }}
+                    >
+                      <button
+                        type="button"
+                        className="ghost"
+                        disabled={triageMutation.isPending}
+                        style={{
+                          background: isRelevant ? "var(--accent)" : "transparent",
+                          color: isRelevant ? "#041512" : "var(--text)",
+                        }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          triageMutation.mutate({ alertId: alert.id, status: "RELEVANT" });
+                        }}
+                      >
+                        ⭐ {t("markRelevant")}
+                      </button>
+                      <button
+                        type="button"
+                        className="ghost"
+                        disabled={triageMutation.isPending}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          triageMutation.mutate({ alertId: alert.id, status: "DISCARDED" });
+                        }}
+                      >
+                        ✓ {t("discardAlert")}
+                      </button>
+                      {alert.triage_status !== "UNREVIEWED" && (
+                        <button
+                          type="button"
+                          className="ghost"
+                          disabled={triageMutation.isPending}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            triageMutation.mutate({ alertId: alert.id, status: "UNREVIEWED" });
+                          }}
+                        >
+                          ↺ {t("resetTriage")}
+                        </button>
+                      )}
+                    </div>
+                    {alert.reviewed_at && (
+                      <p style={{ margin: "10px 0 0", fontSize: "0.85rem", color: "var(--muted)" }}>
+                        {t("treatedBy", {
+                          user: alert.reviewer_display_name || alert.reviewed_by_user_id || "Analyst",
+                          time: new Date(alert.reviewed_at).toLocaleString(i18n.language),
+                        })}
+                      </p>
+                    )}
+                  </div>
+                )}
+              </article>
+            );
+          })}
         </div>
       </section>
     </>
@@ -610,6 +952,10 @@ function IncidentDetailPage() {
   const { id = "" } = useParams();
   const { t, i18n } = useTranslation();
   const queryClient = useQueryClient();
+  const [activeTab, setActiveTab] = useState<"overview" | "alerts" | "threatIntel" | "audit">("overview");
+  const [expandedAlertId, setExpandedAlertId] = useState<string | null>(null);
+  const [showMoreMenu, setShowMoreMenu] = useState(false);
+
   const incident = useQuery({ queryKey: ["incident", id], queryFn: () => getIncident(id) });
   const currentUser = useQuery({ queryKey: ["me"], queryFn: getMe, retry: false });
   const timeline = useQuery({ queryKey: ["timeline", id], queryFn: () => getTimeline(id) });
@@ -617,6 +963,10 @@ function IncidentDetailPage() {
   const correlations = useQuery({
     queryKey: ["correlations", id],
     queryFn: () => getCorrelations(id),
+  });
+  const linkedAlerts = useQuery({
+    queryKey: ["incident-alerts", id],
+    queryFn: () => getIncidentAlerts(id),
   });
   const enrichment = useQuery({
     queryKey: ["enrichment", id],
@@ -633,6 +983,7 @@ function IncidentDetailPage() {
     queryFn: () => getPlaybookExecutions(id),
     retry: false,
   });
+
   const transition = useMutation({
     mutationFn: (target: string) => transitionIncident(id, incident.data!.version, target),
     onSuccess: async () => {
@@ -690,6 +1041,7 @@ function IncidentDetailPage() {
       await queryClient.invalidateQueries({ queryKey: ["response-decisions", id] });
     },
   });
+
   const next: Record<string, string> = {
     new: "triaged",
     triaged: "investigating",
@@ -699,10 +1051,12 @@ function IncidentDetailPage() {
     closed: "reopened",
     reopened: "investigating",
   };
+
   if (incident.isLoading) return <PageState loading error={false} empty={false} />;
   if (incident.isError || !incident.data) {
     return <PageState loading={false} error empty={false} />;
   }
+
   return (
     <>
       <div className="page-title">
@@ -712,6 +1066,7 @@ function IncidentDetailPage() {
         </div>
         {incident.data.is_simulated && <span className="demo-badge">{t("simulated")}</span>}
       </div>
+
       <section className="metrics">
         <article>
           <p>{t("status")}</p>
@@ -734,341 +1089,798 @@ function IncidentDetailPage() {
           <strong>{incident.data.version}</strong>
         </article>
       </section>
-      <section className="panel">
-        <div>
-          <h2>{t("timeline")}</h2>
-          <p>{incident.data.description}</p>
-        </div>
-        <div className="timeline">
-          {timeline.data?.map((entry) => (
-            <p key={entry.id}>
-              <strong>{entry.entry_type}</strong>
-              <br />
-              {entry.summary}
-            </p>
-          ))}
-          <PageState
-            loading={timeline.isLoading}
-            error={timeline.isError}
-            empty={!timeline.isLoading && !timeline.isError && timeline.data?.length === 0}
-          />
-          <button
-            disabled={transition.isPending}
-            onClick={() => transition.mutate(next[incident.data!.status])}
-          >
-            {t("advanceTo")}{" "}
-            {t(`statusCodes.${next[incident.data.status]}`, {
-              defaultValue: next[incident.data.status],
-            })}
-          </button>
-          <button className="ghost" disabled={analysis.isPending} onClick={() => analysis.mutate()}>
-            {t("analyze")}
-          </button>
-          <button
-            className="ghost"
-            disabled={responseProposal.isPending}
-            onClick={() => responseProposal.mutate()}
-          >
-            {t("proposeSafeResponse")}
-          </button>
-          <button
-            className="ghost"
-            onClick={() => void downloadIncidentReport(id, incident.data!.code)}
-          >
-            {t("downloadReport")}
-          </button>
-          {analysis.data && (
-            <div className="analysis-card">
-              <strong>
-                {t("risk")}: {analysis.data.risk_score}/100
-              </strong>
-              <p>
-                {i18n.language.startsWith("es")
-                  ? analysis.data.summary_es
-                  : analysis.data.summary_en}
-              </p>
-              <small>{analysis.data.techniques.map((item) => item.external_id).join(" · ")}</small>
-            </div>
-          )}
-          {responseProposal.data && <p className="demo-badge">{t("proposalCreated")}</p>}
-          {(transition.isError || analysis.isError || responseProposal.isError) && (
-            <p className="status-message status-error" role="alert">
-              {t("actionError")}
-            </p>
-          )}
-        </div>
-      </section>
-      <section className="panel claim-panel">
-        <div>
-          <p className="eyebrow">{t("safeResponse")}</p>
-          <h2>{t("decisionsAndApprovals")}</h2>
-          <p>{t("decisionsIntro")}</p>
-        </div>
-        <div className="claim-grid">
-          {responseDecisions.data?.map((decision) => (
-            <article className="claim-card" key={decision.id}>
-              <div className="claim-badges">
-                <span>{decision.status}</span>
-                <span>{decision.impact}</span>
-                {decision.is_simulated && <span>{t("simulated")}</span>}
-              </div>
-              <strong>{decision.action_type}</strong>
-              <p>
-                {t("approvalProgress")}: {decision.decisions.length}/{decision.required_approvals}
-              </p>
-              <small>
-                {t("policyOutcome")}: {decision.evaluation_outcome}
-              </small>
-              <br />
-              <small>{decision.reason_codes.join(" · ")}</small>
-              {decision.approval_request_id &&
-                decision.approval_status === "PENDING" &&
-                currentUser.data?.id !== decision.requester_user_id && (
-                  <div>
-                    <button
-                      className="ghost"
-                      disabled={approvalDecision.isPending}
-                      onClick={() =>
-                        approvalDecision.mutate({
-                          requestId: decision.approval_request_id!,
-                          decision: "APPROVE",
-                          fingerprint: decision.fingerprint,
-                        })
-                      }
-                    >
-                      {t("approveResponse")}
-                    </button>
-                    <button
-                      className="ghost"
-                      disabled={approvalDecision.isPending}
-                      onClick={() =>
-                        approvalDecision.mutate({
-                          requestId: decision.approval_request_id!,
-                          decision: "REJECT",
-                          fingerprint: decision.fingerprint,
-                        })
-                      }
-                    >
-                      {t("rejectResponse")}
-                    </button>
-                  </div>
-                )}
-              {decision.authorization?.status === "ACTIVE" && (
+
+      {/* Enterprise Tab Bar Segmented Control with 3-Dots Menu */}
+      <div style={{ position: "relative", marginBottom: "1.5rem" }}>
+        <nav
+          aria-label="Incident Detail Sections"
+          style={{
+            display: "flex",
+            justify: "space-between",
+            alignItems: "center",
+            background: "var(--panel-raised)",
+            border: "1px solid var(--line)",
+            borderRadius: "8px",
+            padding: "4px 8px",
+            flexWrap: "wrap",
+            gap: "8px",
+          }}
+        >
+          <div style={{ display: "flex", gap: "4px", flexWrap: "wrap" }}>
+            <button
+              type="button"
+              style={{
+                border: "none",
+                borderRadius: "6px",
+                padding: "8px 16px",
+                fontSize: "0.875rem",
+                fontWeight: activeTab === "overview" ? 600 : 400,
+                cursor: "pointer",
+                background: activeTab === "overview" ? "var(--accent)" : "transparent",
+                color: activeTab === "overview" ? "#041512" : "var(--text)",
+                transition: "all 0.2s ease",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "6px",
+              }}
+              onClick={() => setActiveTab("overview")}
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="3" width="7" height="7" rx="1.5" />
+                <rect x="14" y="3" width="7" height="7" rx="1.5" />
+                <rect x="14" y="14" width="7" height="7" rx="1.5" />
+                <rect x="3" y="14" width="7" height="7" rx="1.5" />
+              </svg>
+              {t("tabOverview")}
+            </button>
+            <button
+              type="button"
+              style={{
+                border: "none",
+                borderRadius: "6px",
+                padding: "8px 16px",
+                fontSize: "0.875rem",
+                fontWeight: activeTab === "alerts" ? 600 : 400,
+                cursor: "pointer",
+                background: activeTab === "alerts" ? "var(--accent)" : "transparent",
+                color: activeTab === "alerts" ? "#041512" : "var(--text)",
+                transition: "all 0.2s ease",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "6px",
+              }}
+              onClick={() => setActiveTab("alerts")}
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+                <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+              </svg>
+              {t("tabAlerts")} {linkedAlerts.data?.length ? `(${linkedAlerts.data.length})` : ""}
+            </button>
+            <button
+              type="button"
+              style={{
+                border: "none",
+                borderRadius: "6px",
+                padding: "8px 16px",
+                fontSize: "0.875rem",
+                fontWeight: activeTab === "threatIntel" ? 600 : 400,
+                cursor: "pointer",
+                background: activeTab === "threatIntel" ? "var(--accent)" : "transparent",
+                color: activeTab === "threatIntel" ? "#041512" : "var(--text)",
+                transition: "all 0.2s ease",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "6px",
+              }}
+              onClick={() => setActiveTab("threatIntel")}
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+              </svg>
+              {t("tabThreatIntel")}
+            </button>
+            <button
+              type="button"
+              style={{
+                border: "none",
+                borderRadius: "6px",
+                padding: "8px 16px",
+                fontSize: "0.875rem",
+                fontWeight: activeTab === "audit" ? 600 : 400,
+                cursor: "pointer",
+                background: activeTab === "audit" ? "var(--accent)" : "transparent",
+                color: activeTab === "audit" ? "#041512" : "var(--text)",
+                transition: "all 0.2s ease",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "6px",
+              }}
+              onClick={() => setActiveTab("audit")}
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                <polyline points="14 2 14 8 20 8" />
+                <line x1="16" y1="13" x2="8" y2="13" />
+                <line x1="16" y1="17" x2="8" y2="17" />
+              </svg>
+              {t("tabAudit")} {playbookExecutions.data?.length ? `(${playbookExecutions.data.length})` : ""}
+            </button>
+          </div>
+
+          {/* 3-Dots Vertical Menu Container */}
+          <div style={{ position: "relative", display: "inline-block" }}>
+            <button
+              type="button"
+              className="ghost"
+              style={{
+                padding: "6px 12px",
+                fontSize: "1.1rem",
+                minHeight: "36px",
+                cursor: "pointer",
+              }}
+              aria-expanded={showMoreMenu}
+              aria-label="Más opciones"
+              onClick={() => setShowMoreMenu(!showMoreMenu)}
+            >
+              ⋮
+            </button>
+
+            {/* 3-Dots Dropdown Popover */}
+            {showMoreMenu && (
+              <div
+                style={{
+                  position: "absolute",
+                  top: "calc(100% + 8px)",
+                  right: 0,
+                  background: "var(--panel-raised)",
+                  border: "1px solid var(--line)",
+                  borderRadius: "8px",
+                  padding: "8px",
+                  boxShadow: "0 8px 24px rgba(0, 0, 0, 0.4)",
+                  zIndex: 100,
+                  minWidth: "220px",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "6px",
+                }}
+              >
                 <button
+                  type="button"
                   className="ghost"
-                  disabled={executeResponse.isPending}
-                  onClick={() => executeResponse.mutate(decision.authorization!.id)}
+                  disabled={analysis.isPending}
+                  style={{ justifyContent: "flex-start", width: "100%", textAlign: "left" }}
+                  onClick={() => {
+                    setShowMoreMenu(false);
+                    analysis.mutate();
+                  }}
                 >
-                  {t("simulateResponse")}
+                  🔍 {t("analyze")}
                 </button>
-              )}
-            </article>
-          ))}
-          <PageState
-            loading={responseDecisions.isLoading}
-            error={responseDecisions.isError}
-            empty={
-              !responseDecisions.isLoading &&
-              !responseDecisions.isError &&
-              responseDecisions.data?.length === 0
-            }
-          />
-        </div>
-        <div className="claim-grid">
-          <h3>{t("executionHistory")}</h3>
-          {playbookExecutions.data?.map((execution) => (
-            <article className="claim-card" key={execution.id}>
-              <div className="claim-badges">
-                <span>{execution.status}</span>
-                <span>{execution.execution_mode}</span>
+                <button
+                  type="button"
+                  className="ghost"
+                  style={{ justifyContent: "flex-start", width: "100%", textAlign: "left" }}
+                  onClick={() => {
+                    setShowMoreMenu(false);
+                    void downloadIncidentReport(id, incident.data!.code);
+                  }}
+                >
+                  📄 {t("downloadReport")}
+                </button>
               </div>
-              <strong>{execution.id}</strong>
-              <small>{new Date(execution.created_at).toLocaleString(i18n.language)}</small>
-              {execution.error_code && <p>{execution.error_code}</p>}
-            </article>
-          ))}
-          <PageState
-            loading={playbookExecutions.isLoading}
-            error={playbookExecutions.isError || executeResponse.isError}
-            empty={
-              !playbookExecutions.isLoading &&
-              !playbookExecutions.isError &&
-              playbookExecutions.data?.length === 0
-            }
-          />
-        </div>
-      </section>
-      <section className="panel claim-panel">
-        <div>
-          <p className="eyebrow">MITRE ATT&amp;CK</p>
-          <h2>{t("threatEnrichment")}</h2>
-          <p>{t("threatEnrichmentIntro")}</p>
-          <button
-            className="ghost"
-            disabled={recalculateRisk.isPending}
-            onClick={() => recalculateRisk.mutate()}
-          >
-            {t("recalculateRisk")}
-          </button>
-          <button
-            className="ghost"
-            disabled={generateExplanation.isPending || !enrichment.data}
-            onClick={() => generateExplanation.mutate()}
-          >
-            {t("redactWithAi")}
-          </button>
-        </div>
-        <div className="claim-grid">
-          {enrichment.data && (
-            <>
-              <article className="claim-card analysis-card">
-                <div className="claim-badges">
-                  <span>
-                    {t("riskDefinition")} {enrichment.data.risk.definition_code} v
-                    {enrichment.data.risk.definition_version}
-                  </span>
-                  <span>
-                    {t(`riskBands.${enrichment.data.risk.band}`, {
-                      defaultValue: enrichment.data.risk.band,
-                    })}
-                  </span>
-                </div>
-                <strong>
-                  {t("risk")}: {enrichment.data.risk.score}/100
-                </strong>
-                <div className="correlation-factors">
-                  {enrichment.data.risk.factors.map((factor) => (
-                    <span key={factor.code}>
-                      {t(`riskFactors.${factor.code}`, { defaultValue: factor.code })}:{" "}
-                      {factor.contribution}/{factor.weight}
-                    </span>
-                  ))}
-                </div>
-                <p>
-                  {enrichment.data.explanations.find(
-                    (item) =>
-                      item.locale === (i18n.language.startsWith("es") ? "es" : "en") &&
-                      item.mode === "AI_REDACTION",
-                  )?.text ??
-                    enrichment.data.explanations.find(
-                      (item) =>
-                        item.locale === (i18n.language.startsWith("es") ? "es" : "en") &&
-                        item.mode === "DETERMINISTIC",
-                    )?.text}
-                </p>
-              </article>
-              {enrichment.data.mappings.map((mapping) => (
-                <article className="claim-card" key={mapping.id}>
-                  <div className="claim-badges">
-                    <span>{mapping.status}</span>
-                    <span>{mapping.external_id}</span>
+            )}
+          </div>
+        </nav>
+      </div>
+
+      {activeTab === "overview" && (
+        <>
+          {/* Recommended Playbooks & Approval Section */}
+          <section className="panel" style={{ marginBottom: "1.25rem" }}>
+            <div
+              style={{
+                display: "flex",
+                justify: "space-between",
+                alignItems: "flex-start",
+                marginBottom: "1rem",
+                flexWrap: "wrap",
+                gap: "12px",
+              }}
+            >
+              <div>
+                <p className="eyebrow">{t("safeResponse")}</p>
+                <h2 style={{ margin: 0 }}>{t("recommendedPlaybooksHeading")}</h2>
+              </div>
+
+              {(() => {
+                const hasPending = responseDecisions.data?.some((d) => d.approval_status === "PENDING");
+                return (
+                  <button
+                    type="button"
+                    disabled={responseProposal.isPending || hasPending}
+                    title={hasPending ? t("proposalPendingNotice", { defaultValue: "Ya existe una propuesta pendiente de aprobación" }) : undefined}
+                    onClick={() => responseProposal.mutate()}
+                  >
+                    ⚡ {t("proposeSafeResponse")}
+                  </button>
+                );
+              })()}
+            </div>
+
+            {/* Sub-header Notice Banner for 4-Eye Principle */}
+            <div
+              style={{
+                background: "var(--panel-raised)",
+                border: "1px solid var(--line)",
+                borderRadius: "6px",
+                padding: "8px 14px",
+                fontSize: "0.85rem",
+                color: "var(--text-soft)",
+                marginBottom: "1.25rem",
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+              }}
+            >
+              <span>ℹ️</span>
+              <span>{t("dualControlNotice")}</span>
+            </div>
+
+            {responseProposal.data && (
+              <div
+                className="demo-badge"
+                style={{
+                  padding: "8px 14px",
+                  fontSize: "0.85rem",
+                  marginBottom: "1rem",
+                  display: "inline-block",
+                }}
+              >
+                ✓ {t("proposalCreated")}
+              </div>
+            )}
+
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fill, minmax(360px, 1fr))",
+                gap: "14px",
+                width: "100%",
+              }}
+            >
+              {responseDecisions.data?.map((decision) => (
+                <article
+                  className="claim-card"
+                  key={decision.id}
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    justify: "space-between",
+                    padding: "1.25rem",
+                    border: "1px solid var(--panel-border)",
+                    borderRadius: "8px",
+                  }}
+                >
+                  <div>
+                    <div className="claim-badges" style={{ marginBottom: "10px" }}>
+                      <span className="severity">{decision.status}</span>
+                      <span>{decision.impact}</span>
+                      {decision.is_simulated && <span>{t("simulated")}</span>}
+                    </div>
+                    <strong style={{ fontSize: "1.15rem", display: "block", marginBottom: "8px" }}>
+                      {decision.action_type}
+                    </strong>
+                    <p style={{ margin: "6px 0", fontSize: "0.9rem" }}>
+                      <strong>{t("approvalProgress")}:</strong> {decision.decisions.length}/{decision.required_approvals}
+                    </p>
+                    <small style={{ color: "var(--muted)", display: "block", marginTop: "6px" }}>
+                      {t("policyOutcome")}: {decision.evaluation_outcome} · {decision.reason_codes.join(" · ")}
+                    </small>
                   </div>
-                  <strong>{mapping.name_en}</strong>
-                  <p>{mapping.tactic_codes.join(" · ")}</p>
-                  <small>
-                    {t("evidence")}: {mapping.evidence_revision_ids.length} ·{" "}
-                    {mapping.selector_codes.join(", ")}
-                  </small>
+                  <div style={{ marginTop: "16px" }}>
+                    {decision.approval_request_id &&
+                      decision.approval_status === "PENDING" && (
+                        currentUser.data?.id !== decision.requester_user_id ? (
+                          <div style={{ display: "flex", gap: "10px" }}>
+                            <button
+                              type="button"
+                              style={{ flex: 1 }}
+                              disabled={approvalDecision.isPending}
+                              onClick={() =>
+                                approvalDecision.mutate({
+                                  requestId: decision.approval_request_id!,
+                                  decision: "APPROVE",
+                                  fingerprint: decision.fingerprint,
+                                })
+                              }
+                            >
+                              ✓ {t("approveResponse")}
+                            </button>
+                            <button
+                              type="button"
+                              className="ghost"
+                              style={{ flex: 1 }}
+                              disabled={approvalDecision.isPending}
+                              onClick={() =>
+                                approvalDecision.mutate({
+                                  requestId: decision.approval_request_id!,
+                                  decision: "REJECT",
+                                  fingerprint: decision.fingerprint,
+                                })
+                              }
+                            >
+                              ✕ {t("rejectResponse")}
+                            </button>
+                          </div>
+                        ) : (
+                          <p style={{ margin: 0, fontSize: "0.85rem", color: "var(--text-soft)", background: "var(--panel-raised)", padding: "8px 12px", borderRadius: "6px" }}>
+                            🔒 {t("awaitingSecondAnalystNotice", { defaultValue: "Esperando aprobación de un 2º analista (Principio 4-Ojos)" })}
+                          </p>
+                        )
+                      )}
+                    {decision.authorization?.status === "ACTIVE" && (
+                      <button
+                        type="button"
+                        style={{ width: "100%", minHeight: "40px" }}
+                        disabled={executeResponse.isPending}
+                        onClick={() => executeResponse.mutate(decision.authorization!.id)}
+                      >
+                        ▶ {t("simulateResponse")}
+                      </button>
+                    )}
+                  </div>
                 </article>
               ))}
-            </>
-          )}
-          <PageState
-            loading={enrichment.isLoading || recalculateRisk.isPending}
-            error={recalculateRisk.isError || generateExplanation.isError}
-            empty={!enrichment.isLoading && !enrichment.data}
-          />
-        </div>
-      </section>
-      <section className="panel claim-panel">
-        <div>
-          <p className="eyebrow">{t("traceability")}</p>
-          <h2>{t("knowledgeClaims")}</h2>
-          <p>{t("knowledgeClaimsIntro")}</p>
-        </div>
-        <div className="claim-grid">
-          {claims.data?.map((claim) => {
-            const locale = i18n.language.startsWith("es") ? "es" : "en";
-            const statement =
-              claim.presentations[locale] ??
-              (claim.language_code === locale ? claim.statement : undefined) ??
-              claim.presentations.en ??
-              claim.presentations.es ??
-              claim.statement;
-            return (
-              <article className="claim-card" key={claim.id}>
-                <div className="claim-badges">
-                  <span>
-                    {t(`claimTypes.${claim.claim_type}`, { defaultValue: claim.claim_type })}
-                  </span>
-                  <span>{t(`claimStates.${claim.state}`, { defaultValue: claim.state })}</span>
-                  <span>
-                    {t(`claimOrigins.${claim.origin_type}`, { defaultValue: claim.origin_type })}
-                  </span>
-                  {claim.is_simulated && <span>{t("simulated")}</span>}
-                </div>
-                <p>{statement}</p>
-                {claim.confidence !== null && (
-                  <small>
-                    {t("confidence")}: {Math.round(claim.confidence * 100)}%
-                  </small>
-                )}
-              </article>
-            );
-          })}
-          <PageState
-            loading={claims.isLoading}
-            error={claims.isError}
-            empty={!claims.isLoading && !claims.isError && claims.data?.length === 0}
-          />
-        </div>
-      </section>
-      <section className="panel claim-panel">
-        <div>
-          <p className="eyebrow">{t("traceability")}</p>
-          <h2>{t("correlations")}</h2>
-          <p>{t("correlationIntro")}</p>
-        </div>
-        <div className="claim-grid">
-          {correlations.data?.map((match) => (
-            <article className="claim-card correlation-card" key={match.id}>
-              <div className="claim-badges">
-                <span>
-                  {t("rule")}: {match.rule_code} v{match.rule_version}
-                </span>
-                <span>{match.result_type}</span>
-                {match.is_simulated && <span>{t("simulated")}</span>}
+              <PageState
+                loading={responseDecisions.isLoading}
+                error={responseDecisions.isError}
+                empty={
+                  !responseDecisions.isLoading &&
+                  !responseDecisions.isError &&
+                  responseDecisions.data?.length === 0
+                }
+              />
+            </div>
+          </section>
+
+          {/* Operational Timeline Panel with Integrated Advance State Button */}
+          <section className="panel">
+            <div
+              style={{
+                display: "flex",
+                justify: "space-between",
+                alignItems: "center",
+                marginBottom: "1rem",
+                flexWrap: "wrap",
+                gap: "10px",
+              }}
+            >
+              <div>
+                <h2>{t("timeline")}</h2>
+                <p>{incident.data.description}</p>
               </div>
-              <strong>
-                {t("correlationScore")}: {match.score}/100 · {t("threshold")}: {match.threshold}
-              </strong>
-              <p>
-                {t("members")}: {match.members.length}
+              <button
+                type="button"
+                disabled={transition.isPending}
+                style={{
+                  minHeight: "40px",
+                  padding: "0 18px",
+                  fontWeight: 600,
+                  fontSize: "0.9rem",
+                }}
+                onClick={() => transition.mutate(next[incident.data!.status])}
+              >
+                ➜ {t("advanceTo")}{" "}
+                {t(`statusCodes.${next[incident.data.status]}`, {
+                  defaultValue: next[incident.data.status],
+                })}
+              </button>
+            </div>
+
+            {analysis.data && (
+              <div className="analysis-card" style={{ marginBottom: "1rem" }}>
+                <strong>
+                  {t("risk")}: {analysis.data.risk_score}/100
+                </strong>
+                <p>
+                  {i18n.language.startsWith("es")
+                    ? analysis.data.summary_es
+                    : analysis.data.summary_en}
+                </p>
+                <small>{analysis.data.techniques.map((item) => item.external_id).join(" · ")}</small>
+              </div>
+            )}
+
+            {(transition.isError || analysis.isError || responseProposal.isError) && (
+              <p className="status-message status-error" role="alert" style={{ marginBottom: "1rem" }}>
+                {t("actionError")}
               </p>
-              {match.result_type === "LEGACY_SIMULATED_V0" && (
-                <small>{t("legacyCorrelation")}</small>
-              )}
-              <div className="correlation-factors">
-                {match.factors.map((factor) => (
-                  <span key={factor.factor_code}>
-                    {t(`correlationFactors.${factor.factor_code}`, {
-                      defaultValue: factor.factor_code,
-                    })}
-                    : {factor.contribution}/{factor.weight}
-                  </span>
-                ))}
+            )}
+
+            <div className="timeline" style={{ marginTop: "1rem" }}>
+              {timeline.data?.map((entry) => (
+                <p key={entry.id}>
+                  <strong>{entry.entry_type}</strong>
+                  <br />
+                  {entry.summary}
+                </p>
+              ))}
+              <PageState
+                loading={timeline.isLoading}
+                error={timeline.isError}
+                empty={!timeline.isLoading && !timeline.isError && timeline.data?.length === 0}
+              />
+            </div>
+          </section>
+        </>
+      )}
+
+      {activeTab === "alerts" && (
+        <>
+          <section className="panel" style={{ marginBottom: "1.25rem" }}>
+            <div>
+              <p className="eyebrow">{t("traceability")}</p>
+              <h2>{t("tabAlerts")}</h2>
+              <p>{t("linkedAlertsIntro")}</p>
+            </div>
+            <PageState
+              loading={linkedAlerts.isLoading}
+              error={linkedAlerts.isError}
+              empty={!linkedAlerts.isLoading && !linkedAlerts.isError && linkedAlerts.data?.length === 0}
+            />
+            <div className="data-list" style={{ marginTop: "1rem" }}>
+              {linkedAlerts.data?.map((alert) => {
+                const isExpanded = expandedAlertId === alert.id;
+                const isDimmed = alert.triage_status === "DISCARDED";
+                return (
+                  <article
+                    key={alert.id}
+                    style={{ cursor: "pointer", opacity: isDimmed ? 0.55 : 1 }}
+                    onClick={() => setExpandedAlertId(isExpanded ? null : alert.id)}
+                  >
+                    <span className={`severity ${alert.severity}`}>
+                      {t(`severityCodes.${alert.severity}`, { defaultValue: alert.severity })}
+                    </span>
+                    <div>
+                      <strong>
+                        {alert.title}
+                        {alert.triage_status !== "UNREVIEWED" && (
+                          <span
+                            className="demo-badge"
+                            style={{ marginLeft: "8px", verticalAlign: "middle" }}
+                          >
+                            {t(`triageStatus.${alert.triage_status}`, {
+                              defaultValue: alert.triage_status,
+                            })}
+                          </span>
+                        )}
+                      </strong>
+                      <small>
+                        {alert.source} · {alert.category}
+                      </small>
+                    </div>
+                    {alert.is_simulated ? (
+                      <span className="demo-badge">{t("simulated")}</span>
+                    ) : (
+                      <span />
+                    )}
+                    <div style={{ display: "flex", alignItems: "center", gap: "10px", justifyContent: "flex-end" }}>
+                      <time dateTime={alert.observed_at}>
+                        {new Date(alert.observed_at).toLocaleString(i18n.language)}
+                      </time>
+                      <button
+                        type="button"
+                        className="ghost"
+                        style={{ minHeight: "auto", padding: "4px 8px", fontSize: "0.75rem" }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setExpandedAlertId(isExpanded ? null : alert.id);
+                        }}
+                      >
+                        {isExpanded ? t("hideDetails") : t("showDetails")}
+                      </button>
+                    </div>
+                    {isExpanded && (
+                      <div
+                        className="analysis-card"
+                        style={{ gridColumn: "1 / -1", marginTop: "12px", opacity: 1 }}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
+                          <strong>{t("alertDetails")}</strong>
+                          <button
+                            type="button"
+                            className="ghost"
+                            style={{ minHeight: "auto", padding: "4px 10px", fontSize: "0.8rem" }}
+                            onClick={() => setExpandedAlertId(null)}
+                          >
+                            ✕ {t("close")}
+                          </button>
+                        </div>
+                        <div className="connector-grid">
+                          <div>
+                            <strong>{t("externalId")}</strong>
+                            <small>{alert.external_id || alert.id}</small>
+                          </div>
+                          <div>
+                            <strong>{t("provenance")}</strong>
+                            <small>{alert.provenance || alert.source}</small>
+                          </div>
+                          <div>
+                            <strong>{t("assetSummary")}</strong>
+                            <small>{alert.asset_summary || t("noParameters")}</small>
+                          </div>
+                          <div>
+                            <strong>{t("identitySummary")}</strong>
+                            <small>{alert.identity_summary || t("noParameters")}</small>
+                          </div>
+                          <div>
+                            <strong>{t("indicatorSummary")}</strong>
+                            <small>{alert.indicator_summary || t("noParameters")}</small>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </article>
+                );
+              })}
+            </div>
+          </section>
+
+          <section className="panel">
+            <div>
+              <p className="eyebrow">{t("traceability")}</p>
+              <h2>{t("correlations")}</h2>
+              <p>{t("correlationIntro")}</p>
+            </div>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))",
+                gap: "12px",
+                marginTop: "1rem",
+              }}
+            >
+              {correlations.data?.map((match) => (
+                <article className="claim-card correlation-card" key={match.id}>
+                  <div className="claim-badges">
+                    <span>
+                      {t("rule")}: {match.rule_code} v{match.rule_version}
+                    </span>
+                    <span>{match.result_type}</span>
+                    {match.is_simulated && <span>{t("simulated")}</span>}
+                  </div>
+                  <strong>
+                    {t("correlationScore")}: {match.score}/100 · {t("threshold")}: {match.threshold}
+                  </strong>
+                  <p style={{ margin: "4px 0" }}>
+                    {t("members")}: {match.members.length}
+                  </p>
+                  {match.result_type === "LEGACY_SIMULATED_V0" && (
+                    <small style={{ color: "var(--muted)" }}>{t("legacyCorrelation")}</small>
+                  )}
+                  <div className="correlation-factors" style={{ marginTop: "8px" }}>
+                    {match.factors.map((factor) => (
+                      <span key={factor.factor_code}>
+                        {t(`correlationFactors.${factor.factor_code}`, {
+                          defaultValue: factor.factor_code,
+                        })}
+                        : {factor.contribution}/{factor.weight}
+                      </span>
+                    ))}
+                  </div>
+                </article>
+              ))}
+              <PageState
+                loading={correlations.isLoading}
+                error={correlations.isError}
+                empty={
+                  !correlations.isLoading && !correlations.isError && correlations.data?.length === 0
+                }
+              />
+            </div>
+          </section>
+        </>
+      )}
+
+      {activeTab === "threatIntel" && (
+        <>
+          <section className="panel" style={{ marginBottom: "1.25rem" }}>
+            <div
+              style={{
+                display: "flex",
+                justify: "space-between",
+                alignItems: "center",
+                flexWrap: "wrap",
+                gap: "10px",
+                marginBottom: "1rem",
+              }}
+            >
+              <div>
+                <p className="eyebrow">MITRE ATT&amp;CK</p>
+                <h2>{t("threatEnrichment")}</h2>
+                <p>{t("threatEnrichmentIntro")}</p>
               </div>
-            </article>
-          ))}
-          <PageState
-            loading={correlations.isLoading}
-            error={correlations.isError}
-            empty={
-              !correlations.isLoading && !correlations.isError && correlations.data?.length === 0
-            }
-          />
-        </div>
-      </section>
+              <div style={{ display: "flex", gap: "8px" }}>
+                <button
+                  className="ghost"
+                  disabled={recalculateRisk.isPending}
+                  onClick={() => recalculateRisk.mutate()}
+                >
+                  {t("recalculateRisk")}
+                </button>
+                <button
+                  className="ghost"
+                  disabled={generateExplanation.isPending || !enrichment.data}
+                  onClick={() => generateExplanation.mutate()}
+                >
+                  {t("redactWithAi")}
+                </button>
+              </div>
+            </div>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))",
+                gap: "12px",
+              }}
+            >
+              {enrichment.data && (
+                <>
+                  <article className="claim-card analysis-card" style={{ gridColumn: "1 / -1" }}>
+                    <div className="claim-badges">
+                      <span>
+                        {t("riskDefinition")} {enrichment.data.risk.definition_code} v
+                        {enrichment.data.risk.definition_version}
+                      </span>
+                      <span>
+                        {t(`riskBands.${enrichment.data.risk.band}`, {
+                          defaultValue: enrichment.data.risk.band,
+                        })}
+                      </span>
+                    </div>
+                    <strong>
+                      {t("risk")}: {enrichment.data.risk.score}/100
+                    </strong>
+                    <div className="correlation-factors" style={{ margin: "8px 0" }}>
+                      {enrichment.data.risk.factors.map((factor) => (
+                        <span key={factor.code}>
+                          {t(`riskFactors.${factor.code}`, { defaultValue: factor.code })}:{" "}
+                          {factor.contribution}/{factor.weight}
+                        </span>
+                      ))}
+                    </div>
+                    <p>
+                      {enrichment.data.explanations.find(
+                        (item) =>
+                          item.locale === (i18n.language.startsWith("es") ? "es" : "en") &&
+                          item.mode === "AI_REDACTION",
+                      )?.text ??
+                        enrichment.data.explanations.find(
+                          (item) =>
+                            item.locale === (i18n.language.startsWith("es") ? "es" : "en") &&
+                            item.mode === "DETERMINISTIC",
+                        )?.text}
+                    </p>
+                  </article>
+                  {enrichment.data.mappings.map((mapping) => (
+                    <article className="claim-card" key={mapping.id}>
+                      <div className="claim-badges">
+                        <span>{mapping.status}</span>
+                        <span>{mapping.external_id}</span>
+                      </div>
+                      <strong>{mapping.name_en}</strong>
+                      <p>{mapping.tactic_codes.join(" · ")}</p>
+                      <small>
+                        {t("evidence")}: {mapping.evidence_revision_ids.length} ·{" "}
+                        {mapping.selector_codes.join(", ")}
+                      </small>
+                    </article>
+                  ))}
+                </>
+              )}
+              <PageState
+                loading={enrichment.isLoading || recalculateRisk.isPending}
+                error={recalculateRisk.isError || generateExplanation.isError}
+                empty={!enrichment.isLoading && !enrichment.data}
+              />
+            </div>
+          </section>
+
+          <section className="panel">
+            <div>
+              <p className="eyebrow">{t("traceability")}</p>
+              <h2>{t("knowledgeClaims")}</h2>
+              <p>{t("knowledgeClaimsIntro")}</p>
+            </div>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))",
+                gap: "12px",
+                marginTop: "1rem",
+              }}
+            >
+              {claims.data?.map((claim) => {
+                const locale = i18n.language.startsWith("es") ? "es" : "en";
+                const statement =
+                  claim.presentations[locale] ??
+                  (claim.language_code === locale ? claim.statement : undefined) ??
+                  claim.presentations.en ??
+                  claim.presentations.es ??
+                  claim.statement;
+                return (
+                  <article className="claim-card" key={claim.id}>
+                    <div className="claim-badges">
+                      <span>
+                        {t(`claimTypes.${claim.claim_type}`, { defaultValue: claim.claim_type })}
+                      </span>
+                      <span>{t(`claimStates.${claim.state}`, { defaultValue: claim.state })}</span>
+                      <span>
+                        {t(`claimOrigins.${claim.origin_type}`, { defaultValue: claim.origin_type })}
+                      </span>
+                      {claim.is_simulated && <span>{t("simulated")}</span>}
+                    </div>
+                    <p style={{ margin: "6px 0" }}>{statement}</p>
+                    {claim.confidence !== null && (
+                      <small style={{ color: "var(--muted)" }}>
+                        {t("confidence")}: {Math.round(claim.confidence * 100)}%
+                      </small>
+                    )}
+                  </article>
+                );
+              })}
+              <PageState
+                loading={claims.isLoading}
+                error={claims.isError}
+                empty={!claims.isLoading && !claims.isError && claims.data?.length === 0}
+              />
+            </div>
+          </section>
+        </>
+      )}
+
+      {activeTab === "audit" && (
+        <section className="panel">
+          <div>
+            <p className="eyebrow">{t("traceability")}</p>
+            <h2>{t("executionHistory")}</h2>
+            <p>{t("decisionsIntro")}</p>
+          </div>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))",
+              gap: "12px",
+              marginTop: "1rem",
+            }}
+          >
+            {playbookExecutions.data?.map((execution) => (
+              <article className="claim-card" key={execution.id}>
+                <div className="claim-badges">
+                  <span>{execution.status}</span>
+                  <span>{execution.execution_mode}</span>
+                </div>
+                <strong style={{ display: "block", margin: "6px 0" }}>{execution.id}</strong>
+                <small style={{ color: "var(--muted)" }}>
+                  {new Date(execution.created_at).toLocaleString(i18n.language)}
+                </small>
+                {execution.error_code && <p style={{ color: "var(--status-error)" }}>{execution.error_code}</p>}
+              </article>
+            ))}
+            <PageState
+              loading={playbookExecutions.isLoading}
+              error={playbookExecutions.isError || executeResponse.isError}
+              empty={
+                !playbookExecutions.isLoading &&
+                !playbookExecutions.isError &&
+                playbookExecutions.data?.length === 0
+              }
+            />
+          </div>
+        </section>
+      )}
     </>
   );
 }
@@ -1148,115 +1960,7 @@ function IntegrationsPage() {
 }
 
 function PlaybooksPage() {
-  const { t } = useTranslation();
-  const controls = useListControls();
-  const catalog = useQuery({
-    queryKey: ["playbooks", controls.query, controls.page, controls.pageSize],
-    queryFn: () =>
-      getPlaybooks({
-        query: controls.query,
-        page: controls.page,
-        pageSize: controls.pageSize,
-      }),
-  });
-  const management = useQuery({
-    queryKey: ["playbook-management"],
-    queryFn: getPlaybookManagement,
-    retry: false,
-  });
-  const items = catalog.data?.items ?? [];
-  const hasNext =
-    catalog.data !== undefined && (controls.page + 1) * controls.pageSize < catalog.data.total;
-  return (
-    <>
-      <div className="page-title">
-        <div>
-          <p className="eyebrow">{t("approvedAutomation")}</p>
-          <h1>{t("playbooks")}</h1>
-        </div>
-        {management.data && (
-          <a
-            className="button-link"
-            href={management.data.editor_url}
-            target="_blank"
-            rel="noreferrer"
-          >
-            {t("openN8n")}
-          </a>
-        )}
-      </div>
-      <section className="playbook-status" aria-label={t("synchronizationStatus")}>
-        <div>
-          <span>{t("automationEngine")}</span>
-          <strong>n8n · {t(`integrationModes.${catalog.data?.mode ?? "disabled"}`)}</strong>
-        </div>
-        <div>
-          <span>{t("synchronizationStatus")}</span>
-          <strong>{catalog.data?.synchronized ? t("synchronized") : t("syncPending")}</strong>
-          <small>
-            {t(`n8nSyncDetails.${catalog.data?.sync_detail ?? "api_key_not_configured"}`)}
-          </small>
-        </div>
-        <div>
-          <span>{t("administrationAccess")}</span>
-          <strong>{management.data ? t("localOnly") : t("permissionDenied")}</strong>
-          {management.data && <small>{management.data.editor_url}</small>}
-        </div>
-      </section>
-      <section className="panel table-panel">
-        <ListControls state={controls} visibleCount={items.length} hasNext={hasNext} />
-        <PageState
-          loading={catalog.isLoading}
-          error={catalog.isError}
-          empty={!catalog.isLoading && !catalog.isError && items.length === 0}
-        />
-        <div className="playbook-list">
-          {items.map((playbook) => (
-            <article key={playbook.workflow_id}>
-              <div className="playbook-heading">
-                <div>
-                  <span className="demo-badge">
-                    {playbook.active === null
-                      ? t("statusUnknown")
-                      : playbook.active
-                        ? t("active")
-                        : t("inactive")}
-                  </span>
-                  <h2>{playbook.name}</h2>
-                  <code>{playbook.workflow_id}</code>
-                </div>
-                <div className="playbook-version">
-                  <span>{t("version")}</span>
-                  <strong>{playbook.version_id ?? t("notSynchronized")}</strong>
-                </div>
-              </div>
-              <h3>{t("workflowConnectors")}</h3>
-              {playbook.connectors.length === 0 ? (
-                <p className="muted">{t("connectorMetadataPending")}</p>
-              ) : (
-                <div className="connector-grid">
-                  {playbook.connectors.map((connector) => (
-                    <div key={`${connector.node_type}-${connector.name}`}>
-                      <strong>{connector.name}</strong>
-                      <code>{connector.node_type}</code>
-                      <small>
-                        {connector.credential_names.length > 0
-                          ? t("linkedCredentials", {
-                              names: connector.credential_names.join(", "),
-                            })
-                          : t("noLinkedCredentials")}
-                      </small>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </article>
-          ))}
-        </div>
-      </section>
-      <p className="security-note">{t("n8nSecretBoundary")}</p>
-    </>
-  );
+  return <PlaybookLibraryPage />;
 }
 
 function AuditPage() {
@@ -1811,6 +2515,8 @@ export default function App() {
           <Route path="incidents/:id" element={<IncidentDetailPage />} />
           <Route path="playbooks" element={<PlaybooksPage />} />
           <Route path="integrations" element={<IntegrationsPage />} />
+          <Route path="memory" element={<GovernedMemoryPage />} />
+          <Route path="api-keys" element={<ApiKeysPage />} />
           <Route path="audit" element={<AuditPage />} />
           <Route path="administration" element={<Administration />} />
         </Route>

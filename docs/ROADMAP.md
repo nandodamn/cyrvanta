@@ -18,8 +18,16 @@
   `docs/specifications/PHASE_19_MITRE_RISK_EXPLAINABILITY.md`.
 - Contrato aprobado e implementado de Etapa 6:
   `docs/specifications/PHASE_20_SAFE_DECISION_APPROVAL.md`.
-- Contrato aprobado de Etapa 7:
+- Contrato aprobado e implementado localmente de Etapa 7:
   `docs/specifications/PHASE_21_N8N_WORKFLOWS_EXECUTION.md`.
+- Contrato aprobado con implementación local base de Etapa 8:
+  `docs/specifications/PHASE_22_GOVERNED_FEEDBACK_MEMORY.md`.
+- Contrato aprobado con implementación local base de evolución de Etapa 7 para
+  incorporar el motor nativo y conservar n8n como adaptador opcional:
+  `docs/specifications/PHASE_21A_CYRVANTA_PLAYBOOK_ENGINE.md`.
+- Contrato aprobado con implementación local base de pulso operativo real y UI
+  responsive:
+  `docs/specifications/PHASE_23_OPERATIONAL_PULSE_RESPONSIVE_UI.md`.
 
 Las decisiones D-001 a D-012 están aprobadas. Las Etapas estratégicas 1 a 6
 están implementadas y validadas. La correlación determinista multi-fuente de
@@ -27,8 +35,34 @@ Etapa 4 conserva el paquete aprobado de 18 decisiones.
 Retención y polling periódico Wazuh conservan puertas operativas independientes.
 La Etapa 5 está implementada y validada conforme al ADR 0013. La Etapa 6 está
 implementada y validada conforme al ADR 0014.
-La Etapa 7 está aprobada para implementación conforme al ADR 0015. El modo
-`live` continúa sujeto a una aprobación operativa separada.
+La Etapa 7 está implementada y validada localmente conforme al ADR 0015:
+workflow sintético, claim, callback, retry y outcomes append-only atravesaron
+E2E real. `N8N_API_KEY` está en el secret store local; la API pública confirmó
+los cinco digests exactos y los estados esperados sin exponer la clave: sólo
+`simulate-user-block` activo y los workflows con credenciales pendientes o
+legados inactivos. El modo `live` continúa sujeto a una aprobación operativa
+separada.
+La Etapa 8 tiene implementación local base según el ADR 0016 aceptado: ocho
+tablas
+append-only/RLS, API tenant-scoped, separación autor/revisor/activador, scheduler
+de expiración, kill switch desactivado por defecto y UI bilingüe. Ruff, mypy,
+108 pruebas backend, 10 pruebas frontend, build, rollback vacío y pruebas SQL
+transaccionales de RLS/separación fueron satisfactorias. El cierre integral
+permanece pendiente de un E2E API multi-actor con evidencia real aprobada y de
+snapshots métricos sobre una muestra operativa; la influencia sigue en
+`MEMORY_INFLUENCE_ENABLED=false`.
+
+La evolución Fase 21-A, su contrato físico y los ADR 0017/0018 están aprobados.
+Migración 0020, puertos, runner, registry simulado, API, biblioteca bilingüe,
+binding híbrido y cancelación segura tienen implementación local validada. Recovery tras crash, DLQ, `UNKNOWN` y outcome tardío tienen evidencia E2E con
+fallos inyectados. El cierre integral conserva pendiente la paridad concurrente
+sin doble efecto y el GATE de identidad de plataforma para el ciclo operativo
+write-only de la API key externa de n8n. La Fase 23 ya consume una
+ventana tenant-scoped real de 24 horas y no inventa cifras; falta conservar la
+evidencia visual a 320 px, 4K y zoom 200 % por indisponibilidad del conector del
+navegador. La evidencia ejecutada está en
+`docs/evidence/PHASE_21A_23_VALIDATION_2026-08-01.md`. `LIVE` y el retiro de n8n
+requieren aprobaciones operativas separadas.
 
 Cada fase requiere aprobación de sus especificaciones y criterios antes de
 autorizar contratos o implementación de la siguiente.

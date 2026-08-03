@@ -1,7 +1,7 @@
 [
   {
     "id": "cyrvanta-notify-critical-incident",
-    "name": "Cyrvanta — Notify Critical Incident",
+    "name": "Cyrvanta â€” Notify Critical Incident",
     "active": false,
     "nodes": [
       {
@@ -15,6 +15,7 @@
         "name": "Inactive Managed Entry",
         "type": "n8n-nodes-base.webhook",
         "typeVersion": 2,
+        "webhookId": "1b336d2e-7de5-46b6-b89a-7bcf3b9abc72",
         "position": [260, 300]
       },
       {

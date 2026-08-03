@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 
 from cyrvanta.modules.incident.application.schemas import (
     AlertResponse,
+    AlertTriageUpdate,
     DemoScenarioResponse,
     IncidentAssign,
     IncidentCreate,
@@ -77,6 +78,26 @@ async def get_alert(alert_id: UUID, context: AlertRead, service: Service) -> Ale
         raise translate_error(exc) from exc
 
 
+@router.post("/alerts/{alert_id}/triage", response_model=AlertResponse)
+async def triage_alert(
+    alert_id: UUID,
+    payload: AlertTriageUpdate,
+    request: Request,
+    context: AlertRead,
+    service: Service,
+) -> AlertResponse:
+    try:
+        return await service.triage_alert(
+            context.tenant_id,
+            context.user_id,
+            alert_id,
+            payload,
+            correlation_id(request),
+        )
+    except IncidentNotFound as exc:
+        raise translate_error(exc) from exc
+
+
 @router.get("/incidents", response_model=list[IncidentResponse])
 async def list_incidents(
     context: IncidentRead,
@@ -112,6 +133,16 @@ async def get_incident(
         return IncidentResponse.model_validate(
             await service.get_incident(context.tenant_id, incident_id)
         )
+    except IncidentNotFound as exc:
+        raise translate_error(exc) from exc
+
+
+@router.get("/incidents/{incident_id}/alerts", response_model=list[AlertResponse])
+async def list_incident_alerts(
+    incident_id: UUID, context: AlertRead, service: Service
+) -> list[AlertResponse]:
+    try:
+        return await service.list_incident_alerts(context.tenant_id, incident_id)
     except IncidentNotFound as exc:
         raise translate_error(exc) from exc
 

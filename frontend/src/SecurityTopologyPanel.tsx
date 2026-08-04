@@ -255,26 +255,6 @@ export function SecurityTopologyPanel() {
             ))}
           </div>
         </div>
-
-        {/* Managed Core Stack Integration Badges */}
-        <div className="topology-services" style={{ marginTop: "4px" }}>
-          <div>
-            <strong>Ollama · Gemma 4</strong>
-            <small>{t("assistedAnalysis")}</small>
-          </div>
-          <div>
-            <strong>Wazuh SIEM Manager</strong>
-            <small>{t("detectionEngine")}</small>
-          </div>
-          <div>
-            <strong>n8n Workflows</strong>
-            <small>{t("approvedAutomation")}</small>
-          </div>
-          <div>
-            <strong>PostgreSQL 16 RLS</strong>
-            <small>{t("traceableHistory")}</small>
-          </div>
-        </div>
       </article>
 
       <NetworkTopologyModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />

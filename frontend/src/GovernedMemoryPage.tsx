@@ -560,9 +560,24 @@ export function GovernedMemoryPage() {
             boxSizing: "border-box",
           }}
         >
-          <form className="panel" onSubmit={submitFeedback} style={{ flex: "1 1 380px", minWidth: "300px", width: "100%", boxSizing: "border-box", padding: "1.25rem" }}>
-            <h2>{t("memory.recordFeedback")}</h2>
-            <p className="muted" style={{ fontSize: "0.85rem", marginBottom: "1rem" }}>
+          <form
+            onSubmit={submitFeedback}
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              flex: "1 1 380px",
+              minWidth: "300px",
+              width: "100%",
+              boxSizing: "border-box",
+              padding: "1.5rem",
+              background: "var(--panel)",
+              border: "1px solid var(--panel-border)",
+              borderRadius: "8px",
+              boxShadow: "0 4px 12px rgba(0,0,0,0.2)",
+            }}
+          >
+            <h2 style={{ margin: 0 }}>{t("memory.recordFeedback")}</h2>
+            <p className="muted" style={{ fontSize: "0.85rem", margin: "4px 0 1rem" }}>
               {t("memory.feedbackIntro", { defaultValue: "Registra observaciones de campo inmutables sobre recursos autoritativos existentes." })}
             </p>
             <label style={{ display: "flex", flexDirection: "column", gap: "4px", marginBottom: "12px", width: "100%", boxSizing: "border-box" }}>
@@ -627,9 +642,24 @@ export function GovernedMemoryPage() {
             {feedbackMutation.isError && <p className="form-error" style={{ marginTop: "8px" }}>{t("actionError")}</p>}
           </form>
 
-          <form className="panel" onSubmit={submitCandidate} style={{ flex: "1 1 380px", minWidth: "300px", width: "100%", boxSizing: "border-box", padding: "1.25rem" }}>
-            <h2>{t("memory.proposeCandidate")}</h2>
-            <p className="muted" style={{ fontSize: "0.85rem", marginBottom: "1rem" }}>
+          <form
+            onSubmit={submitCandidate}
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              flex: "1 1 380px",
+              minWidth: "300px",
+              width: "100%",
+              boxSizing: "border-box",
+              padding: "1.5rem",
+              background: "var(--panel)",
+              border: "1px solid var(--panel-border)",
+              borderRadius: "8px",
+              boxShadow: "0 4px 12px rgba(0,0,0,0.2)",
+            }}
+          >
+            <h2 style={{ margin: 0 }}>{t("memory.proposeCandidate")}</h2>
+            <p className="muted" style={{ fontSize: "0.85rem", margin: "4px 0 1rem" }}>
               {t("memory.candidateIntro", { defaultValue: "Crea una propuesta de patrón o lección aprendida para ser revisada por un 2º analista." })}
             </p>
             <label style={{ display: "flex", flexDirection: "column", gap: "4px", marginBottom: "12px", width: "100%", boxSizing: "border-box" }}>

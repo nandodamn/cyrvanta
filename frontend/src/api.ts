@@ -807,6 +807,35 @@ export async function getResponseDecisions(incidentId: string): Promise<Response
   ).items;
 }
 
+export async function createResponseProposal(
+  id: string,
+  actionType: string = "block-ip-address",
+  targets: string[] = ["192.168.1.105"],
+): Promise<ResponseDecision> {
+  return responseDecisionSchema.parse(
+    await checked(
+      await authenticatedFetch("/api/v1/response-proposals", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Idempotency-Key": `proposal-${id}-${Date.now()}`,
+        },
+        body: JSON.stringify({
+          incident_id: id,
+          action_type: actionType,
+          impact: "MODERATE",
+          requested_mode: "HUMAN_APPROVAL",
+          workflow_id: actionType === "block-ip-address" ? "block-ip-address" : "cyrvanta-simulate-user-block",
+          workflow_version: "1.0.0",
+          targets: targets,
+          parameters: { execution_mode: "live" },
+          evidence_refs: [],
+        }),
+      }),
+    ),
+  );
+}
+
 export async function createDemoResponseProposal(id: string): Promise<ResponseDecision> {
   return responseDecisionSchema.parse(
     await checked(

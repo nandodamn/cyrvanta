@@ -308,6 +308,7 @@ const playbookDefinitionSchema = z.object({
   rollback_target_code: z.string().nullable().default(null),
   rollback_guidance_i18n: z.object({ es: z.string(), en: z.string() }).nullable().default(null),
   automation_policy_i18n: z.object({ es: z.string(), en: z.string() }).nullable().default(null),
+  approval_mode: z.enum(["AUTOMATIC", "SINGLE", "FOUR_EYES"]).default("AUTOMATIC"),
   last_execution_status: z.string().nullable(),
   last_executed_at: z.string().nullable(),
 });
@@ -618,7 +619,7 @@ export async function getAuditEvents(options?: ListQuery): Promise<AuditEvent[]>
     .parse(await authorized(listPath("/api/v1/audit-events", options)));
 }
 
-async function authorizedMutation(
+export async function authorizedMutation(
   path: string,
   method: "POST" | "PATCH" | "PUT",
   body: unknown,
@@ -747,13 +748,14 @@ export async function transitionIncident(
   id: string,
   expectedVersion: number,
   targetStatus: string,
+  reason?: string,
 ) {
   const closing = ["resolved", "closed", "reopened"].includes(targetStatus);
   return incidentSchema.parse(
     await authorizedMutation(`/api/v1/incidents/${id}/transition`, "POST", {
       expected_version: expectedVersion,
       target_status: targetStatus,
-      reason: closing ? "Demo analyst lifecycle action" : undefined,
+      reason: reason?.trim() || (closing ? "Acción de ciclo de vida del incidente" : "Transición de estado registrada"),
       close_reason: targetStatus === "closed" ? "resolved" : undefined,
     }),
   );
@@ -869,6 +871,19 @@ export async function decideResponse(
   );
 }
 
+export async function updatePlaybookApprovalGovernance(
+  definitionId: string,
+  approvalMode: "AUTOMATIC" | "SINGLE" | "FOUR_EYES",
+): Promise<PlaybookDefinition> {
+  return playbookDefinitionSchema.parse(
+    await authorizedMutation(
+      `/api/v1/playbook-definitions/${definitionId}/approval-governance`,
+      "POST",
+      { approval_mode: approvalMode },
+    ),
+  );
+}
+
 export async function downloadIncidentReport(id: string, code: string): Promise<void> {
   const response = await authenticatedFetch(`/api/v1/incidents/${id}/report`);
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -954,4 +969,46 @@ export async function clearSession(): Promise<void> {
   } finally {
     accessToken = null;
   }
+}
+
+export interface TopologyNodeAlert {
+  id: string;
+  title: string;
+  severity: "critical" | "high" | "medium" | "low" | "informational";
+  category: string;
+  observed_at: string;
+}
+
+export interface TopologyNode {
+  id: string;
+  name: string;
+  type: "FIREWALL" | "SERVER" | "DATABASE" | "SIEM" | "GATEWAY" | "ENDPOINT";
+  ip_address: string;
+  subnet: string;
+  status: "ONLINE" | "WARNING" | "OFFLINE";
+  latency_ms: number;
+  last_ping: string;
+  active_alerts_count: number;
+  active_alerts?: TopologyNodeAlert[];
+  role_description_es: string;
+  role_description_en: string;
+}
+
+export interface TopologyEdge {
+  id: string;
+  source_id: string;
+  target_id: string;
+  protocol: string;
+  status: "NORMAL" | "DEGRADED" | "BLOCKED";
+}
+
+export interface NetworkTopologyResponse {
+  tenant_id: string;
+  nodes: TopologyNode[];
+  edges: TopologyEdge[];
+  updated_at: string;
+}
+
+export async function getNetworkTopology(): Promise<NetworkTopologyResponse> {
+  return (await authorized("/api/v1/operations/topology")) as NetworkTopologyResponse;
 }

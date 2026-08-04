@@ -16,6 +16,7 @@ from cyrvanta.modules.playbooks.application.administration_schemas import (
     NativeActionBindingCreate,
     NativeActionBindingResponse,
     ToggleBindingPayload,
+    UpdateApprovalGovernancePayload,
     ValidationResponse,
     VersionCreate,
     VersionResponse,
@@ -107,6 +108,25 @@ async def toggle_definition_binding(
         raise _translate(exc) from exc
 
 
+@router.post("/playbook-definitions/{definition_id}/approval-governance", response_model=DefinitionResponse)
+async def update_approval_governance(
+    definition_id: UUID,
+    payload: UpdateApprovalGovernancePayload,
+    request: Request,
+    context: PlaybookReviewer,
+) -> DefinitionResponse:
+    try:
+        return await PlaybookAdministrationService().update_approval_governance(
+            tenant_id=context.tenant_id,
+            actor_user_id=context.user_id,
+            definition_id=definition_id,
+            payload=payload,
+            correlation_id=_correlation_id(request),
+        )
+    except (PlaybookAdministrationConflict, PlaybookAdministrationNotFound) as exc:
+        raise _translate(exc) from exc
+
+
 
 @router.post(
     "/playbook-definitions/{definition_id}/versions",
@@ -150,6 +170,19 @@ async def validate_version(
             valid=not errors,
             digest=version.artifact_sha256,
             error_codes=errors,
+        )
+    except PlaybookAdministrationNotFound as exc:
+        raise _translate(exc) from exc
+
+
+@router.get("/playbook-versions/{version_id}/connection-dependencies")
+async def get_connection_dependencies(
+    version_id: UUID, context: PlaybookReviewer
+) -> list[dict[str, object]]:
+    try:
+        return await PlaybookAdministrationService().validate_connection_dependencies(
+            tenant_id=context.tenant_id,
+            version_id=version_id,
         )
     except PlaybookAdministrationNotFound as exc:
         raise _translate(exc) from exc

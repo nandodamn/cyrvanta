@@ -35,7 +35,7 @@ class Settings(BaseSettings):
     wazuh_mode: str = "simulated"
     wazuh_manager_host: str = "wazuh-manager"
     wazuh_manager_port: int = 1514
-    ollama_mode: str = "simulated"
+    ollama_mode: str = "live"
     ollama_base_url: str = "http://host.docker.internal:11434"
     ollama_model: str = "gemma4:e4b"
     ai_request_timeout_seconds: int = 120

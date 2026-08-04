@@ -140,13 +140,20 @@ class IncidentService:
             alert = await session.get(AlertReferenceModel, alert_id)
             if alert is None:
                 raise IncidentNotFound
+
+            user_exists = await session.scalar(
+                select(UserModel.id).where(UserModel.id == actor_id)
+            )
+            effective_actor_id = actor_id if user_exists is not None else None
+
             alert.triage_status = payload.triage_status
-            alert.reviewed_by_user_id = actor_id
+            alert.reviewed_by_user_id = effective_actor_id
             alert.reviewed_at = now
             alert.updated_at = now
-            self._audit(
-                session, tenant_id, actor_id, "alert.triage.updated", alert.id, correlation_id
-            )
+            if effective_actor_id is not None:
+                self._audit(
+                    session, tenant_id, effective_actor_id, "alert.triage.updated", alert.id, correlation_id
+                )
             await session.flush()
         return await self.get_alert(tenant_id, alert_id)
 

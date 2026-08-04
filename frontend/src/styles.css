@@ -739,42 +739,59 @@ nav a.active {
 }
 
 .list-controls {
-  display: grid;
-  grid-template-columns: minmax(220px, 1fr) auto minmax(110px, auto) auto auto;
-  align-items: end;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
   gap: 10px;
+  justify-content: space-between;
   margin-bottom: 14px;
-  padding-bottom: 16px;
+  padding-bottom: 14px;
   border-bottom: 1px solid var(--line);
 }
 
 .list-controls label {
-  display: grid;
-  gap: 7px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .list-controls select {
-  min-width: 90px;
+  min-width: 70px;
+  padding: 4px 8px;
+  font-size: 0.8rem;
 }
 
 .list-result-count {
   align-self: center;
   color: var(--muted);
   font-size: 13px;
+  white-space: nowrap;
 }
 
 .pager {
   display: flex;
-  gap: 8px;
+  gap: 6px;
+}
+
+.pager button {
+  padding: 4px 10px !important;
+  font-size: 0.75rem !important;
+  min-width: unset !important;
+  width: auto !important;
 }
 
 .admin-panel .list-controls {
-  grid-template-columns: minmax(150px, 1fr) auto;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: space-between;
+  grid-template-columns: none;
 }
 
 .admin-panel .list-result-count,
 .admin-panel .pager {
-  grid-column: 1 / -1;
+  grid-column: auto;
 }
 
 .data-list {
@@ -1414,3 +1431,67 @@ nav a.active {
     grid-template-columns: 1fr;
   }
 }
+
+/* Administration Workspace Sub-Sidebar Layout */
+.admin-workspace-layout {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  gap: 24px;
+  align-items: start;
+  margin-top: 1.5rem;
+}
+
+.admin-sub-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  padding: 10px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+}
+
+.admin-sub-tab-button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 9px 12px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-soft);
+  cursor: pointer;
+  text-align: left;
+  white-space: nowrap;
+  gap: 10px;
+  transition: all 0.15s ease;
+}
+
+.admin-sub-tab-button:hover {
+  background: var(--panel-raised);
+  color: var(--text);
+}
+
+.admin-sub-tab-button.active {
+  background: rgba(13, 209, 155, 0.12);
+  color: var(--accent);
+  border-color: rgba(13, 209, 155, 0.3);
+  font-weight: 700;
+}
+
+.admin-content-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+@media (max-width: 850px) {
+  .admin-workspace-layout {
+    grid-template-columns: 1fr;
+  }
+}
+

@@ -5,11 +5,13 @@ import { getOperationalActivity24h } from "./api";
 
 export function OperationalPulse() {
   const { t } = useTranslation();
+
   const activity = useQuery({
     queryKey: ["operations", "activity-24h"],
     queryFn: getOperationalActivity24h,
     refetchInterval: 60_000,
   });
+
   const maximum = Math.max(
     ...(activity.data?.series.map((bucket) => bucket.alerts + bucket.incidents) ?? [0]),
     1,

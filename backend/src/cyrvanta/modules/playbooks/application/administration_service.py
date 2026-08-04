@@ -22,6 +22,7 @@ from cyrvanta.modules.playbooks.application.administration_schemas import (
     NativeActionBindingCreate,
     NativeActionBindingResponse,
     ToggleBindingPayload,
+    UpdateApprovalGovernancePayload,
     VersionCreate,
     VersionResponse,
 )
@@ -90,6 +91,19 @@ PLAYBOOK_AUTOMATION_POLICY_MAP: dict[str, dict[str, str]] = {
     "closure-controlled-learning": {
         "es": "Verificación de contención automática. Integración de aprendizaje a la memoria gobernada: aprobación humana obligatoria.",
         "en": "Automatic containment verification. Memory candidate learning integration: mandatory human approval.",
+    },
+}
+
+PLAYBOOK_ROLLBACK_MAP: dict[str, dict[str, str]] = {
+    "compromised-account": {
+        "code": "rollback-compromised-account",
+        "es": "Restauración de cuenta y desbloqueo de sesiones.",
+        "en": "Account restoration and session unblock.",
+    },
+    "compromised-endpoint": {
+        "code": "rollback-compromised-endpoint",
+        "es": "Liberación de aislamiento de host y restauración de cuarentena.",
+        "en": "Host isolation release and quarantine restoration.",
     },
 }
 
@@ -299,6 +313,7 @@ class PlaybookAdministrationService:
                     impact="MODERATE",
                     classification="SYNTHETIC",
                     status="APPROVED",
+                    approved_at=datetime.now(UTC),
                     workflow_code=code,
                     artifact_sha256=digest,
                     portable_artifact=artifact.model_dump(mode="json", exclude_none=True),
@@ -505,6 +520,38 @@ class PlaybookAdministrationService:
                 {"digest": version.artifact_sha256},
             )
             return self._version_response(version), errors
+
+    async def validate_connection_dependencies(
+        self,
+        *,
+        tenant_id: UUID,
+        version_id: UUID,
+    ) -> list[dict[str, object]]:
+        from cyrvanta.modules.integrations.application.resolver import ConnectionResolver
+        resolver = ConnectionResolver()
+        results: list[dict[str, object]] = []
+        async with tenant_session(tenant_id) as session:
+            version = await self._locked_version(session, version_id)
+            try:
+                artifact = self._artifact(version)
+                for step in artifact.steps:
+                    if isinstance(step, ActionStep):
+                        capability = f"action.{step.action}"
+                        res = await resolver.resolve(tenant_id, capability)
+                        results.append({
+                            "step_id": step.id,
+                            "action": step.action,
+                            "required_capability": capability,
+                            "resolution_status": res.resolution_status,
+                            "connection_id": res.connection_id,
+                            "connector_type": res.connector_type,
+                            "requires_approval": res.requires_approval,
+                            "simulation_supported": res.simulation_supported,
+                            "verification_supported": res.verification_supported,
+                        })
+            except Exception:
+                pass
+        return results
 
     async def publish_version(
         self,
@@ -943,10 +990,43 @@ class PlaybookAdministrationService:
                 "rollback_target_code": rollback_info["code"],
                 "rollback_guidance_i18n": rollback_guidance,
                 "automation_policy_i18n": policy_guidance,
+                "approval_mode": getattr(item, "approval_mode", "AUTOMATIC") or "AUTOMATIC",
                 "last_execution_status": (execution.status if execution is not None else None),
                 "last_executed_at": (execution.created_at if execution is not None else None),
             }
         )
+
+    async def update_approval_governance(
+        self,
+        *,
+        tenant_id: UUID,
+        actor_user_id: UUID,
+        definition_id: UUID,
+        payload: UpdateApprovalGovernancePayload,
+        correlation_id: UUID,
+    ) -> DefinitionResponse:
+        async with tenant_session(tenant_id) as session:
+            definition = await session.scalar(
+                select(PlaybookDefinitionModel).where(PlaybookDefinitionModel.id == definition_id)
+            )
+            if definition is None:
+                raise PlaybookAdministrationNotFound("PLAYBOOK_NOT_FOUND")
+
+            definition.approval_mode = payload.approval_mode
+            await session.flush()
+            self._audit(
+                session,
+                tenant_id,
+                actor_user_id,
+                correlation_id,
+                "playbook.approval_governance.updated",
+                "playbook_definition",
+                definition.id,
+                {
+                    "approval_mode": payload.approval_mode,
+                },
+            )
+            return await self._enriched_definition_response(session, definition)
 
     async def toggle_definition_binding(
         self,
@@ -1072,6 +1152,10 @@ class PlaybookAdministrationService:
                 en=item.description_en or item.name_en,
             ),
             created_at=item.created_at,
+            approval_mode=cast(
+                Literal["AUTOMATIC", "SINGLE", "FOUR_EYES"],
+                item.approval_mode or "AUTOMATIC",
+            ),
         )
 
     @staticmethod

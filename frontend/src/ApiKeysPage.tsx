@@ -28,6 +28,46 @@ export function ApiKeysPage() {
         </div>
       </div>
 
+      {/* Integration Banner */}
+      <section
+        className="panel"
+        style={{
+          background: "rgba(13, 209, 155, 0.06)",
+          border: "1.5px solid var(--accent)",
+          display: "flex",
+          justify: "space-between",
+          alignItems: "center",
+          flexWrap: "wrap",
+          gap: "1rem",
+        }}
+      >
+        <div>
+          <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "var(--accent)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+            🏛️ ARQUITECTURA DE CONEXIONES & SECRETOS DE CYRVANTA
+          </span>
+          <h2 style={{ margin: "4px 0 0", fontSize: "1.1rem" }}>
+            Gestión Centralizada de Credenciales e Integraciones
+          </h2>
+          <p style={{ margin: "4px 0 0", fontSize: "0.85rem", color: "var(--text-soft)", maxWidth: "800px" }}>
+            Todas las llaves API (n8n, Wazuh, OpenSearch, Ollama, SMTP, LDAP/AD) deben administrarse directamente dentro de sus respectivas Conexiones en el catálogo de integraciones con cifrado por tenant.
+          </p>
+        </div>
+        <a
+          href="/integrations"
+          style={{
+            padding: "8px 16px",
+            fontWeight: 600,
+            background: "var(--accent)",
+            color: "#041512",
+            borderRadius: "4px",
+            textDecoration: "none",
+            fontSize: "0.85rem",
+          }}
+        >
+          🔗 Ir a Integraciones & Conexiones
+        </a>
+      </section>
+
       <section className="panel secret-boundary" aria-labelledby="secret-boundary-title">
         <div>
           <p className="eyebrow">{t("apiKeys.securityBoundary")}</p>

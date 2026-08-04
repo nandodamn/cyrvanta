@@ -41,7 +41,7 @@ class DefinitionResponse(StrictModel):
     rollback_supported: bool = True
     rollback_target_code: str | None = None
     rollback_guidance_i18n: LocalizedDescription | None = None
-    automation_policy_i18n: LocalizedDescription | None = None
+    approval_mode: Literal["AUTOMATIC", "SINGLE", "FOUR_EYES"] = "AUTOMATIC"
     last_execution_status: str | None = None
     last_executed_at: datetime | None = None
 
@@ -49,6 +49,10 @@ class DefinitionResponse(StrictModel):
 class ToggleBindingPayload(StrictModel):
     active: bool | None = None
     engine_type: Literal["NATIVE", "N8N"] | None = None
+
+
+class UpdateApprovalGovernancePayload(StrictModel):
+    approval_mode: Literal["AUTOMATIC", "SINGLE", "FOUR_EYES"]
 
 
 

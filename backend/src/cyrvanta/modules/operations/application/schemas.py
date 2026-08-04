@@ -73,3 +73,42 @@ class PlaybookManagementResponse(BaseModel):
     editor_url: str
     local_only: bool
     api_sync_configured: bool
+
+
+class TopologyNodeAlert(BaseModel):
+    id: str
+    title: str
+    severity: Literal["critical", "high", "medium", "low", "informational"]
+    category: str
+    observed_at: str
+
+
+class TopologyNode(BaseModel):
+    id: str
+    name: str
+    type: Literal["FIREWALL", "SERVER", "DATABASE", "SIEM", "GATEWAY", "ENDPOINT"]
+    ip_address: str
+    subnet: str
+    status: Literal["ONLINE", "WARNING", "OFFLINE"]
+    latency_ms: int
+    last_ping: str
+    active_alerts_count: int = 0
+    active_alerts: list[TopologyNodeAlert] = []
+    role_description_es: str
+    role_description_en: str
+
+
+class TopologyEdge(BaseModel):
+    id: str
+    source_id: str
+    target_id: str
+    protocol: str
+    status: Literal["NORMAL", "DEGRADED", "BLOCKED"]
+
+
+class NetworkTopologyResponse(BaseModel):
+    tenant_id: UUID
+    nodes: list[TopologyNode]
+    edges: list[TopologyEdge]
+    updated_at: str
+

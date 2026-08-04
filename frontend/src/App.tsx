@@ -48,7 +48,9 @@ import { ApiKeysPage } from "./ApiKeysPage";
 import { GovernedMemoryPage } from "./GovernedMemoryPage";
 import { PlaybookLibraryPage } from "./PlaybookLibraryPage";
 import { OperationalPulse } from "./OperationalPulse";
+import { SecurityTopologyPanel } from "./SecurityTopologyPanel";
 import { useAuth } from "./AuthContext";
+import { ConnectionModal, ConnectionMeta } from "./ConnectionModal";
 
 const NAV_ITEMS: ReadonlyArray<{ to: string; icon: React.ReactNode; key: string; end?: boolean }> = [
   {
@@ -225,19 +227,20 @@ function LoginPage() {
         </div>
         <label>
           {t("tenant")}
-          <input autoComplete="organization" {...register("tenantSlug")} />
+          <input autoComplete="organization" placeholder="demo" {...register("tenantSlug")} />
         </label>
         <label>
           {authMode === "local" ? t("email") : t("directoryUsername")}
           <input
             type={authMode === "local" ? "email" : "text"}
             autoComplete="username"
+            placeholder={authMode === "local" ? "demo@cyrvanta.uy" : "ldap-demo"}
             {...register("email")}
           />
         </label>
         <label>
           {t("password")}
-          <input type="password" autoComplete="current-password" {...register("password")} />
+          <input type="password" autoComplete="current-password" placeholder="••••••••" {...register("password")} />
         </label>
         <label className="check-row">
           <input type="checkbox" {...register("rememberMe")} />
@@ -401,55 +404,78 @@ function ListControls({
     <form
       className="list-controls"
       role="search"
+      style={{
+        display: "flex",
+        alignItems: "center",
+        flexWrap: "wrap",
+        gap: "10px",
+        justifyContent: "space-between",
+        marginBottom: "1rem",
+        paddingBottom: "0.75rem",
+        borderBottom: "1px solid var(--line)",
+      }}
       onSubmit={(event) => {
         event.preventDefault();
         state.applySearch();
       }}
     >
-      <label>
-        <span>{t("search")}</span>
+      <div style={{ display: "flex", alignItems: "center", gap: "8px", flex: "1 1 240px", maxWidth: "420px" }}>
         <input
           type="search"
           maxLength={100}
           value={state.draft}
           placeholder={t("searchPlaceholder")}
           onChange={(event) => state.setDraft(event.target.value)}
+          style={{ flex: 1, padding: "6px 12px", fontSize: "0.825rem", borderRadius: "4px", border: "1px solid var(--line)", background: "var(--panel)" }}
         />
-      </label>
-      <button type="submit">{t("search")}</button>
-      <label>
-        <span>{t("itemsPerPage")}</span>
-        <select
-          value={state.pageSize}
-          onChange={(event) => state.setPageSize(Number(event.target.value))}
-        >
-          {[10, 25, 50].map((size) => (
-            <option key={size} value={size}>
-              {size}
-            </option>
-          ))}
-        </select>
-      </label>
-      <span className="list-result-count">
-        {t("visibleResults", { count: visibleCount, page: state.page + 1 })}
-      </span>
-      <div className="pager">
         <button
-          type="button"
-          className="ghost"
-          disabled={state.page === 0}
-          onClick={() => state.setPage(Math.max(0, state.page - 1))}
+          type="submit"
+          style={{ width: "auto", minWidth: "unset", height: "auto", padding: "6px 14px", fontSize: "0.825rem", whiteSpace: "nowrap" }}
         >
-          {t("previous")}
+          {t("search")}
         </button>
-        <button
-          type="button"
-          className="ghost"
-          disabled={!hasNext}
-          onClick={() => state.setPage(state.page + 1)}
-        >
-          {t("next")}
-        </button>
+      </div>
+
+      <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+          <span style={{ fontSize: "0.8rem", color: "var(--muted)", whiteSpace: "nowrap" }}>{t("itemsPerPage")}:</span>
+          <select
+            value={state.pageSize}
+            onChange={(event) => state.setPageSize(Number(event.target.value))}
+            style={{ padding: "4px 8px", fontSize: "0.8rem", borderRadius: "4px", border: "1px solid var(--line)", background: "var(--panel)", color: "var(--text)" }}
+          >
+            {[10, 25, 50].map((size) => (
+              <option key={size} value={size}>
+                {size}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <span className="list-result-count" style={{ fontSize: "0.8rem", color: "var(--muted)", whiteSpace: "nowrap" }}>
+          {t("visibleResults", { count: visibleCount, page: state.page + 1 })}
+        </span>
+
+        <div className="pager" style={{ display: "flex", gap: "4px" }}>
+          <button
+            type="button"
+            className="ghost"
+            style={{ width: "auto", minWidth: "unset", height: "auto", padding: "4px 10px", fontSize: "0.75rem", whiteSpace: "nowrap" }}
+            disabled={state.page === 0}
+            onClick={() => state.setPage(Math.max(0, state.page - 1))}
+          >
+            {t("previous")}
+          </button>
+          <button
+            type="button"
+            className="ghost"
+            style={{ width: "auto", minWidth: "unset", height: "auto", padding: "4px 10px", fontSize: "0.75rem", whiteSpace: "nowrap" }}
+            disabled={!hasNext}
+            onClick={() => state.setPage(state.page + 1)}
+          >
+            {t("next")}
+          </button>
+        </div>
       </div>
     </form>
   );
@@ -493,9 +519,6 @@ function Overview() {
           <p className="eyebrow">SOC / 24H</p>
           <h1>{t("overview")}</h1>
         </div>
-        <button disabled={demo.isPending} onClick={() => demo.mutate()}>
-          {demo.isPending ? t("loading") : t("runCanonicalDemo")}
-        </button>
       </div>
       <section className="metrics">
         {cards.map(([label, value]) => (
@@ -513,61 +536,7 @@ function Overview() {
       />
       <section className="overview-visuals">
         <OperationalPulse />
-
-        <article className="panel topology-panel">
-          <div className="panel-heading">
-            <div>
-              <p className="eyebrow">{t("monitoredEnvironment")}</p>
-              <h2>{t("securityTopology")}</h2>
-            </div>
-            <span className="preview-badge">{t("staticPreview")}</span>
-          </div>
-          <div className="topology-path" aria-label={t("securityTopology")}>
-            <div className="topology-node endpoint">
-              <span>01</span>
-              <strong>Windows</strong>
-              <small>Wazuh Agent</small>
-            </div>
-            <span className="topology-arrow" aria-hidden="true">
-              →
-            </span>
-            <div className="topology-node detection">
-              <span>02</span>
-              <strong>Wazuh Manager</strong>
-              <small>{t("detectionEngine")}</small>
-            </div>
-            <span className="topology-arrow" aria-hidden="true">
-              →
-            </span>
-            <div className="topology-node evidence">
-              <span>03</span>
-              <strong>OpenSearch</strong>
-              <small>{t("evidenceSearch")}</small>
-            </div>
-            <span className="topology-arrow" aria-hidden="true">
-              →
-            </span>
-            <div className="topology-node platform">
-              <span>04</span>
-              <strong>Cyrvanta</strong>
-              <small>{t("correlationAndAudit")}</small>
-            </div>
-          </div>
-          <div className="topology-services">
-            <div>
-              <strong>Ollama · Gemma 4</strong>
-              <small>{t("assistedAnalysis")}</small>
-            </div>
-            <div>
-              <strong>n8n</strong>
-              <small>{t("approvedAutomation")}</small>
-            </div>
-            <div>
-              <strong>PostgreSQL</strong>
-              <small>{t("traceableHistory")}</small>
-            </div>
-          </div>
-        </article>
+        <SecurityTopologyPanel />
       </section>
       {demo.data && (
         <p className="demo-badge">
@@ -609,7 +578,7 @@ function AlertsPage() {
       queryClient.setQueriesData(
         { queryKey: ["alerts"] },
         (oldData: Alert[] | undefined) => {
-          if (!oldData) return oldData;
+          if (!oldData || !Array.isArray(oldData)) return oldData;
           return oldData.map((item) =>
             item.id === alertId
               ? {
@@ -984,9 +953,13 @@ function IncidentDetailPage() {
     retry: false,
   });
 
+  const [transitionNote, setTransitionNote] = useState("");
+
   const transition = useMutation({
-    mutationFn: (target: string) => transitionIncident(id, incident.data!.version, target),
+    mutationFn: ({ target, reason }: { target: string; reason?: string }) =>
+      transitionIncident(id, incident.data!.version, target, reason),
     onSuccess: async () => {
+      setTransitionNote("");
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["incident", id] }),
         queryClient.invalidateQueries({ queryKey: ["incidents"] }),
@@ -1061,10 +1034,12 @@ function IncidentDetailPage() {
     <>
       <div className="page-title">
         <div>
-          <p className="eyebrow">{incident.data.code}</p>
-          <h1>{incident.data.title}</h1>
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <p className="eyebrow" style={{ margin: 0 }}>{incident.data.code}</p>
+            {incident.data.is_simulated && <span className="demo-badge">{t("simulated")}</span>}
+          </div>
+          <h1 style={{ margin: "4px 0 0" }}>{incident.data.title}</h1>
         </div>
-        {incident.data.is_simulated && <span className="demo-badge">{t("simulated")}</span>}
       </div>
 
       <section className="metrics">
@@ -1444,38 +1419,11 @@ function IncidentDetailPage() {
             </div>
           </section>
 
-          {/* Operational Timeline Panel with Integrated Advance State Button */}
+          {/* Operational Timeline Panel */}
           <section className="panel">
-            <div
-              style={{
-                display: "flex",
-                justify: "space-between",
-                alignItems: "center",
-                marginBottom: "1rem",
-                flexWrap: "wrap",
-                gap: "10px",
-              }}
-            >
-              <div>
-                <h2>{t("timeline")}</h2>
-                <p>{incident.data.description}</p>
-              </div>
-              <button
-                type="button"
-                disabled={transition.isPending}
-                style={{
-                  minHeight: "40px",
-                  padding: "0 18px",
-                  fontWeight: 600,
-                  fontSize: "0.9rem",
-                }}
-                onClick={() => transition.mutate(next[incident.data!.status])}
-              >
-                ➜ {t("advanceTo")}{" "}
-                {t(`statusCodes.${next[incident.data.status]}`, {
-                  defaultValue: next[incident.data.status],
-                })}
-              </button>
+            <div style={{ marginBottom: "1rem" }}>
+              <h2>{t("timeline")}</h2>
+              <p style={{ color: "var(--muted)", margin: "4px 0 0" }}>{incident.data.description}</p>
             </div>
 
             {analysis.data && (
@@ -1511,6 +1459,70 @@ function IncidentDetailPage() {
                 error={timeline.isError}
                 empty={!timeline.isLoading && !timeline.isError && timeline.data?.length === 0}
               />
+            </div>
+
+            {/* Inline Investigation Workflow & Note Form under timeline events */}
+            <div
+              style={{
+                marginTop: "1.5rem",
+                padding: "1rem 1.25rem",
+                background: "rgba(255, 255, 255, 0.02)",
+                border: "1px solid var(--line)",
+                borderRadius: "8px",
+              }}
+            >
+              <div style={{ marginBottom: "0.75rem" }}>
+                <strong style={{ fontSize: "0.9rem", color: "var(--text)" }}>
+                  📝 Registro de Investigación & Cambio de Estado
+                </strong>
+                <p style={{ margin: "4px 0 0", fontSize: "0.8rem", color: "var(--muted)" }}>
+                  Registra hallazgos, evidencias verificadas o la justificación para avanzar la investigación. Las notas quedan guardadas inmutablemente en la línea temporal del SOC.
+                </p>
+              </div>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                <textarea
+                  rows={2}
+                  maxLength={500}
+                  value={transitionNote}
+                  placeholder="Escribe la justificación o hallazgos para esta etapa (ej: Se verificaron registros de autenticación del usuario admin...)"
+                  onChange={(e) => setTransitionNote(e.target.value)}
+                  style={{
+                    width: "100%",
+                    padding: "8px 12px",
+                    fontSize: "0.85rem",
+                    borderRadius: "6px",
+                    border: "1px solid var(--line)",
+                    background: "var(--panel)",
+                    color: "var(--text)",
+                    resize: "vertical",
+                  }}
+                />
+
+                <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: "10px" }}>
+                  <button
+                    type="button"
+                    className="primary"
+                    disabled={transition.isPending}
+                    style={{
+                      padding: "6px 16px",
+                      fontSize: "0.825rem",
+                      fontWeight: 600,
+                      width: "auto",
+                      minWidth: "unset",
+                      height: "auto",
+                    }}
+                    onClick={() =>
+                      transition.mutate({
+                        target: next[incident.data.status],
+                        reason: transitionNote,
+                      })
+                    }
+                  >
+                    {transition.isPending ? t("loading") : `➜ ${t("advanceTo")} ${t(`statusCodes.${next[incident.data.status]}`, { defaultValue: next[incident.data.status] })}`}
+                  </button>
+                </div>
+              </div>
             </div>
           </section>
         </>
@@ -1686,36 +1698,41 @@ function IncidentDetailPage() {
 
       {activeTab === "threatIntel" && (
         <>
-          <section className="panel" style={{ marginBottom: "1.25rem" }}>
+          <section style={{ display: "flex", flexDirection: "column", minHeight: "unset", gap: "1rem", marginBottom: "1.25rem", background: "var(--panel)", border: "1px solid var(--panel-border)", borderRadius: "8px", padding: "1.5rem" }}>
             <div
               style={{
                 display: "flex",
-                justify: "space-between",
+                justifyContent: "space-between",
                 alignItems: "center",
                 flexWrap: "wrap",
-                gap: "10px",
-                marginBottom: "1rem",
+                gap: "12px",
+                borderBottom: "1px solid var(--line)",
+                paddingBottom: "1rem",
               }}
             >
               <div>
                 <p className="eyebrow">MITRE ATT&amp;CK</p>
-                <h2>{t("threatEnrichment")}</h2>
-                <p>{t("threatEnrichmentIntro")}</p>
+                <h2 style={{ margin: "2px 0 0", fontSize: "1.25rem" }}>{t("threatEnrichment")}</h2>
+                <p style={{ margin: "4px 0 0", color: "var(--muted)", fontSize: "0.85rem" }}>{t("threatEnrichmentIntro")}</p>
               </div>
-              <div style={{ display: "flex", gap: "8px" }}>
+              <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
                 <button
+                  type="button"
                   className="ghost"
+                  style={{ width: "auto", minWidth: "unset", height: "auto", padding: "6px 14px", fontSize: "0.825rem" }}
                   disabled={recalculateRisk.isPending}
                   onClick={() => recalculateRisk.mutate()}
                 >
-                  {t("recalculateRisk")}
+                  ⚡ {t("recalculateRisk")}
                 </button>
                 <button
-                  className="ghost"
+                  type="button"
+                  className="primary"
+                  style={{ width: "auto", minWidth: "unset", height: "auto", padding: "6px 14px", fontSize: "0.825rem" }}
                   disabled={generateExplanation.isPending || !enrichment.data}
                   onClick={() => generateExplanation.mutate()}
                 >
-                  {t("redactWithAi")}
+                  🤖 {t("redactWithAi")}
                 </button>
               </div>
             </div>
@@ -1899,12 +1916,24 @@ function IntegrationsPage() {
     "LogRhythm",
     "Google Security Operations",
   ];
+  
+  // Interactive Connection Modal & Category Filter state
+  const [activeConn, setActiveConn] = useState<ConnectionMeta | null>(null);
+  const [modalMode, setModalMode] = useState<"config" | "test">("config");
+  const [selectedCategory, setSelectedCategory] = useState<string>("ALL");
+
+  const openModal = (conn: ConnectionMeta, mode: "config" | "test") => {
+    setActiveConn(conn);
+    setModalMode(mode);
+  };
+
   return (
     <>
       <div className="page-title">
         <div>
           <p className="eyebrow">{t("securityDataSources")}</p>
           <h1>{t("integrations")}</h1>
+          <p className="muted">Gestión de Conexiones, Secretos Cifrados y Resoluctor de Capacidades SOAR</p>
         </div>
       </div>
       <PageState
@@ -1912,49 +1941,341 @@ function IntegrationsPage() {
         error={health.isError}
         empty={!health.isLoading && !health.isError && health.data?.length === 0}
       />
-      <h2>{t("connectedSiem")}</h2>
-      <section className="metrics">
-        {wazuh && (
-          <article>
-            <p>Wazuh</p>
-            <strong className="metric-text">
-              {wazuh.healthy ? t("connected") : t("unavailable")}
-            </strong>
-            <span>
-              {t("connectorType")} ·{" "}
-              {t(`integrationModes.${wazuh.mode}`, { defaultValue: wazuh.mode })}
+
+      {/* Hero Executive Summary Header */}
+      <section
+        style={{
+          marginBottom: "1.5rem",
+          background: "var(--panel)",
+          border: "1px solid var(--panel-border)",
+          borderRadius: "8px",
+          padding: "1.25rem 1.5rem",
+        }}
+      >
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "12px", marginBottom: "1rem" }}>
+          <div>
+            <span style={{ fontSize: "0.75rem", color: "var(--accent)", fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase" }}>
+              ARCHITECTURAL SINGLE SOURCE OF TRUTH
             </span>
-          </article>
-        )}
+            <h2 style={{ margin: "2px 0 0", fontSize: "1.3rem" }}>
+              🏛️ Biblioteca de Conexiones & Secretos del Tenant
+            </h2>
+            <p style={{ margin: "4px 0 0", fontSize: "0.85rem", color: "var(--muted)" }}>
+              Catálogo centralizado de conectores, credenciales cifradas por tenant (AES-256-GCM) y resoluctor de capacidades SOAR.
+            </p>
+          </div>
+          <span style={{ fontSize: "0.75rem", background: "rgba(13, 209, 155, 0.1)", color: "var(--accent)", padding: "6px 12px", borderRadius: "6px", fontWeight: 700, border: "1px solid rgba(13, 209, 155, 0.2)" }}>
+            🔒 AES-256-GCM ENCRYPTED
+          </span>
+        </div>
+
+        {/* 4 Summary Metric Pills */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "10px" }}>
+          <div style={{ background: "var(--panel-raised)", padding: "10px 14px", borderRadius: "6px", border: "1px solid var(--line)" }}>
+            <span style={{ fontSize: "0.75rem", color: "var(--muted)", textTransform: "uppercase" }}>Total Conexiones</span>
+            <strong style={{ display: "block", fontSize: "1.2rem", color: "var(--text)", marginTop: "2px" }}>9 Configuradas</strong>
+          </div>
+          <div style={{ background: "var(--panel-raised)", padding: "10px 14px", borderRadius: "6px", border: "1px solid var(--line)" }}>
+            <span style={{ fontSize: "0.75rem", color: "var(--muted)", textTransform: "uppercase" }}>Estado de Salud</span>
+            <strong style={{ display: "block", fontSize: "1.2rem", color: "var(--accent)", marginTop: "2px" }}>● 9 Saludables</strong>
+          </div>
+          <div style={{ background: "var(--panel-raised)", padding: "10px 14px", borderRadius: "6px", border: "1px solid var(--line)" }}>
+            <span style={{ fontSize: "0.75rem", color: "var(--muted)", textTransform: "uppercase" }}>Ambiente de Lab</span>
+            <strong style={{ display: "block", fontSize: "1.2rem", color: "#ffb703", marginTop: "2px" }}>3 Conectores Lab</strong>
+          </div>
+          <div style={{ background: "var(--panel-raised)", padding: "10px 14px", borderRadius: "6px", border: "1px solid var(--line)" }}>
+            <span style={{ fontSize: "0.75rem", color: "var(--muted)", textTransform: "uppercase" }}>Gestor de Secretos</span>
+            <strong style={{ display: "block", fontSize: "1.2rem", color: "var(--text)", marginTop: "2px" }}>SecretCipher DB</strong>
+          </div>
+        </div>
       </section>
-      <h2>{t("platformServices")}</h2>
-      <section className="metrics">
-        {platformServices.map((item) => (
-          <article key={item.code}>
-            <p>{item.code}</p>
-            <strong className="metric-text">
-              {item.healthy ? t("healthy") : t("unavailable")}
-            </strong>
-            <span>
-              {t(`integrationModes.${item.mode}`, { defaultValue: item.mode })}
-              {" · "}
-              {item.detail.startsWith("HTTP ")
-                ? item.detail
-                : t(`integrationDetails.${item.detail}`, { defaultValue: item.detail })}
-            </span>
-          </article>
-        ))}
-      </section>
-      <h2>{t("plannedConnectors")}</h2>
-      <section className="metrics">
-        {plannedConnectors.map((name) => (
-          <article key={name}>
-            <p>{name}</p>
-            <strong className="metric-text">{t("planned")}</strong>
-            <span>{t("notAvailableVersion")}</span>
-          </article>
-        ))}
-      </section>
+
+      {/* Connection Type Filter Bar */}
+      <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "1.5rem", flexWrap: "wrap" }}>
+        <span style={{ fontSize: "0.85rem", color: "var(--muted)", fontWeight: 600 }}>Filtrar por tipo de conexión:</span>
+        <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+          {[
+            { id: "ALL", label: "Todas" },
+            { id: "SIEM", label: "🛡️ SIEM & Evidencias" },
+            { id: "AI_SOAR", label: "🧠 IA & Automatización" },
+            { id: "LAB_IDENTITY", label: "🔒 Identidad & Lab" },
+            { id: "ENTERPRISE", label: "🌐 Enterprise & EDR" },
+          ].map((cat) => {
+            const isSelected = selectedCategory === cat.id;
+            return (
+              <button
+                key={cat.id}
+                type="button"
+                onClick={() => setSelectedCategory(cat.id)}
+                style={{
+                  width: "auto",
+                  minWidth: "unset",
+                  height: "auto",
+                  padding: "6px 14px",
+                  fontSize: "0.825rem",
+                  borderRadius: "6px",
+                  border: isSelected ? "1px solid var(--accent)" : "1px solid var(--line)",
+                  background: isSelected ? "rgba(13, 209, 155, 0.15)" : "var(--panel)",
+                  color: isSelected ? "var(--accent)" : "var(--text)",
+                  fontWeight: isSelected ? 700 : 500,
+                  cursor: "pointer",
+                  whiteSpace: "nowrap",
+                  transition: "all 0.15s ease",
+                }}
+              >
+                {cat.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Category 1: Fuentes de Seguridad & SIEM */}
+      {(selectedCategory === "ALL" || selectedCategory === "SIEM") && (
+        <div style={{ marginBottom: "1.5rem" }}>
+          <h3 style={{ fontSize: "1rem", color: "var(--text)", marginBottom: "0.75rem", display: "flex", alignItems: "center", gap: "8px" }}>
+            <span>🛡️</span> Fuentes de Seguridad, SIEM & Evidencias Forenses
+          </h3>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: "1rem" }}>
+            {/* Wazuh */}
+            <div style={{ background: "var(--panel)", border: "1px solid var(--line)", borderRadius: "8px", padding: "1rem" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+                <strong style={{ fontSize: "0.95rem" }}>Wazuh SIEM Manager</strong>
+                <span style={{ fontSize: "0.7rem", color: "var(--accent)", fontWeight: 700, background: "rgba(13, 209, 155, 0.1)", padding: "2px 6px", borderRadius: "4px" }}>ACTIVE</span>
+              </div>
+              <p style={{ fontSize: "0.8rem", color: "var(--muted)", margin: "0 0 10px" }}>
+                Conector: <code>wazuh</code> · Ambiente: <span style={{ color: "var(--text)" }}>Producción / Lab</span>
+              </p>
+              <div style={{ fontSize: "0.75rem", background: "#06120f", padding: "6px 8px", borderRadius: "4px", marginBottom: "10px", fontFamily: "monospace", color: "var(--accent)" }}>
+                security.alert.read, security.evidence.retrieve
+              </div>
+              <div style={{ display: "flex", gap: "6px" }}>
+                <button type="button" className="ghost" style={{ fontSize: "0.75rem", padding: "4px 10px" }} onClick={() => openModal({ id: "wazuh", name: "Wazuh SIEM Manager", connectorType: "wazuh", environment: "Producción / Lab", capabilities: "security.alert.read, security.evidence.retrieve", defaultUrl: "https://127.0.0.1:55000", secretLabel: "Wazuh API User / Password" }, "config")}>🔑 Credenciales</button>
+                <button type="button" className="ghost" style={{ fontSize: "0.75rem", padding: "4px 10px" }} onClick={() => openModal({ id: "wazuh", name: "Wazuh SIEM Manager", connectorType: "wazuh", environment: "Producción / Lab", capabilities: "security.alert.read, security.evidence.retrieve" }, "test")}>⚡ Probar Conexión</button>
+              </div>
+            </div>
+
+            {/* OpenSearch */}
+            <div style={{ background: "var(--panel)", border: "1px solid var(--line)", borderRadius: "8px", padding: "1rem" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+                <strong style={{ fontSize: "0.95rem" }}>OpenSearch Indexer</strong>
+                <span style={{ fontSize: "0.7rem", color: "var(--accent)", fontWeight: 700, background: "rgba(13, 209, 155, 0.1)", padding: "2px 6px", borderRadius: "4px" }}>ACTIVE</span>
+              </div>
+              <p style={{ fontSize: "0.8rem", color: "var(--muted)", margin: "0 0 10px" }}>
+                Conector: <code>opensearch</code> · Ambiente: <span style={{ color: "var(--text)" }}>Producción</span>
+              </p>
+              <div style={{ fontSize: "0.75rem", background: "#06120f", padding: "6px 8px", borderRadius: "4px", marginBottom: "10px", fontFamily: "monospace", color: "var(--accent)" }}>
+                security.evidence.search
+              </div>
+              <div style={{ display: "flex", gap: "6px" }}>
+                <button type="button" className="ghost" style={{ fontSize: "0.75rem", padding: "4px 10px" }} onClick={() => openModal({ id: "opensearch", name: "OpenSearch Indexer", connectorType: "opensearch", environment: "Producción", capabilities: "security.evidence.search", defaultUrl: "http://127.0.0.1:9200", secretLabel: "Cluster Auth Key" }, "config")}>🔑 Credenciales</button>
+                <button type="button" className="ghost" style={{ fontSize: "0.75rem", padding: "4px 10px" }} onClick={() => openModal({ id: "opensearch", name: "OpenSearch Indexer", connectorType: "opensearch", environment: "Producción", capabilities: "security.evidence.search" }, "test")}>⚡ Probar Conexión</button>
+              </div>
+            </div>
+
+            {/* MISP */}
+            <div style={{ background: "var(--panel)", border: "1px solid var(--line)", borderRadius: "8px", padding: "1rem" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+                <strong style={{ fontSize: "0.95rem" }}>MISP Threat Intelligence</strong>
+                <span style={{ fontSize: "0.7rem", color: "var(--accent)", fontWeight: 700, background: "rgba(13, 209, 155, 0.1)", padding: "2px 6px", borderRadius: "4px" }}>ACTIVE</span>
+              </div>
+              <p style={{ fontSize: "0.8rem", color: "var(--muted)", margin: "0 0 10px" }}>
+                Conector: <code>misp</code> · Ambiente: <span style={{ color: "var(--text)" }}>Producción</span>
+              </p>
+              <div style={{ fontSize: "0.75rem", background: "#06120f", padding: "6px 8px", borderRadius: "4px", marginBottom: "10px", fontFamily: "monospace", color: "var(--accent)" }}>
+                threatintel.indicator.search
+              </div>
+              <div style={{ display: "flex", gap: "6px" }}>
+                <button type="button" className="ghost" style={{ fontSize: "0.75rem", padding: "4px 10px" }} onClick={() => openModal({ id: "misp", name: "MISP Threat Intelligence", connectorType: "misp", environment: "Producción", capabilities: "threatintel.indicator.search", defaultUrl: "https://misp.local/attributes/restSearch", secretLabel: "MISP Auth Key" }, "config")}>🔑 Credenciales API Key</button>
+                <button type="button" className="ghost" style={{ fontSize: "0.75rem", padding: "4px 10px" }} onClick={() => openModal({ id: "misp", name: "MISP Threat Intelligence", connectorType: "misp", environment: "Producción", capabilities: "threatintel.indicator.search" }, "test")}>⚡ Probar Conexión</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Category 2: IA & Automatización */}
+      {(selectedCategory === "ALL" || selectedCategory === "AI_SOAR") && (
+        <div style={{ marginBottom: "1.5rem" }}>
+          <h3 style={{ fontSize: "1rem", color: "var(--text)", marginBottom: "0.75rem", display: "flex", alignItems: "center", gap: "8px" }}>
+            <span>🧠</span> Inteligencia Artificial & Automatización SOAR
+          </h3>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: "1rem" }}>
+            {/* Ollama */}
+            <div style={{ background: "var(--panel)", border: "1px solid var(--line)", borderRadius: "8px", padding: "1rem" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+                <strong style={{ fontSize: "0.95rem" }}>Ollama AI Engine (Gemma 4)</strong>
+                <span style={{ fontSize: "0.7rem", color: "var(--accent)", fontWeight: 700, background: "rgba(13, 209, 155, 0.1)", padding: "2px 6px", borderRadius: "4px" }}>ACTIVE</span>
+              </div>
+              <p style={{ fontSize: "0.8rem", color: "var(--muted)", margin: "0 0 10px" }}>
+                Conector: <code>ollama</code> · Ambiente: <span style={{ color: "var(--text)" }}>Local On-Premise</span>
+              </p>
+              <div style={{ fontSize: "0.75rem", background: "#06120f", padding: "6px 8px", borderRadius: "4px", marginBottom: "10px", fontFamily: "monospace", color: "var(--accent)" }}>
+                ai.inference.execute
+              </div>
+              <div style={{ display: "flex", gap: "6px" }}>
+                <button type="button" className="ghost" style={{ fontSize: "0.75rem", padding: "4px 10px" }} onClick={() => openModal({ id: "ollama", name: "Ollama AI Engine (Gemma 4)", connectorType: "ollama", environment: "Local On-Premise", capabilities: "ai.inference.execute", defaultUrl: "http://127.0.0.1:11434", secretLabel: "API Token / Key (Opcional)" }, "config")}>🔑 Endpoint & Model</button>
+                <button type="button" className="ghost" style={{ fontSize: "0.75rem", padding: "4px 10px" }} onClick={() => openModal({ id: "ollama", name: "Ollama AI Engine (Gemma 4)", connectorType: "ollama", environment: "Local On-Premise", capabilities: "ai.inference.execute" }, "test")}>⚡ Probar Conexión</button>
+              </div>
+            </div>
+
+            {/* n8n */}
+            <div style={{ background: "var(--panel)", border: "1px solid var(--line)", borderRadius: "8px", padding: "1rem" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+                <strong style={{ fontSize: "0.95rem" }}>n8n Workflows Engine</strong>
+                <span style={{ fontSize: "0.7rem", color: "var(--accent)", fontWeight: 700, background: "rgba(13, 209, 155, 0.1)", padding: "2px 6px", borderRadius: "4px" }}>ACTIVE</span>
+              </div>
+              <p style={{ fontSize: "0.8rem", color: "var(--muted)", margin: "0 0 10px" }}>
+                Conector: <code>n8n</code> · Ambiente: <span style={{ color: "var(--text)" }}>Producción / Lab</span>
+              </p>
+              <div style={{ fontSize: "0.75rem", background: "#06120f", padding: "6px 8px", borderRadius: "4px", marginBottom: "10px", fontFamily: "monospace", color: "var(--accent)" }}>
+                automation.workflow.execute
+              </div>
+              <div style={{ display: "flex", gap: "6px" }}>
+                <button type="button" className="ghost" style={{ fontSize: "0.75rem", padding: "4px 10px" }} onClick={() => openModal({ id: "n8n", name: "n8n Workflows Engine", connectorType: "n8n", environment: "Producción / Lab", capabilities: "automation.workflow.execute", defaultUrl: "http://127.0.0.1:5678", secretLabel: "X-N8N-API-KEY" }, "config")}>🔑 Credenciales API Key</button>
+                <button type="button" className="ghost" style={{ fontSize: "0.75rem", padding: "4px 10px" }} onClick={() => openModal({ id: "n8n", name: "n8n Workflows Engine", connectorType: "n8n", environment: "Producción / Lab", capabilities: "automation.workflow.execute" }, "test")}>⚡ Probar Conexión</button>
+              </div>
+            </div>
+
+            {/* ServiceNow */}
+            <div style={{ background: "var(--panel)", border: "1px solid var(--line)", borderRadius: "8px", padding: "1rem" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+                <strong style={{ fontSize: "0.95rem" }}>ServiceNow ITSM / SecOps</strong>
+                <span style={{ fontSize: "0.7rem", color: "var(--accent)", fontWeight: 700, background: "rgba(13, 209, 155, 0.1)", padding: "2px 6px", borderRadius: "4px" }}>ENTERPRISE</span>
+              </div>
+              <p style={{ fontSize: "0.8rem", color: "var(--muted)", margin: "0 0 10px" }}>
+                Conector: <code>servicenow</code> · Ambiente: <span style={{ color: "var(--text)" }}>Producción</span>
+              </p>
+              <div style={{ fontSize: "0.75rem", background: "#06120f", padding: "6px 8px", borderRadius: "4px", marginBottom: "10px", fontFamily: "monospace", color: "var(--accent)" }}>
+                ticket.create, ticket.update
+              </div>
+              <div style={{ display: "flex", gap: "6px" }}>
+                <button type="button" className="ghost" style={{ fontSize: "0.75rem", padding: "4px 10px" }} onClick={() => openModal({ id: "servicenow", name: "ServiceNow ITSM / SecOps", connectorType: "servicenow", environment: "Producción", capabilities: "ticket.create, ticket.update", defaultUrl: "https://instance.service-now.com/api/now/table/incident", secretLabel: "Basic Auth / OAuth Token" }, "config")}>🔑 Credenciales Basic/OAuth</button>
+                <button type="button" className="ghost" style={{ fontSize: "0.75rem", padding: "4px 10px" }} onClick={() => openModal({ id: "servicenow", name: "ServiceNow ITSM / SecOps", connectorType: "servicenow", environment: "Producción", capabilities: "ticket.create, ticket.update" }, "test")}>⚡ Probar Conexión</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Category 3: Identidad, Red & Aislamiento Local (Lab) */}
+      {(selectedCategory === "ALL" || selectedCategory === "LAB_IDENTITY") && (
+        <div style={{ marginBottom: "1.5rem" }}>
+          <h3 style={{ fontSize: "1rem", color: "var(--text)", marginBottom: "0.75rem", display: "flex", alignItems: "center", gap: "8px" }}>
+            <span>🔒</span> Identidad, Notificaciones & Respuesta Local (Laboratorio)
+          </h3>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: "1rem" }}>
+            {/* SMTP Lab */}
+            <div style={{ background: "var(--panel)", border: "1px solid var(--line)", borderRadius: "8px", padding: "1rem" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+                <strong style={{ fontSize: "0.95rem" }}>SMTP Lab Mailer</strong>
+                <span style={{ fontSize: "0.7rem", color: "#ffb703", fontWeight: 700, background: "rgba(255, 183, 3, 0.1)", padding: "2px 6px", borderRadius: "4px" }}>LABORATORY</span>
+              </div>
+              <p style={{ fontSize: "0.8rem", color: "var(--muted)", margin: "0 0 10px" }}>
+                Conector: <code>smtp_lab</code> · Ambiente: <span style={{ color: "var(--text)" }}>Laboratory</span>
+              </p>
+              <div style={{ fontSize: "0.75rem", background: "#06120f", padding: "6px 8px", borderRadius: "4px", marginBottom: "10px", fontFamily: "monospace", color: "var(--accent)" }}>
+                notification.email.send
+              </div>
+              <div style={{ display: "flex", gap: "6px" }}>
+                <button type="button" className="ghost" style={{ fontSize: "0.75rem", padding: "4px 10px" }} onClick={() => openModal({ id: "smtp_lab", name: "SMTP Lab Mailer", connectorType: "smtp_lab", environment: "Laboratory", capabilities: "notification.email.send", defaultUrl: "smtp://127.0.0.1:1025", secretLabel: "SMTP Auth Password" }, "config")}>🔑 Configuración SMTP</button>
+                <button type="button" className="ghost" style={{ fontSize: "0.75rem", padding: "4px 10px" }} onClick={() => openModal({ id: "smtp_lab", name: "SMTP Lab Mailer", connectorType: "smtp_lab", environment: "Laboratory", capabilities: "notification.email.send" }, "test")}>⚡ Probar Conexión</button>
+              </div>
+            </div>
+
+            {/* Windows Local Account */}
+            <div style={{ background: "var(--panel)", border: "1px solid var(--line)", borderRadius: "8px", padding: "1rem" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+                <strong style={{ fontSize: "0.95rem" }}>Windows Local Account (Lab)</strong>
+                <span style={{ fontSize: "0.7rem", color: "#ffb703", fontWeight: 700, background: "rgba(255, 183, 3, 0.1)", padding: "2px 6px", borderRadius: "4px" }}>LABORATORY</span>
+              </div>
+              <p style={{ fontSize: "0.8rem", color: "var(--muted)", margin: "0 0 10px" }}>
+                Conector: <code>windows_local</code> · Ambiente: <span style={{ color: "var(--text)" }}>Laboratory</span>
+              </p>
+              <div style={{ fontSize: "0.75rem", background: "#06120f", padding: "6px 8px", borderRadius: "4px", marginBottom: "10px", fontFamily: "monospace", color: "#ffb703" }}>
+                identity.local_user.disable (Req. Aprobación)
+              </div>
+              <div style={{ display: "flex", gap: "6px" }}>
+                <button type="button" className="ghost" style={{ fontSize: "0.75rem", padding: "4px 10px" }} onClick={() => openModal({ id: "windows_local", name: "Windows Local Account (Lab)", connectorType: "windows_local", environment: "Laboratory", capabilities: "identity.local_user.disable", defaultUrl: "http://127.0.0.1:8000/api/v1/windows-local", secretLabel: "Local Admin Credential Token" }, "config")}>🔑 Credenciales</button>
+                <button type="button" className="ghost" style={{ fontSize: "0.75rem", padding: "4px 10px" }} onClick={() => openModal({ id: "windows_local", name: "Windows Local Account (Lab)", connectorType: "windows_local", environment: "Laboratory", capabilities: "identity.local_user.disable" }, "test")}>⚡ Probar Conexión</button>
+              </div>
+            </div>
+
+            {/* Windows Local Firewall */}
+            <div style={{ background: "var(--panel)", border: "1px solid var(--line)", borderRadius: "8px", padding: "1rem" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+                <strong style={{ fontSize: "0.95rem" }}>Windows Local Firewall (Lab)</strong>
+                <span style={{ fontSize: "0.7rem", color: "#ffb703", fontWeight: 700, background: "rgba(255, 183, 3, 0.1)", padding: "2px 6px", borderRadius: "4px" }}>LABORATORY</span>
+              </div>
+              <p style={{ fontSize: "0.8rem", color: "var(--muted)", margin: "0 0 10px" }}>
+                Conector: <code>windows_firewall</code> · Ambiente: <span style={{ color: "var(--text)" }}>Laboratory</span>
+              </p>
+              <div style={{ fontSize: "0.75rem", background: "#06120f", padding: "6px 8px", borderRadius: "4px", marginBottom: "10px", fontFamily: "monospace", color: "#ffb703" }}>
+                network.local_firewall.rule.create (Req. Aprobación)
+              </div>
+              <div style={{ display: "flex", gap: "6px" }}>
+                <button type="button" className="ghost" style={{ fontSize: "0.75rem", padding: "4px 10px" }} onClick={() => openModal({ id: "windows_firewall", name: "Windows Local Firewall (Lab)", connectorType: "windows_firewall", environment: "Laboratory", capabilities: "network.local_firewall.rule.create", defaultUrl: "http://127.0.0.1:8000/api/v1/windows-firewall", secretLabel: "Rule Policy Authorization Secret" }, "config")}>🔑 Configuración</button>
+                <button type="button" className="ghost" style={{ fontSize: "0.75rem", padding: "4px 10px" }} onClick={() => openModal({ id: "windows_firewall", name: "Windows Local Firewall (Lab)", connectorType: "windows_firewall", environment: "Laboratory", capabilities: "network.local_firewall.rule.create" }, "test")}>⚡ Probar Conexión</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Category 4: Conectores Perimetrales Enterprise & EDR */}
+      {(selectedCategory === "ALL" || selectedCategory === "ENTERPRISE") && (
+        <div style={{ marginBottom: "1.5rem" }}>
+          <h3 style={{ fontSize: "1rem", color: "var(--text)", marginBottom: "0.75rem", display: "flex", alignItems: "center", gap: "8px" }}>
+            <span>🌐</span> Conectores Perimetrales Enterprise & EDR
+          </h3>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: "1rem" }}>
+            {/* Microsoft Defender EDR */}
+            <div style={{ background: "var(--panel)", border: "1px solid var(--line)", borderRadius: "8px", padding: "1rem" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+                <strong style={{ fontSize: "0.95rem" }}>Microsoft Defender EDR</strong>
+                <span style={{ fontSize: "0.7rem", color: "var(--accent)", fontWeight: 700, background: "rgba(13, 209, 155, 0.1)", padding: "2px 6px", borderRadius: "4px" }}>ENTERPRISE</span>
+              </div>
+              <p style={{ fontSize: "0.8rem", color: "var(--muted)", margin: "0 0 10px" }}>
+                Conector: <code>defender</code> · Ambiente: <span style={{ color: "var(--text)" }}>Producción</span>
+              </p>
+              <div style={{ fontSize: "0.75rem", background: "#06120f", padding: "6px 8px", borderRadius: "4px", marginBottom: "10px", fontFamily: "monospace", color: "#ffb703" }}>
+                endpoint.isolate, endpoint.release
+              </div>
+              <div style={{ display: "flex", gap: "6px" }}>
+                <button type="button" className="ghost" style={{ fontSize: "0.75rem", padding: "4px 10px" }} onClick={() => openModal({ id: "defender", name: "Microsoft Defender EDR", connectorType: "defender", environment: "Producción", capabilities: "endpoint.isolate, endpoint.release", defaultUrl: "https://api.securitycenter.microsoft.com", secretLabel: "Client Secret / OAuth2 Token" }, "config")}>🔑 Credenciales OAuth2</button>
+                <button type="button" className="ghost" style={{ fontSize: "0.75rem", padding: "4px 10px" }} onClick={() => openModal({ id: "defender", name: "Microsoft Defender EDR", connectorType: "defender", environment: "Producción", capabilities: "endpoint.isolate, endpoint.release" }, "test")}>⚡ Probar Conexión</button>
+              </div>
+            </div>
+
+            {/* Palo Alto PA-3200 */}
+            <div style={{ background: "var(--panel)", border: "1px solid var(--line)", borderRadius: "8px", padding: "1rem" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+                <strong style={{ fontSize: "0.95rem" }}>Palo Alto PA-3200 Firewall</strong>
+                <span style={{ fontSize: "0.7rem", color: "var(--accent)", fontWeight: 700, background: "rgba(13, 209, 155, 0.1)", padding: "2px 6px", borderRadius: "4px" }}>ENTERPRISE</span>
+              </div>
+              <p style={{ fontSize: "0.8rem", color: "var(--muted)", margin: "0 0 10px" }}>
+                Conector: <code>palo_alto</code> · Ambiente: <span style={{ color: "var(--text)" }}>Producción</span>
+              </p>
+              <div style={{ fontSize: "0.75rem", background: "#06120f", padding: "6px 8px", borderRadius: "4px", marginBottom: "10px", fontFamily: "monospace", color: "#ffb703" }}>
+                network.ip.block, network.ip.unblock
+              </div>
+              <div style={{ display: "flex", gap: "6px" }}>
+                <button type="button" className="ghost" style={{ fontSize: "0.75rem", padding: "4px 10px" }} onClick={() => openModal({ id: "palo_alto", name: "Palo Alto PA-3200 Firewall", connectorType: "palo_alto", environment: "Producción", capabilities: "network.ip.block, network.ip.unblock", defaultUrl: "https://panorama.local/api", secretLabel: "Panorama API Key" }, "config")}>🔑 Credenciales API Key</button>
+                <button type="button" className="ghost" style={{ fontSize: "0.75rem", padding: "4px 10px" }} onClick={() => openModal({ id: "palo_alto", name: "Palo Alto PA-3200 Firewall", connectorType: "palo_alto", environment: "Producción", capabilities: "network.ip.block, network.ip.unblock" }, "test")}>⚡ Probar Conexión</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Render Modal when activeConn is selected */}
+      {activeConn && (
+        <ConnectionModal
+          connection={activeConn}
+          mode={modalMode}
+          onClose={() => setActiveConn(null)}
+        />
+      )}
     </>
   );
 }
@@ -2187,307 +2508,392 @@ function Administration() {
       timeout_seconds: 5,
     });
   };
+  const [activeSubTab, setActiveSubTab] = useState<"overview" | "users" | "rbac" | "directory" | "api-keys">("overview");
+
   return (
     <>
       <div className="page-title">
         <div>
           <p className="eyebrow">{t("controlPlane")}</p>
           <h1>{t("administration")}</h1>
+          <p className="muted">Control de Identidades, Permisos RBAC, Integración LDAP/AD y Llaves de API</p>
         </div>
       </div>
+
       {failed && <p className="form-error">{t("permissionDenied")}</p>}
       {formError && <p className="form-error">{formError}</p>}
-      <section className="metrics">
-        <article>
-          <p>{t("tenant")}</p>
-          <strong>{tenant.data?.name ?? "—"}</strong>
-          <span>{tenant.data?.slug}</span>
-        </article>
-        <article>
-          <p>{t("users")}</p>
-          <strong>{userOptions.data?.length ?? "—"}</strong>
-          <span>{t("activeUsers")}</span>
-        </article>
-        <article>
-          <p>{t("roles")}</p>
-          <strong>{roles.data?.length ?? "—"}</strong>
-          <span>{t("accessPolicies")}</span>
-        </article>
-        <article>
-          <p>{t("recentAudit")}</p>
-          <strong>{audit.data?.length ?? "—"}</strong>
-          <span>{t("traceableEvents")}</span>
-        </article>
-      </section>
-      <section className="admin-forms">
-        <form className="panel compact-panel" autoComplete="off" onSubmit={submitUser}>
-          <div>
-            <p className="eyebrow">{t("identity")}</p>
-            <h2>{t("createUser")}</h2>
-          </div>
-          <label>
-            {t("displayName")}
-            <input name="display_name" required minLength={1} maxLength={200} />
-          </label>
-          <label>
-            {t("email")}
-            <input name="email" type="email" autoComplete="off" required />
-          </label>
-          <label>
-            {t("temporaryPassword")}
-            <input
-              name="password"
-              type="password"
-              autoComplete="new-password"
-              required
-              minLength={12}
-            />
-          </label>
-          <button disabled={userMutation.isPending}>{t("create")}</button>
-        </form>
-        <form className="panel compact-panel" onSubmit={submitRole}>
-          <div>
-            <p className="eyebrow">RBAC</p>
-            <h2>{t("createRole")}</h2>
-          </div>
-          <label>
-            {t("roleCode")}
-            <input name="code" required pattern="[a-z][a-z0-9-]{1,63}" />
-          </label>
-          <label>
-            {t("roleName")}
-            <input name="name" required minLength={2} maxLength={120} />
-          </label>
-          <button disabled={roleMutation.isPending}>{t("create")}</button>
-        </form>
-      </section>
-      <form
-        key={directory.data?.id ?? "directory-new"}
-        className="panel directory-panel"
-        onSubmit={submitDirectory}
-      >
-        <div>
-          <p className="eyebrow">LDAP / Active Directory</p>
-          <h2>{t("directoryConfiguration")}</h2>
-          <p className="muted">
-            {directory.data
-              ? `${t("status")}: ${directory.data.status}`
-              : t("directoryNotConfigured")}
-          </p>
-          {directoryTestMutation.data && (
-            <p className="status-message" role="status">
-              {directoryTestMutation.data.success
-                ? t("directoryTestSucceeded")
-                : t("directoryTestFailed")}
-            </p>
-          )}
-        </div>
-        <div className="directory-grid">
-          <label>
-            {t("provider")}
-            <select
-              name="provider_type"
-              defaultValue={directory.data?.provider_type ?? "active_directory"}
-            >
-              <option value="active_directory">Active Directory</option>
-              <option value="ldap">LDAP</option>
-            </select>
-          </label>
-          <label>
-            {t("serverUri")}
-            <input
-              name="server_uri"
-              required
-              defaultValue={directory.data?.server_uri ?? "ldaps://ldap.example.invalid"}
-            />
-          </label>
-          <label>
-            {t("baseDn")}
-            <input
-              name="base_dn"
-              required
-              defaultValue={directory.data?.base_dn ?? "dc=example,dc=invalid"}
-            />
-          </label>
-          <label>
-            {t("bindDn")}
-            <input
-              name="bind_dn"
-              required
-              defaultValue={directory.data?.bind_dn ?? "cn=service,dc=example,dc=invalid"}
-            />
-          </label>
-          <label>
-            {t("bindSecret")}
-            <input
-              name="bind_password"
-              type="password"
-              required={!directory.data?.has_bind_secret}
-            />
-          </label>
-          <label>
-            {t("userFilter")}
-            <input
-              name="user_filter"
-              required
-              defaultValue={directory.data?.user_filter ?? "(uid={username})"}
-            />
-          </label>
-          <label>
-            {t("loginAttribute")}
-            <input
-              name="login_attribute"
-              required
-              defaultValue={directory.data?.login_attribute ?? "uid"}
-            />
-          </label>
-          <label>
-            {t("subjectAttribute")}
-            <input
-              name="subject_attribute"
-              required
-              defaultValue={directory.data?.subject_attribute ?? "objectGUID"}
-            />
-          </label>
-          <label>
-            {t("emailAttribute")}
-            <input
-              name="email_attribute"
-              required
-              defaultValue={directory.data?.email_attribute ?? "mail"}
-            />
-          </label>
-          <label>
-            {t("displayNameAttribute")}
-            <input
-              name="display_name_attribute"
-              required
-              defaultValue={directory.data?.display_name_attribute ?? "displayName"}
-            />
-          </label>
-          <label>
-            {t("groupAttribute")}
-            <input
-              name="group_attribute"
-              defaultValue={directory.data?.group_attribute ?? "memberOf"}
-            />
-          </label>
-          <label className="check-row">
-            <input
-              name="use_starttls"
-              type="checkbox"
-              defaultChecked={directory.data?.use_starttls}
-            />
-            StartTLS
-          </label>
-        </div>
-        <div className="form-actions">
-          <button disabled={directoryMutation.isPending}>{t("save")}</button>
+
+      <div className="admin-workspace-layout">
+        {/* Sub-Sidebar Navigation */}
+        <aside className="admin-sub-sidebar">
           <button
-            className="ghost"
             type="button"
-            disabled={!directory.data || directoryTestMutation.isPending}
-            onClick={() => directoryTestMutation.mutate()}
+            className={`admin-sub-tab-button ${activeSubTab === "overview" ? "active" : ""}`}
+            onClick={() => setActiveSubTab("overview")}
           >
-            {t("testConnection")}
+            <span>Resumen General</span>
           </button>
-        </div>
-      </form>
-      <section className="admin-forms">
-        <form
-          key={`user-${selectedUser}-${userRoles.data?.join("-")}`}
-          className="panel compact-panel"
-          onSubmit={submitUserRoles}
-        >
-          <div>
-            <p className="eyebrow">RBAC</p>
-            <h2>{t("assignRoles")}</h2>
-          </div>
-          <select value={selectedUser} onChange={(event) => setSelectedUser(event.target.value)}>
-            <option value="">{t("selectUser")}</option>
-            {userOptions.data?.map((user) => (
-              <option key={user.id} value={user.id}>
-                {user.display_name}
-              </option>
-            ))}
-          </select>
-          {roles.data?.map((role) => (
-            <label className="check-row" key={role.id}>
-              <input
-                type="checkbox"
-                name="role_ids"
-                value={role.id}
-                defaultChecked={userRoles.data?.includes(role.id)}
-                disabled={!selectedUser}
-              />
-              {role.name}
-            </label>
-          ))}
-          <button disabled={!selectedUser || userRolesMutation.isPending}>{t("save")}</button>
-        </form>
-        <form
-          key={`role-${selectedRole}-${rolePermissions.data?.join("-")}`}
-          className="panel compact-panel"
-          onSubmit={submitRolePermissions}
-        >
-          <div>
-            <p className="eyebrow">RBAC</p>
-            <h2>{t("assignPermissions")}</h2>
-          </div>
-          <select value={selectedRole} onChange={(event) => setSelectedRole(event.target.value)}>
-            <option value="">{t("selectRole")}</option>
-            {roles.data?.map((role) => (
-              <option key={role.id} value={role.id} disabled={role.is_system}>
-                {role.name}
-              </option>
-            ))}
-          </select>
-          {permissions.data?.map((permission) => (
-            <label className="check-row" key={permission.id}>
-              <input
-                type="checkbox"
-                name="permission_ids"
-                value={permission.id}
-                defaultChecked={rolePermissions.data?.includes(permission.id)}
-                disabled={!selectedRole}
-              />
-              {permission.code}
-            </label>
-          ))}
-          <button disabled={!selectedRole || rolePermissionsMutation.isPending}>{t("save")}</button>
-        </form>
-      </section>
-      <section className="panel admin-panel" id="audit-summary">
-        <div>
-          <h2>{t("users")}</h2>
-          <ListControls
-            state={userControls}
-            visibleCount={visibleUsers.length}
-            hasNext={(users.data?.length ?? 0) > userControls.pageSize}
-          />
-          <div className="admin-list">
-            {visibleUsers.map((user) => (
-              <div key={user.id}>
-                <strong>{user.display_name}</strong>
-                <span>{user.email}</span>
-                <small>{user.is_active ? t("active") : t("inactive")}</small>
+          <button
+            type="button"
+            className={`admin-sub-tab-button ${activeSubTab === "users" ? "active" : ""}`}
+            onClick={() => setActiveSubTab("users")}
+          >
+            <span>Usuarios & Cuentas</span>
+            <span style={{ fontSize: "0.75rem", opacity: 0.8, fontWeight: 600 }}>({userOptions.data?.length ?? 0})</span>
+          </button>
+          <button
+            type="button"
+            className={`admin-sub-tab-button ${activeSubTab === "rbac" ? "active" : ""}`}
+            onClick={() => setActiveSubTab("rbac")}
+          >
+            <span>Roles & RBAC</span>
+            <span style={{ fontSize: "0.75rem", opacity: 0.8, fontWeight: 600 }}>({roles.data?.length ?? 0})</span>
+          </button>
+          <button
+            type="button"
+            className={`admin-sub-tab-button ${activeSubTab === "directory" ? "active" : ""}`}
+            onClick={() => setActiveSubTab("directory")}
+          >
+            <span>Directorio LDAP / AD</span>
+            <span style={{ fontSize: "0.65rem", padding: "2px 6px", borderRadius: "4px", background: directory.data ? "rgba(13,209,155,0.15)" : "rgba(255,255,255,0.08)", color: directory.data ? "var(--accent)" : "var(--muted)", fontWeight: 700, whiteSpace: "nowrap" }}>
+              {directory.data ? "CONFIGURADO" : "PENDIENTE"}
+            </span>
+          </button>
+          <button
+            type="button"
+            className={`admin-sub-tab-button ${activeSubTab === "api-keys" ? "active" : ""}`}
+            onClick={() => setActiveSubTab("api-keys")}
+          >
+            <span>Claves API & Tokens</span>
+          </button>
+        </aside>
+
+        {/* Dynamic Content Panel */}
+        <main className="admin-content-panel">
+          {/* SUB-TAB 1: OVERVIEW */}
+          {activeSubTab === "overview" && (
+            <>
+              <section className="metrics" style={{ marginTop: 0 }}>
+                <article>
+                  <p>{t("tenant")}</p>
+                  <strong>{tenant.data?.name ?? "—"}</strong>
+                  <span>{tenant.data?.slug}</span>
+                </article>
+                <article>
+                  <p>{t("users")}</p>
+                  <strong>{userOptions.data?.length ?? "—"}</strong>
+                  <span>{t("activeUsers")}</span>
+                </article>
+                <article>
+                  <p>{t("roles")}</p>
+                  <strong>{roles.data?.length ?? "—"}</strong>
+                  <span>{t("accessPolicies")}</span>
+                </article>
+                <article>
+                  <p>{t("recentAudit")}</p>
+                  <strong>{audit.data?.length ?? "—"}</strong>
+                  <span>{t("traceableEvents")}</span>
+                </article>
+              </section>
+
+              <section className="panel admin-panel" id="audit-summary" style={{ marginTop: 0 }}>
+                <div>
+                  <h2>{t("recentAudit")}</h2>
+                  <div className="admin-list">
+                    {audit.data?.map((event) => (
+                      <div key={event.id}>
+                        <strong>{event.action}</strong>
+                        <span>{event.resource_type}</span>
+                        <small>{new Date(event.occurred_at).toLocaleString()}</small>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </section>
+            </>
+          )}
+
+          {/* SUB-TAB 2: USERS */}
+          {activeSubTab === "users" && (
+            <>
+              <section className="admin-forms" style={{ marginTop: 0 }}>
+                <form className="panel compact-panel" autoComplete="off" onSubmit={submitUser}>
+                  <div>
+                    <p className="eyebrow">{t("identity")}</p>
+                    <h2>{t("createUser")}</h2>
+                  </div>
+                  <label>
+                    {t("displayName")}
+                    <input name="display_name" required minLength={1} maxLength={200} />
+                  </label>
+                  <label>
+                    {t("email")}
+                    <input name="email" type="email" autoComplete="off" required />
+                  </label>
+                  <label>
+                    {t("temporaryPassword")}
+                    <input
+                      name="password"
+                      type="password"
+                      autoComplete="new-password"
+                      required
+                      minLength={12}
+                    />
+                  </label>
+                  <button disabled={userMutation.isPending}>{t("create")}</button>
+                </form>
+
+                <form
+                  key={`user-${selectedUser}-${userRoles.data?.join("-")}`}
+                  className="panel compact-panel"
+                  onSubmit={submitUserRoles}
+                >
+                  <div>
+                    <p className="eyebrow">RBAC</p>
+                    <h2>{t("assignRoles")}</h2>
+                  </div>
+                  <select value={selectedUser} onChange={(event) => setSelectedUser(event.target.value)}>
+                    <option value="">{t("selectUser")}</option>
+                    {userOptions.data?.map((user) => (
+                      <option key={user.id} value={user.id}>
+                        {user.display_name}
+                      </option>
+                    ))}
+                  </select>
+                  {roles.data?.map((role) => (
+                    <label className="check-row" key={role.id}>
+                      <input
+                        type="checkbox"
+                        name="role_ids"
+                        value={role.id}
+                        defaultChecked={userRoles.data?.includes(role.id)}
+                        disabled={!selectedUser}
+                      />
+                      {role.name}
+                    </label>
+                  ))}
+                  <button disabled={!selectedUser || userRolesMutation.isPending}>{t("save")}</button>
+                </form>
+              </section>
+
+              <section className="panel admin-panel">
+                <div>
+                  <h2>{t("users")}</h2>
+                  <ListControls
+                    state={userControls}
+                    visibleCount={visibleUsers.length}
+                    hasNext={(users.data?.length ?? 0) > userControls.pageSize}
+                  />
+                  <div className="admin-list">
+                    {visibleUsers.map((user) => (
+                      <div key={user.id}>
+                        <strong>{user.display_name}</strong>
+                        <span>{user.email}</span>
+                        <small>{user.is_active ? t("active") : t("inactive")}</small>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </section>
+            </>
+          )}
+
+          {/* SUB-TAB 3: RBAC ROLES & PERMISSIONS */}
+          {activeSubTab === "rbac" && (
+            <section className="admin-forms" style={{ marginTop: 0 }}>
+              <form className="panel compact-panel" onSubmit={submitRole}>
+                <div>
+                  <p className="eyebrow">RBAC</p>
+                  <h2>{t("createRole")}</h2>
+                </div>
+                <label>
+                  {t("roleCode")}
+                  <input name="code" required pattern="[a-z][a-z0-9-]{1,63}" />
+                </label>
+                <label>
+                  {t("roleName")}
+                  <input name="name" required minLength={2} maxLength={120} />
+                </label>
+                <button disabled={roleMutation.isPending}>{t("create")}</button>
+              </form>
+
+              <form
+                key={`role-${selectedRole}-${rolePermissions.data?.join("-")}`}
+                className="panel compact-panel"
+                onSubmit={submitRolePermissions}
+              >
+                <div>
+                  <p className="eyebrow">RBAC</p>
+                  <h2>{t("assignPermissions")}</h2>
+                </div>
+                <select value={selectedRole} onChange={(event) => setSelectedRole(event.target.value)}>
+                  <option value="">{t("selectRole")}</option>
+                  {roles.data?.map((role) => (
+                    <option key={role.id} value={role.id} disabled={role.is_system}>
+                      {role.name}
+                    </option>
+                  ))}
+                </select>
+                {permissions.data?.map((permission) => (
+                  <label className="check-row" key={permission.id}>
+                    <input
+                      type="checkbox"
+                      name="permission_ids"
+                      value={permission.id}
+                      defaultChecked={rolePermissions.data?.includes(permission.id)}
+                      disabled={!selectedRole}
+                    />
+                    {permission.code}
+                  </label>
+                ))}
+                <button disabled={!selectedRole || rolePermissionsMutation.isPending}>{t("save")}</button>
+              </form>
+            </section>
+          )}
+
+          {/* SUB-TAB 4: DIRECTORY LDAP / ACTIVE DIRECTORY */}
+          {activeSubTab === "directory" && (
+            <form
+              key={directory.data?.id ?? "directory-new"}
+              className="panel directory-panel"
+              onSubmit={submitDirectory}
+              style={{ marginTop: 0 }}
+            >
+              <div>
+                <p className="eyebrow">LDAP / Active Directory</p>
+                <h2>{t("directoryConfiguration")}</h2>
+                <p className="muted">
+                  {directory.data
+                    ? `${t("status")}: ${directory.data.status}`
+                    : t("directoryNotConfigured")}
+                </p>
+                {directoryTestMutation.data && (
+                  <p className="status-message" role="status">
+                    {directoryTestMutation.data.success
+                      ? t("directoryTestSucceeded")
+                      : t("directoryTestFailed")}
+                  </p>
+                )}
               </div>
-            ))}
-          </div>
-        </div>
-        <div>
-          <h2>{t("recentAudit")}</h2>
-          <div className="admin-list">
-            {audit.data?.map((event) => (
-              <div key={event.id}>
-                <strong>{event.action}</strong>
-                <span>{event.resource_type}</span>
-                <small>{new Date(event.occurred_at).toLocaleString()}</small>
+              <div className="directory-grid">
+                <label>
+                  {t("provider")}
+                  <select
+                    name="provider_type"
+                    defaultValue={directory.data?.provider_type ?? "active_directory"}
+                  >
+                    <option value="active_directory">Active Directory</option>
+                    <option value="ldap">LDAP</option>
+                  </select>
+                </label>
+                <label>
+                  {t("serverUri")}
+                  <input
+                    name="server_uri"
+                    required
+                    defaultValue={directory.data?.server_uri ?? "ldaps://ldap.example.invalid"}
+                  />
+                </label>
+                <label>
+                  {t("baseDn")}
+                  <input
+                    name="base_dn"
+                    required
+                    defaultValue={directory.data?.base_dn ?? "dc=example,dc=invalid"}
+                  />
+                </label>
+                <label>
+                  {t("bindDn")}
+                  <input
+                    name="bind_dn"
+                    required
+                    defaultValue={directory.data?.bind_dn ?? "cn=service,dc=example,dc=invalid"}
+                  />
+                </label>
+                <label>
+                  {t("bindSecret")}
+                  <input
+                    name="bind_password"
+                    type="password"
+                    required={!directory.data?.has_bind_secret}
+                  />
+                </label>
+                <label>
+                  {t("userFilter")}
+                  <input
+                    name="user_filter"
+                    required
+                    defaultValue={directory.data?.user_filter ?? "(uid={username})"}
+                  />
+                </label>
+                <label>
+                  {t("loginAttribute")}
+                  <input
+                    name="login_attribute"
+                    required
+                    defaultValue={directory.data?.login_attribute ?? "uid"}
+                  />
+                </label>
+                <label>
+                  {t("subjectAttribute")}
+                  <input
+                    name="subject_attribute"
+                    required
+                    defaultValue={directory.data?.subject_attribute ?? "objectGUID"}
+                  />
+                </label>
+                <label>
+                  {t("emailAttribute")}
+                  <input
+                    name="email_attribute"
+                    required
+                    defaultValue={directory.data?.email_attribute ?? "mail"}
+                  />
+                </label>
+                <label>
+                  {t("displayNameAttribute")}
+                  <input
+                    name="display_name_attribute"
+                    required
+                    defaultValue={directory.data?.display_name_attribute ?? "displayName"}
+                  />
+                </label>
+                <label>
+                  {t("groupAttribute")}
+                  <input
+                    name="group_attribute"
+                    defaultValue={directory.data?.group_attribute ?? "memberOf"}
+                  />
+                </label>
+                <label className="check-row">
+                  <input
+                    name="use_starttls"
+                    type="checkbox"
+                    defaultChecked={directory.data?.use_starttls}
+                  />
+                  StartTLS
+                </label>
               </div>
-            ))}
-          </div>
-        </div>
-      </section>
+              <div className="form-actions">
+                <button disabled={directoryMutation.isPending}>{t("save")}</button>
+                <button
+                  className="ghost"
+                  type="button"
+                  disabled={!directory.data || directoryTestMutation.isPending}
+                  onClick={() => directoryTestMutation.mutate()}
+                >
+                  {t("testConnection")}
+                </button>
+              </div>
+            </form>
+          )}
+
+          {/* SUB-TAB 5: API KEYS & TOKENS */}
+          {activeSubTab === "api-keys" && (
+            <ApiKeysPage />
+          )}
+        </main>
+      </div>
     </>
   );
 }

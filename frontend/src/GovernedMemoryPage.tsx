@@ -300,10 +300,8 @@ export function GovernedMemoryPage() {
 
   const [candidate, setCandidate] = useState({
     kind: "CASE_NOTE",
-    title_es: "",
-    title_en: "",
-    statement_es: "",
-    statement_en: "",
+    title: "",
+    statement: "",
     evidence_refs: "",
     valid_until: isoDaysFromNow(30),
     is_synthetic: false,
@@ -319,10 +317,10 @@ export function GovernedMemoryPage() {
       createMemoryCandidate({
         kind: candidate.kind,
         source_type: "HUMAN",
-        title_es: candidate.title_es,
-        title_en: candidate.title_en,
-        statement_es: candidate.statement_es,
-        statement_en: candidate.statement_en,
+        title_es: candidate.title,
+        title_en: candidate.title,
+        statement_es: candidate.statement,
+        statement_en: candidate.statement,
         conditions: {},
         evidence_refs: candidate.evidence_refs
           .split(",")
@@ -335,10 +333,8 @@ export function GovernedMemoryPage() {
     onSuccess: async () => {
       setCandidate((current) => ({
         ...current,
-        title_es: "",
-        title_en: "",
-        statement_es: "",
-        statement_en: "",
+        title: "",
+        statement: "",
         evidence_refs: "",
       }));
       await queryClient.invalidateQueries({ queryKey: ["memory-candidates"] });
@@ -674,45 +670,26 @@ export function GovernedMemoryPage() {
               </select>
             </label>
             <label style={{ display: "flex", flexDirection: "column", gap: "4px", marginBottom: "12px", width: "100%", boxSizing: "border-box" }}>
-              <span>{t("memory.titleEs")}</span>
+              <span>{t("memory.candidateTitle")}</span>
               <input
                 required
                 maxLength={200}
                 style={{ width: "100%", boxSizing: "border-box", padding: "8px 10px" }}
-                value={candidate.title_es}
-                onChange={(e) => setCandidate({ ...candidate, title_es: e.target.value })}
+                value={candidate.title}
+                placeholder="Título descriptivo de la lección aprendida..."
+                onChange={(e) => setCandidate({ ...candidate, title: e.target.value })}
               />
             </label>
             <label style={{ display: "flex", flexDirection: "column", gap: "4px", marginBottom: "12px", width: "100%", boxSizing: "border-box" }}>
-              <span>{t("memory.titleEn")}</span>
-              <input
-                required
-                maxLength={200}
-                style={{ width: "100%", boxSizing: "border-box", padding: "8px 10px" }}
-                value={candidate.title_en}
-                onChange={(e) => setCandidate({ ...candidate, title_en: e.target.value })}
-              />
-            </label>
-            <label style={{ display: "flex", flexDirection: "column", gap: "4px", marginBottom: "12px", width: "100%", boxSizing: "border-box" }}>
-              <span>{t("memory.statementEs")}</span>
+              <span>{t("memory.statement")}</span>
               <textarea
                 required
-                rows={2}
+                rows={3}
                 maxLength={2000}
                 style={{ width: "100%", boxSizing: "border-box", padding: "8px 10px" }}
-                value={candidate.statement_es}
-                onChange={(e) => setCandidate({ ...candidate, statement_es: e.target.value })}
-              />
-            </label>
-            <label style={{ display: "flex", flexDirection: "column", gap: "4px", marginBottom: "12px", width: "100%", boxSizing: "border-box" }}>
-              <span>{t("memory.statementEn")}</span>
-              <textarea
-                required
-                rows={2}
-                maxLength={2000}
-                style={{ width: "100%", boxSizing: "border-box", padding: "8px 10px" }}
-                value={candidate.statement_en}
-                onChange={(e) => setCandidate({ ...candidate, statement_en: e.target.value })}
+                value={candidate.statement}
+                placeholder="Descripción detallada del patrón u observación aprendida..."
+                onChange={(e) => setCandidate({ ...candidate, statement: e.target.value })}
               />
             </label>
             <label style={{ display: "flex", flexDirection: "column", gap: "4px", marginBottom: "12px", width: "100%", boxSizing: "border-box" }}>

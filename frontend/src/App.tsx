@@ -1000,6 +1000,16 @@ function IncidentDetailPage() {
       ]);
     },
   });
+  const rollbackResponse = useMutation({
+    mutationFn: (actionType: string) => executeRollbackProposal(id, actionType),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["response-decisions", id] }),
+        queryClient.invalidateQueries({ queryKey: ["playbook-executions", id] }),
+        queryClient.invalidateQueries({ queryKey: ["timeline", id] }),
+      ]);
+    },
+  });
   const approvalDecision = useMutation({
     mutationFn: ({
       requestId,
@@ -1404,6 +1414,15 @@ function IncidentDetailPage() {
                         ▶ {t("simulateResponse")}
                       </button>
                     )}
+                    <button
+                      type="button"
+                      className="ghost"
+                      style={{ width: "100%", marginTop: "8px", minHeight: "36px", color: "var(--accent)" }}
+                      disabled={rollbackResponse.isPending}
+                      onClick={() => rollbackResponse.mutate(decision.action_type)}
+                    >
+                      🔄 {t("rollbackAction", { defaultValue: "Deshacer / Rollback (Restaurar Acceso)" })}
+                    </button>
                   </div>
                 </article>
               ))}

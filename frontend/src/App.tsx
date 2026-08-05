@@ -900,30 +900,29 @@ function IncidentsPage() {
             const detectedDate = incident.detected_at ? new Date(incident.detected_at) : null;
             const isValidDate = detectedDate && !isNaN(detectedDate.getTime());
             return (
-              <NavLink to={`/incidents/${incident.id}`} key={incident.id}>
+              <NavLink
+                to={`/incidents/${incident.id}`}
+                key={incident.id}
+                style={{ display: "flex", alignItems: "center", gap: "14px" }}
+              >
                 <span className={`severity ${incident.severity}`}>
                   {t(`severityCodes.${incident.severity}`, { defaultValue: incident.severity })}
                 </span>
-                <div style={{ flex: 1 }}>
-                  <strong>
+                <div style={{ flex: 1, display: "flex", alignItems: "center", gap: "10px", minWidth: 0 }}>
+                  <strong style={{ whiteSpace: "nowrap" }}>
                     {incident.code} · {incident.title}
                   </strong>
-                  <small style={{ color: "var(--muted)", display: "block", marginTop: "2px" }}>
-                    {incident.classification}
-                  </small>
+                  <span style={{ color: "var(--muted)", fontSize: "0.85rem", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                    ({incident.classification})
+                  </span>
                 </div>
                 {isValidDate && (
-                  <div style={{ textAlign: "right", whiteSpace: "nowrap", marginRight: "12px", minWidth: "120px" }}>
-                    <small style={{ color: "var(--text-soft)", display: "block", fontSize: "0.8rem", fontWeight: 600 }}>
-                      📅 {detectedDate.toLocaleDateString(i18n.language, { day: "2-digit", month: "2-digit", year: "numeric" })}
-                    </small>
-                    <small style={{ color: "var(--muted)", display: "block", fontSize: "0.75rem", marginTop: "2px" }}>
-                      🕒 {detectedDate.toLocaleTimeString(i18n.language, { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
-                    </small>
-                  </div>
+                  <span style={{ fontSize: "0.875rem", color: "var(--text-soft)", whiteSpace: "nowrap", fontFamily: "var(--font-mono, monospace)" }}>
+                    {detectedDate.toLocaleString(i18n.language)}
+                  </span>
                 )}
-                <span>{t(`statusCodes.${incident.status}`, { defaultValue: incident.status })}</span>
-                {incident.is_simulated && <span className="demo-badge">{t("simulated")}</span>}
+                <span style={{ whiteSpace: "nowrap" }}>{t(`statusCodes.${incident.status}`, { defaultValue: incident.status })}</span>
+                {incident.is_simulated && <span className="demo-badge" style={{ whiteSpace: "nowrap" }}>{t("simulated")}</span>}
               </NavLink>
             );
           })}

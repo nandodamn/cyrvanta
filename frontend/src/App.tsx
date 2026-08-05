@@ -901,11 +901,21 @@ function IncidentsPage() {
               <span className={`severity ${incident.severity}`}>
                 {t(`severityCodes.${incident.severity}`, { defaultValue: incident.severity })}
               </span>
-              <div>
+              <div style={{ flex: 1 }}>
                 <strong>
                   {incident.code} · {incident.title}
                 </strong>
-                <small>{incident.classification}</small>
+                <small style={{ color: "var(--muted)", display: "block", marginTop: "2px" }}>
+                  {incident.classification}
+                </small>
+              </div>
+              <div style={{ textAlign: "right", whiteSpace: "nowrap", marginRight: "12px", minWidth: "120px" }}>
+                <small style={{ color: "var(--text-soft)", display: "block", fontSize: "0.8rem", fontWeight: 600 }}>
+                  📅 {new Date(incident.detected_at).toLocaleDateString(i18n.language, { day: "2-digit", month: "2-digit", year: "numeric" })}
+                </small>
+                <small style={{ color: "var(--muted)", display: "block", fontSize: "0.75rem", marginTop: "2px" }}>
+                  🕒 {new Date(incident.detected_at).toLocaleTimeString(i18n.language, { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+                </small>
               </div>
               <span>{t(`statusCodes.${incident.status}`, { defaultValue: incident.status })}</span>
               {incident.is_simulated && <span className="demo-badge">{t("simulated")}</span>}
@@ -1044,8 +1054,11 @@ function IncidentDetailPage() {
     <>
       <div className="page-title">
         <div>
-          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
             <p className="eyebrow" style={{ margin: 0 }}>{incident.data.code}</p>
+            <span style={{ fontSize: "0.8rem", color: "var(--muted)", fontWeight: 500 }}>
+              📅 {new Date(incident.data.detected_at).toLocaleString(i18n.language, { dateStyle: "medium", timeStyle: "medium" })}
+            </span>
             {incident.data.is_simulated && <span className="demo-badge">{t("simulated")}</span>}
           </div>
           <h1 style={{ margin: "4px 0 0" }}>{incident.data.title}</h1>

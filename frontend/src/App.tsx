@@ -866,7 +866,7 @@ function AlertsPage() {
 }
 
 function IncidentsPage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const controls = useListControls();
   const incidents = useQuery({
     queryKey: ["incidents", controls.query, controls.page, controls.pageSize],

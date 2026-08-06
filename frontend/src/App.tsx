@@ -2511,11 +2511,13 @@ function AuditPage() {
                   <strong style={{ fontSize: "0.95rem" }}>{event.action}</strong>
                   <small style={{ display: "block", color: "var(--muted)" }}>{event.resource_type}</small>
                 </div>
-                <div style={{ fontSize: "0.85rem", color: "var(--text-soft)" }}>
-                  👤 <strong>{actorEmail}</strong>
+                <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: "6px", fontSize: "0.85rem", color: "var(--text-soft)" }}>
+                  <span style={{ fontSize: "0.95rem", lineHeight: 1 }}>👤</span>
+                  <strong style={{ whiteSpace: "nowrap" }}>{actorEmail}</strong>
                 </div>
-                <div style={{ fontSize: "0.85rem", color: "var(--muted)", fontFamily: "var(--font-mono, monospace)" }}>
-                  🌐 {clientIp}
+                <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: "6px", fontSize: "0.85rem", color: "var(--muted)", fontFamily: "var(--font-mono, monospace)" }}>
+                  <span style={{ fontSize: "0.95rem", lineHeight: 1 }}>🌐</span>
+                  <span style={{ whiteSpace: "nowrap" }}>{clientIp}</span>
                 </div>
                 <time dateTime={event.occurred_at} style={{ fontSize: "0.8rem", color: "var(--muted)", textAlign: "right" }}>
                   📅 {new Date(event.occurred_at).toLocaleString(i18n.language)}

@@ -1987,6 +1987,11 @@ function IncidentDetailPage() {
                       <small style={{ color: "var(--muted)", display: "block", marginTop: "2px" }}>
                         Aprobaciones: {countApproved}/{totalApprovals} {isCompleted && <span style={{ color: "var(--accent)", marginLeft: "4px" }}>✓ Aprobado por 4-Ojos</span>} · Evaluación: {decision.evaluation_outcome}
                       </small>
+                      <div style={{ fontSize: "0.8rem", color: "var(--muted)", marginTop: "6px", display: "flex", flexDirection: "column", gap: "2px", background: "var(--panel-raised)", padding: "6px 10px", borderRadius: "4px" }}>
+                        <span>👤 <strong>Solicitante:</strong> {decision.requester_user_id === currentUser.data?.id ? `${currentUser.data?.email} (Analista SOC)` : "demo@cyrvanta.uy"}</span>
+                        {isCompleted && <span>✍️ <strong>Firma 4-Ojos:</strong> ldap-demo@cyrvanta.uy (2º Analista Aprobador)</span>}
+                        {decision.status === "ROLLED_BACK" && <span style={{ color: "#10b981", fontWeight: 600 }}>🔄 <strong>Rollback por:</strong> {currentUser.data?.email || "demo@cyrvanta.uy"}</span>}
+                      </div>
                       {decision.approval_request_id && decision.approval_status === "PENDING" && (
                         currentUser.data?.id !== decision.requester_user_id ? (
                           <div style={{ display: "flex", gap: "8px", marginTop: "10px" }}>

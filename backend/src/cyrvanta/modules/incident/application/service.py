@@ -392,12 +392,14 @@ class IncidentService:
                 text("UPDATE approval_requests SET status = 'APPROVED' WHERE proposal_id IN (SELECT id FROM action_proposals WHERE incident_id = :inc_id)"),
                 {"inc_id": incident_id},
             )
+            actor = await session.get(UserModel, actor_id)
+            actor_email = actor.email if actor else "demo@cyrvanta.uy"
             self._timeline(
                 session,
                 incident,
                 actor_id,
                 "action",
-                "🔄 Rollback de Playbook ejecutado por analista. Acceso y sesiones del usuario restauradas a estado activo.",
+                f"🔄 Rollback de Playbook ejecutado por analista ({actor_email}). Acceso y sesiones del usuario restauradas a estado activo.",
                 now,
             )
             self._audit(

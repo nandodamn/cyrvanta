@@ -1385,7 +1385,13 @@ function IncidentDetailPage() {
                       </strong>
                     </div>
                     <p style={{ margin: "6px 0", fontSize: "0.9rem" }}>
-                      <strong>{t("approvalProgress")}:</strong> {decision.decisions.length}/{decision.required_approvals}
+                      <strong>{t("approvalProgress")}:</strong>{" "}
+                      {Math.max(
+                        decision.decisions.filter((d) => d.decision === "APPROVE").length,
+                        ["AUTHORIZED", "ROLLED_BACK", "EXECUTED"].includes(decision.status) || decision.approval_status === "APPROVED"
+                          ? decision.required_approvals
+                          : 0
+                      )}/{decision.required_approvals}
                     </p>
                     <small style={{ color: "var(--muted)", display: "block", marginTop: "6px" }}>
                       {t("policyOutcome")}: {decision.evaluation_outcome} · {decision.reason_codes.join(" · ")}
@@ -1930,30 +1936,77 @@ function IncidentDetailPage() {
                   gap: "12px",
                 }}
               >
-                {responseDecisions.data?.map((decision) => (
-                  <article className="claim-card" key={decision.id} style={{ borderLeft: "3px solid var(--accent)" }}>
-                    <div className="claim-badges" style={{ marginBottom: "8px" }}>
-                      <span className="severity">{decision.status}</span>
-                      <span>{decision.impact}</span>
-                      {decision.is_simulated && <span>{t("simulated")}</span>}
-                    </div>
-                    <strong style={{ fontSize: "1.05rem", display: "block", marginBottom: "4px" }}>
-                      {decision.action_type}
-                    </strong>
-                    <div style={{ background: "var(--panel-raised)", padding: "6px 10px", borderRadius: "4px", margin: "6px 0", fontSize: "0.825rem" }}>
-                      🎯 <span style={{ color: "var(--muted)" }}>Target:</span>{" "}
-                      <strong style={{ fontFamily: "var(--font-mono, monospace)" }}>
-                        {decision.targets && decision.targets.length > 0 ? decision.targets.join(", ") : "synthetic-demo-user"}
+                {responseDecisions.data?.map((decision) => {
+                  const countApproved = Math.max(
+                    decision.decisions.filter((d) => d.decision === "APPROVE").length,
+                    ["AUTHORIZED", "ROLLED_BACK", "EXECUTED"].includes(decision.status) || decision.approval_status === "APPROVED"
+                      ? decision.required_approvals
+                      : 0
+                  );
+                  return (
+                    <article className="claim-card" key={decision.id} style={{ borderLeft: "3px solid var(--accent)" }}>
+                      <div className="claim-badges" style={{ marginBottom: "8px" }}>
+                        <span className="severity">{decision.status}</span>
+                        <span>{decision.impact}</span>
+                        {decision.is_simulated && <span>{t("simulated")}</span>}
+                      </div>
+                      <strong style={{ fontSize: "1.05rem", display: "block", marginBottom: "4px" }}>
+                        {decision.action_type}
                       </strong>
-                    </div>
-                    <small style={{ color: "var(--text-soft)", display: "block", marginTop: "4px" }}>
-                      📅 {new Date(decision.created_at).toLocaleString(i18n.language)}
-                    </small>
-                    <small style={{ color: "var(--muted)", display: "block", marginTop: "2px" }}>
-                      Aprobaciones: {decision.decisions.length}/{decision.required_approvals} · Evaluación: {decision.evaluation_outcome}
-                    </small>
-                  </article>
-                ))}
+                      <div style={{ background: "var(--panel-raised)", padding: "6px 10px", borderRadius: "4px", margin: "6px 0", fontSize: "0.825rem" }}>
+                        🎯 <span style={{ color: "var(--muted)" }}>Target:</span>{" "}
+                        <strong style={{ fontFamily: "var(--font-mono, monospace)" }}>
+                          {decision.targets && decision.targets.length > 0 ? decision.targets.join(", ") : "synthetic-demo-user"}
+                        </strong>
+                      </div>
+                      <small style={{ color: "var(--text-soft)", display: "block", marginTop: "4px" }}>
+                        📅 {new Date(decision.created_at).toLocaleString(i18n.language)}
+                      </small>
+                      <small style={{ color: "var(--muted)", display: "block", marginTop: "2px" }}>
+                        Aprobaciones: {countApproved}/{decision.required_approvals} · Evaluación: {decision.evaluation_outcome}
+                      </small>
+                      {decision.approval_request_id && decision.approval_status === "PENDING" && (
+                        currentUser.data?.id !== decision.requester_user_id ? (
+                          <div style={{ display: "flex", gap: "8px", marginTop: "10px" }}>
+                            <button
+                              type="button"
+                              style={{ flex: 1, padding: "4px 8px", fontSize: "0.8rem" }}
+                              disabled={approvalDecision.isPending}
+                              onClick={() =>
+                                approvalDecision.mutate({
+                                  requestId: decision.approval_request_id!,
+                                  decision: "APPROVE",
+                                  fingerprint: decision.fingerprint,
+                                })
+                              }
+                            >
+                              ✓ {t("approveResponse")}
+                            </button>
+                            <button
+                              type="button"
+                              className="ghost"
+                              style={{ flex: 1, padding: "4px 8px", fontSize: "0.8rem" }}
+                              disabled={approvalDecision.isPending}
+                              onClick={() =>
+                                approvalDecision.mutate({
+                                  requestId: decision.approval_request_id!,
+                                  decision: "REJECT",
+                                  fingerprint: decision.fingerprint,
+                                })
+                              }
+                            >
+                              ✕ {t("rejectResponse")}
+                            </button>
+                          </div>
+                        ) : (
+                          <p style={{ margin: "8px 0 0", fontSize: "0.8rem", color: "var(--text-soft)", background: "var(--panel-raised)", padding: "6px 10px", borderRadius: "4px" }}>
+                            🔒 {t("awaitingSecondAnalystNotice", { defaultValue: "Esperando aprobación de un 2º analista (Principio 4-Ojos)" })}
+                          </p>
+                        )
+                      )}
+                    </article>
+                  );
+                })}
                 <PageState
                   loading={responseDecisions.isLoading}
                   error={responseDecisions.isError}

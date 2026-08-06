@@ -1314,23 +1314,26 @@ function IncidentDetailPage() {
             </div>
 
             {/* Sub-header Notice Banner for 4-Eye Principle */}
-            <div
-              style={{
-                background: "var(--panel-raised)",
-                border: "1px solid var(--line)",
-                borderRadius: "6px",
-                padding: "8px 14px",
-                fontSize: "0.85rem",
-                color: "var(--text-soft)",
-                marginBottom: "1.25rem",
-                display: "flex",
-                alignItems: "center",
-                gap: "8px",
-              }}
-            >
-              <span>ℹ️</span>
-              <span>{t("dualControlNotice")}</span>
-            </div>
+            {responseDecisions.data?.some(
+              (d) => d.status === "AWAITING_APPROVAL" && d.approval_status === "PENDING"
+            ) && (
+              <div
+                style={{
+                  border: "1px solid var(--line)",
+                  borderRadius: "6px",
+                  padding: "8px 14px",
+                  fontSize: "0.85rem",
+                  color: "var(--text-soft)",
+                  marginBottom: "1.25rem",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                }}
+              >
+                <span>ℹ️</span>
+                <span>{t("dualControlNotice")}</span>
+              </div>
+            )}
 
             {responseProposal.data && (
               <div
@@ -1354,53 +1357,53 @@ function IncidentDetailPage() {
                 width: "100%",
               }}
             >
-              {responseDecisions.data?.map((decision) => (
-                <article
-                  className="claim-card"
-                  key={decision.id}
-                  style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    justify: "space-between",
-                    padding: "1.25rem",
-                    border: "1px solid var(--panel-border)",
-                    borderRadius: "8px",
-                  }}
-                >
-                  <div>
-                    <div className="claim-badges" style={{ marginBottom: "10px" }}>
-                      <span className="severity">{decision.status}</span>
-                      <span>{decision.impact}</span>
-                      {decision.is_simulated && <span>{t("simulated")}</span>}
-                    </div>
-                    <strong style={{ fontSize: "1.15rem", display: "block", marginBottom: "6px" }}>
-                      {decision.action_type}
-                    </strong>
-                    <div style={{ background: "var(--panel-raised)", padding: "8px 12px", borderRadius: "6px", margin: "6px 0 10px", borderLeft: "3px solid var(--accent)" }}>
-                      <span style={{ fontSize: "0.75rem", color: "var(--muted)", display: "block", marginBottom: "2px" }}>
-                        🎯 {t("targetBlockedEntity", { defaultValue: "Usuario / Entidad objetivo del bloqueo:" })}
-                      </span>
-                      <strong style={{ fontSize: "0.9rem", color: "var(--text-bright)", fontFamily: "var(--font-mono, monospace)" }}>
-                        {decision.targets && decision.targets.length > 0 ? decision.targets.join(", ") : "synthetic-demo-user"}
+              {responseDecisions.data?.map((decision) => {
+                const isCompleted = ["AUTHORIZED", "ROLLED_BACK", "EXECUTED"].includes(decision.status) || decision.approval_status === "APPROVED";
+                const countApproved = isCompleted ? 2 : Math.max(decision.decisions.filter((d) => d.decision === "APPROVE").length, 0);
+                const totalApprovals = 2;
+                return (
+                  <article
+                    className="claim-card"
+                    key={decision.id}
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      justify: "space-between",
+                      padding: "1.25rem",
+                      border: "1px solid var(--panel-border)",
+                      borderRadius: "8px",
+                    }}
+                  >
+                    <div>
+                      <div className="claim-badges" style={{ marginBottom: "10px" }}>
+                        <span className="severity">{decision.status}</span>
+                        <span>{decision.impact}</span>
+                        {decision.is_simulated && <span>{t("simulated")}</span>}
+                      </div>
+                      <strong style={{ fontSize: "1.15rem", display: "block", marginBottom: "6px" }}>
+                        {decision.action_type}
                       </strong>
+                      <div style={{ background: "var(--panel-raised)", padding: "8px 12px", borderRadius: "6px", margin: "6px 0 10px", borderLeft: "3px solid var(--accent)" }}>
+                        <span style={{ fontSize: "0.75rem", color: "var(--muted)", display: "block", marginBottom: "2px" }}>
+                          🎯 {t("targetBlockedEntity", { defaultValue: "Usuario / Entidad objetivo del bloqueo:" })}
+                        </span>
+                        <strong style={{ fontSize: "0.9rem", color: "var(--text-bright)", fontFamily: "var(--font-mono, monospace)" }}>
+                          {decision.targets && decision.targets.length > 0 ? decision.targets.join(", ") : "synthetic-demo-user"}
+                        </strong>
+                      </div>
+                      <p style={{ margin: "6px 0", fontSize: "0.9rem" }}>
+                        <strong>{t("approvalProgress")}:</strong> {countApproved}/{totalApprovals}
+                        {isCompleted && <span style={{ color: "var(--accent)", marginLeft: "6px", fontWeight: 600 }}>✓ Aprobado por 4-Ojos</span>}
+                      </p>
+                      <small style={{ color: "var(--muted)", display: "block", marginTop: "6px" }}>
+                        {t("policyOutcome")}: {decision.evaluation_outcome} · {decision.reason_codes.join(" · ")}
+                      </small>
                     </div>
-                    <p style={{ margin: "6px 0", fontSize: "0.9rem" }}>
-                      <strong>{t("approvalProgress")}:</strong>{" "}
-                      {Math.max(
-                        decision.decisions.filter((d) => d.decision === "APPROVE").length,
-                        ["AUTHORIZED", "ROLLED_BACK", "EXECUTED"].includes(decision.status) || decision.approval_status === "APPROVED"
-                          ? decision.required_approvals
-                          : 0
-                      )}/{decision.required_approvals}
-                    </p>
-                    <small style={{ color: "var(--muted)", display: "block", marginTop: "6px" }}>
-                      {t("policyOutcome")}: {decision.evaluation_outcome} · {decision.reason_codes.join(" · ")}
-                    </small>
-                  </div>
-                  <div style={{ marginTop: "16px" }}>
-                    {decision.approval_request_id &&
-                      decision.approval_status === "PENDING" && (
-                        currentUser.data?.id !== decision.requester_user_id ? (
+                    <div style={{ marginTop: "16px" }}>
+                      {decision.approval_request_id &&
+                        decision.approval_status === "PENDING" &&
+                        decision.status === "AWAITING_APPROVAL" &&
+                        (currentUser.data?.id !== decision.requester_user_id ? (
                           <div style={{ display: "flex", gap: "10px" }}>
                             <button
                               type="button"
@@ -1436,35 +1439,35 @@ function IncidentDetailPage() {
                           <p style={{ margin: 0, fontSize: "0.85rem", color: "var(--text-soft)", background: "var(--panel-raised)", padding: "8px 12px", borderRadius: "6px" }}>
                             🔒 {t("awaitingSecondAnalystNotice", { defaultValue: "Esperando aprobación de un 2º analista (Principio 4-Ojos)" })}
                           </p>
-                        )
+                        ))}
+                      {decision.authorization?.status === "ACTIVE" && (
+                        <button
+                          type="button"
+                          style={{ width: "100%", minHeight: "40px" }}
+                          disabled={executeResponse.isPending}
+                          onClick={() => executeResponse.mutate(decision.authorization!.id)}
+                        >
+                          ▶ {t("simulateResponse")}
+                        </button>
                       )}
-                    {decision.authorization?.status === "ACTIVE" && (
                       <button
                         type="button"
-                        style={{ width: "100%", minHeight: "40px" }}
-                        disabled={executeResponse.isPending}
-                        onClick={() => executeResponse.mutate(decision.authorization!.id)}
+                        className="ghost"
+                        style={{ width: "100%", marginTop: "8px", minHeight: "36px", color: "var(--accent)" }}
+                        disabled={rollbackResponse.isPending}
+                        onClick={() => rollbackResponse.mutate()}
                       >
-                        ▶ {t("simulateResponse")}
+                        {rollbackResponse.isPending ? t("loading") : `🔄 ${t("rollbackAction", { defaultValue: "Deshacer / Rollback (Restaurar Acceso)" })}`}
                       </button>
-                    )}
-                    <button
-                      type="button"
-                      className="ghost"
-                      style={{ width: "100%", marginTop: "8px", minHeight: "36px", color: "var(--accent)" }}
-                      disabled={rollbackResponse.isPending}
-                      onClick={() => rollbackResponse.mutate()}
-                    >
-                      {rollbackResponse.isPending ? t("loading") : `🔄 ${t("rollbackAction", { defaultValue: "Deshacer / Rollback (Restaurar Acceso)" })}`}
-                    </button>
-                    {rollbackResponse.isSuccess && (
-                      <p style={{ margin: "6px 0 0", fontSize: "0.8rem", color: "#10b981", textAlign: "center" }}>
-                        ✓ {t("rollbackExecuted", { defaultValue: "Acceso del usuario restaurado a estado activo." })}
-                      </p>
-                    )}
-                  </div>
-                </article>
-              ))}
+                      {rollbackResponse.isSuccess && (
+                        <p style={{ margin: "6px 0 0", fontSize: "0.8rem", color: "#10b981", textAlign: "center" }}>
+                          ✓ {t("rollbackExecuted", { defaultValue: "Acceso del usuario restaurado a estado activo." })}
+                        </p>
+                      )}
+                    </div>
+                  </article>
+                );
+              })}
               <PageState
                 loading={responseDecisions.isLoading}
                 error={responseDecisions.isError}
@@ -1937,12 +1940,9 @@ function IncidentDetailPage() {
                 }}
               >
                 {responseDecisions.data?.map((decision) => {
-                  const countApproved = Math.max(
-                    decision.decisions.filter((d) => d.decision === "APPROVE").length,
-                    ["AUTHORIZED", "ROLLED_BACK", "EXECUTED"].includes(decision.status) || decision.approval_status === "APPROVED"
-                      ? decision.required_approvals
-                      : 0
-                  );
+                  const isCompleted = ["AUTHORIZED", "ROLLED_BACK", "EXECUTED"].includes(decision.status) || decision.approval_status === "APPROVED";
+                  const countApproved = isCompleted ? 2 : Math.max(decision.decisions.filter((d) => d.decision === "APPROVE").length, 0);
+                  const totalApprovals = 2;
                   return (
                     <article className="claim-card" key={decision.id} style={{ borderLeft: "3px solid var(--accent)" }}>
                       <div className="claim-badges" style={{ marginBottom: "8px" }}>
@@ -1963,7 +1963,7 @@ function IncidentDetailPage() {
                         📅 {new Date(decision.created_at).toLocaleString(i18n.language)}
                       </small>
                       <small style={{ color: "var(--muted)", display: "block", marginTop: "2px" }}>
-                        Aprobaciones: {countApproved}/{decision.required_approvals} · Evaluación: {decision.evaluation_outcome}
+                        Aprobaciones: {countApproved}/{totalApprovals} {isCompleted && <span style={{ color: "var(--accent)", marginLeft: "4px" }}>✓ Aprobado por 4-Ojos</span>} · Evaluación: {decision.evaluation_outcome}
                       </small>
                       {decision.approval_request_id && decision.approval_status === "PENDING" && (
                         currentUser.data?.id !== decision.requester_user_id ? (

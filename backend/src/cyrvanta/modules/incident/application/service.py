@@ -384,6 +384,14 @@ class IncidentService:
             await session.execute(
                 text("UPDATE users SET is_active = true WHERE email IN ('synthetic-demo-user@cyrvanta.uy', 'demo@cyrvanta.uy')")
             )
+            await session.execute(
+                text("UPDATE action_proposals SET status = 'AUTHORIZED' WHERE incident_id = :inc_id"),
+                {"inc_id": incident_id},
+            )
+            await session.execute(
+                text("UPDATE approval_requests SET status = 'APPROVED' WHERE proposal_id IN (SELECT id FROM action_proposals WHERE incident_id = :inc_id)"),
+                {"inc_id": incident_id},
+            )
             self._timeline(
                 session,
                 incident,

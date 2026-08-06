@@ -1299,12 +1299,12 @@ function IncidentDetailPage() {
               </div>
 
               {(() => {
-                const hasPending = responseDecisions.data?.some((d) => d.approval_status === "PENDING");
+                const hasExistingProposal = (responseDecisions.data?.length ?? 0) > 0;
                 return (
                   <button
                     type="button"
-                    disabled={responseProposal.isPending || hasPending}
-                    title={hasPending ? t("proposalPendingNotice", { defaultValue: "Ya existe una propuesta pendiente de aprobación" }) : undefined}
+                    disabled={responseProposal.isPending || hasExistingProposal}
+                    title={hasExistingProposal ? t("proposalAlreadyExecuted", { defaultValue: "Un Playbook ya ha sido propuesto o procesado para este incidente." }) : undefined}
                     onClick={() => responseProposal.mutate()}
                   >
                     ⚡ {t("proposeSafeResponse")}

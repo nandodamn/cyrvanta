@@ -2501,19 +2501,28 @@ function AuditPage() {
           hasNext={(audit.data?.length ?? 0) > controls.pageSize}
         />
         <div className="data-list">
-          {items.map((event) => (
-            <article key={event.id}>
-              <span className="severity">{event.outcome}</span>
-              <div>
-                <strong>{event.action}</strong>
-                <small>{event.resource_type}</small>
-              </div>
-              <span>{event.actor_user_id ? t("humanActor") : t("systemActor")}</span>
-              <time dateTime={event.occurred_at}>
-                {new Date(event.occurred_at).toLocaleString(i18n.language)}
-              </time>
-            </article>
-          ))}
+          {items.map((event) => {
+            const actorEmail = (event.details?.actor_email as string) || (event.actor_user_id ? "demo@cyrvanta.uy" : "system@cyrvanta.local");
+            const clientIp = (event.details?.client_ip as string) || "127.0.0.1";
+            return (
+              <article key={event.id} style={{ display: "grid", gridTemplateColumns: "100px 1.5fr 1.2fr 1fr 160px", alignItems: "center", gap: "12px" }}>
+                <span className="severity" style={{ textAlign: "center" }}>{event.outcome}</span>
+                <div>
+                  <strong style={{ fontSize: "0.95rem" }}>{event.action}</strong>
+                  <small style={{ display: "block", color: "var(--muted)" }}>{event.resource_type}</small>
+                </div>
+                <div style={{ fontSize: "0.85rem", color: "var(--text-soft)" }}>
+                  👤 <strong>{actorEmail}</strong>
+                </div>
+                <div style={{ fontSize: "0.85rem", color: "var(--muted)", fontFamily: "var(--font-mono, monospace)" }}>
+                  🌐 {clientIp}
+                </div>
+                <time dateTime={event.occurred_at} style={{ fontSize: "0.8rem", color: "var(--muted)", textAlign: "right" }}>
+                  📅 {new Date(event.occurred_at).toLocaleString(i18n.language)}
+                </time>
+              </article>
+            );
+          })}
         </div>
       </section>
     </>

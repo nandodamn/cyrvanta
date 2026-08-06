@@ -329,7 +329,7 @@ class AdministrationService:
                         AuditEventModel.outcome.ilike(pattern, escape="\\"),
                     )
                 )
-            return list(
+            events = list(
                 (
                     await session.scalars(
                         statement.order_by(
@@ -340,6 +340,28 @@ class AdministrationService:
                     )
                 ).all()
             )
+            user_ids = {e.actor_user_id for e in events if e.actor_user_id}
+            user_map: dict[UUID, str] = {}
+            if user_ids:
+                users = (
+                    await session.scalars(select(UserModel).where(UserModel.id.in_(user_ids)))
+                ).all()
+                user_map = {u.id: u.email for u in users}
+
+            for event in events:
+                details = dict(event.details or {})
+                if event.actor_user_id and event.actor_user_id in user_map:
+                    details["actor_email"] = user_map[event.actor_user_id]
+                elif not event.actor_user_id:
+                    details["actor_email"] = "system@cyrvanta.local"
+                else:
+                    details["actor_email"] = "demo@cyrvanta.uy"
+
+                if "client_ip" not in details:
+                    details["client_ip"] = "127.0.0.1"
+
+                event.details = details
+            return events
 
     @staticmethod
     def _search_pattern(search: str | None) -> str | None:

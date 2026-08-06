@@ -2037,36 +2037,42 @@ function IncidentDetailPage() {
               </div>
             </div>
 
-            {(playbookExecutions.data?.length ?? 0) > 0 && (
-              <div style={{ marginTop: "1.5rem" }}>
-                <h3 style={{ fontSize: "1rem", marginBottom: "0.75rem" }}>
-                  ▶️ Instancias de Ejecución de Playbooks
-                </h3>
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))",
-                    gap: "12px",
-                  }}
-                >
-                  {playbookExecutions.data?.map((execution) => (
-                    <article className="claim-card" key={execution.id}>
-                      <div className="claim-badges">
-                        <span>{execution.status}</span>
-                        <span>{execution.execution_mode}</span>
-                      </div>
-                      <strong style={{ display: "block", margin: "6px 0", fontFamily: "var(--font-mono, monospace)", fontSize: "0.85rem" }}>
-                        {execution.id}
-                      </strong>
-                      <small style={{ color: "var(--muted)" }}>
-                        📅 {new Date(execution.created_at).toLocaleString(i18n.language)}
-                      </small>
-                      {execution.error_code && <p style={{ color: "var(--status-error)", margin: "4px 0 0" }}>{execution.error_code}</p>}
-                    </article>
-                  ))}
-                </div>
+            <div style={{ marginTop: "1.5rem" }}>
+              <h3 style={{ fontSize: "1rem", marginBottom: "0.75rem" }}>
+                📋 Registro Cronológico e Inmutable de la Bitácora (Audit Log)
+              </h3>
+              <div className="timeline" style={{ marginTop: "0.5rem" }}>
+                {timeline.data?.map((entry) => (
+                  <div
+                    key={entry.id}
+                    style={{
+                      background: "var(--panel-raised)",
+                      border: "1px solid var(--line)",
+                      borderRadius: "6px",
+                      padding: "10px 14px",
+                      marginBottom: "8px",
+                    }}
+                  >
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
+                      <span className="severity" style={{ fontSize: "0.75rem", textTransform: "uppercase" }}>
+                        {entry.entry_type}
+                      </span>
+                      <time dateTime={entry.created_at} style={{ fontSize: "0.8rem", color: "var(--muted)" }}>
+                        📅 {new Date(entry.created_at).toLocaleString(i18n.language)}
+                      </time>
+                    </div>
+                    <p style={{ margin: "4px 0 0", fontSize: "0.875rem", color: "var(--text)" }}>
+                      {entry.summary}
+                    </p>
+                  </div>
+                ))}
+                <PageState
+                  loading={timeline.isLoading}
+                  error={timeline.isError}
+                  empty={!timeline.isLoading && !timeline.isError && timeline.data?.length === 0}
+                />
               </div>
-            )}
+            </div>
           </section>
         </div>
       )}

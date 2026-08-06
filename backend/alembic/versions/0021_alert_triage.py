@@ -12,18 +12,9 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.add_column(
-        "alert_references",
-        sa.Column("triage_status", sa.String(length=32), nullable=False, server_default="UNREVIEWED"),
-    )
-    op.add_column(
-        "alert_references",
-        sa.Column("reviewed_by_user_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("users.id"), nullable=True),
-    )
-    op.add_column(
-        "alert_references",
-        sa.Column("reviewed_at", sa.DateTime(timezone=True), nullable=True),
-    )
+    op.execute("ALTER TABLE alert_references ADD COLUMN IF NOT EXISTS triage_status VARCHAR(32) DEFAULT 'UNREVIEWED' NOT NULL")
+    op.execute("ALTER TABLE alert_references ADD COLUMN IF NOT EXISTS reviewed_by_user_id UUID REFERENCES users(id)")
+    op.execute("ALTER TABLE alert_references ADD COLUMN IF NOT EXISTS reviewed_at TIMESTAMP WITH TIME ZONE")
 
 
 def downgrade() -> None:

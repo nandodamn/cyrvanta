@@ -1373,9 +1373,17 @@ function IncidentDetailPage() {
                       <span>{decision.impact}</span>
                       {decision.is_simulated && <span>{t("simulated")}</span>}
                     </div>
-                    <strong style={{ fontSize: "1.15rem", display: "block", marginBottom: "8px" }}>
+                    <strong style={{ fontSize: "1.15rem", display: "block", marginBottom: "6px" }}>
                       {decision.action_type}
                     </strong>
+                    <div style={{ background: "var(--panel-raised)", padding: "8px 12px", borderRadius: "6px", margin: "6px 0 10px", borderLeft: "3px solid var(--accent)" }}>
+                      <span style={{ fontSize: "0.75rem", color: "var(--muted)", display: "block", marginBottom: "2px" }}>
+                        🎯 {t("targetBlockedEntity", { defaultValue: "Usuario / Entidad objetivo del bloqueo:" })}
+                      </span>
+                      <strong style={{ fontSize: "0.9rem", color: "var(--text-bright)", fontFamily: "var(--font-mono, monospace)" }}>
+                        {decision.targets && decision.targets.length > 0 ? decision.targets.join(", ") : "synthetic-demo-user"}
+                      </strong>
+                    </div>
                     <p style={{ margin: "6px 0", fontSize: "0.9rem" }}>
                       <strong>{t("approvalProgress")}:</strong> {decision.decisions.length}/{decision.required_approvals}
                     </p>

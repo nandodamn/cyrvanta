@@ -384,10 +384,6 @@ class IncidentService:
             await session.execute(
                 text("UPDATE users SET is_active = true WHERE email IN ('synthetic-demo-user@cyrvanta.uy', 'demo@cyrvanta.uy')")
             )
-            await session.execute(
-                text("UPDATE action_proposals SET status = 'ROLLED_BACK' WHERE incident_id = :inc_id"),
-                {"inc_id": incident_id},
-            )
             self._timeline(
                 session,
                 incident,

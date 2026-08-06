@@ -1016,7 +1016,7 @@ function IncidentDetailPage() {
     },
   });
   const rollbackResponse = useMutation({
-    mutationFn: (actionType: string) => executeRollbackProposal(id, actionType),
+    mutationFn: () => executeRollbackProposal(id),
     onSuccess: async () => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["response-decisions", id] }),
@@ -1439,10 +1439,15 @@ function IncidentDetailPage() {
                       className="ghost"
                       style={{ width: "100%", marginTop: "8px", minHeight: "36px", color: "var(--accent)" }}
                       disabled={rollbackResponse.isPending}
-                      onClick={() => rollbackResponse.mutate(decision.action_type)}
+                      onClick={() => rollbackResponse.mutate()}
                     >
-                      🔄 {t("rollbackAction", { defaultValue: "Deshacer / Rollback (Restaurar Acceso)" })}
+                      {rollbackResponse.isPending ? t("loading") : `🔄 ${t("rollbackAction", { defaultValue: "Deshacer / Rollback (Restaurar Acceso)" })}`}
                     </button>
+                    {rollbackResponse.isSuccess && (
+                      <p style={{ margin: "6px 0 0", fontSize: "0.8rem", color: "#10b981", textAlign: "center" }}>
+                        ✓ {t("rollbackExecuted", { defaultValue: "Acceso del usuario restaurado a estado activo." })}
+                      </p>
+                    )}
                   </div>
                 </article>
               ))}

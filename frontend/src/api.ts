@@ -870,31 +870,15 @@ export async function getPlaybookExecutions(incidentId: string): Promise<Playboo
 
 export async function executeRollbackProposal(
   incidentId: string,
-  actionType: string = "unblock-user",
-): Promise<ResponseDecision> {
-  const rollbackAction = actionType.includes("endpoint") ? "rollback-compromised-endpoint" : "rollback-compromised-account";
-  return responseDecisionSchema.parse(
-    await checked(
-      await authenticatedFetch("/api/v1/response-proposals", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Idempotency-Key": `rollback-${incidentId}-${Date.now()}`,
-        },
-        body: JSON.stringify({
-          incident_id: incidentId,
-          action_type: rollbackAction,
-          impact: "LOW",
-          requested_mode: "AUTOMATIC",
-          workflow_id: rollbackAction,
-          workflow_version: "1.0.0",
-          targets: ["synthetic-demo-user", "demo@cyrvanta.uy"],
-          parameters: { execution_mode: "live", is_rollback: true },
-          evidence_refs: [],
-        }),
-      }),
-    ),
-  );
+): Promise<{ status: string; message: string }> {
+  return checked(
+    await authenticatedFetch(`/api/v1/incidents/${incidentId}/rollback`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    }),
+  ) as { status: string; message: string };
 }
 
 export async function executeAuthorizedResponse(

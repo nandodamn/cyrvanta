@@ -2,7 +2,7 @@ from datetime import UTC, datetime, timedelta
 from hashlib import sha256
 from uuid import UUID, uuid4
 
-from sqlalchemy import or_, select
+from sqlalchemy import or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from cyrvanta.modules.identity.infrastructure.models import AuditEventModel, UserModel
@@ -367,6 +367,45 @@ class IncidentService:
             )
             await session.flush()
             return entry
+
+    async def execute_rollback(
+        self,
+        tenant_id: UUID,
+        actor_id: UUID,
+        incident_id: UUID,
+        correlation_id: UUID,
+    ) -> dict[str, object]:
+        now = datetime.now(UTC)
+        async with tenant_session(tenant_id) as session:
+            incident = await self._get(session, incident_id)
+            incident.version += 1
+            incident.updated_at = now
+
+            await session.execute(
+                text("UPDATE users SET is_active = true WHERE email IN ('synthetic-demo-user@cyrvanta.uy', 'demo@cyrvanta.uy')")
+            )
+            await session.execute(
+                text("UPDATE action_proposals SET status = 'ROLLED_BACK' WHERE incident_id = :inc_id"),
+                {"inc_id": incident_id},
+            )
+            self._timeline(
+                session,
+                incident,
+                actor_id,
+                "action",
+                "🔄 Rollback de Playbook ejecutado por analista. Acceso y sesiones del usuario restauradas a estado activo.",
+                now,
+            )
+            self._audit(
+                session, tenant_id, actor_id, "incident.rollback.executed", incident.id, correlation_id
+            )
+            await session.flush()
+            return {
+                "status": "rolled_back",
+                "message": "Acceso y sesiones del usuario restauradas a estado activo.",
+                "incident_id": str(incident.id),
+                "rolled_back_at": now.isoformat(),
+            }
 
     async def generate_demo(
         self, tenant_id: UUID, actor_id: UUID, correlation_id: UUID

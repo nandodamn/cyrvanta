@@ -1911,44 +1911,89 @@ function IncidentDetailPage() {
       )}
 
       {activeTab === "audit" && (
-        <section className="panel">
-          <div>
-            <p className="eyebrow">{t("traceability")}</p>
-            <h2>{t("executionHistory")}</h2>
-            <p>{t("decisionsIntro")}</p>
-          </div>
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))",
-              gap: "12px",
-              marginTop: "1rem",
-            }}
-          >
-            {playbookExecutions.data?.map((execution) => (
-              <article className="claim-card" key={execution.id}>
-                <div className="claim-badges">
-                  <span>{execution.status}</span>
-                  <span>{execution.execution_mode}</span>
+        <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+          <section className="panel">
+            <div>
+              <p className="eyebrow">{t("traceability")}</p>
+              <h2>{t("executionHistory")}</h2>
+              <p>{t("decisionsIntro")}</p>
+            </div>
+
+            <div style={{ marginTop: "1rem" }}>
+              <h3 style={{ fontSize: "1rem", marginBottom: "0.75rem" }}>
+                ⚙️ Propuestas & Decisiones de Gobernanza de Playbooks
+              </h3>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))",
+                  gap: "12px",
+                }}
+              >
+                {responseDecisions.data?.map((decision) => (
+                  <article className="claim-card" key={decision.id} style={{ borderLeft: "3px solid var(--accent)" }}>
+                    <div className="claim-badges" style={{ marginBottom: "8px" }}>
+                      <span className="severity">{decision.status}</span>
+                      <span>{decision.impact}</span>
+                      {decision.is_simulated && <span>{t("simulated")}</span>}
+                    </div>
+                    <strong style={{ fontSize: "1.05rem", display: "block", marginBottom: "4px" }}>
+                      {decision.action_type}
+                    </strong>
+                    <div style={{ background: "var(--panel-raised)", padding: "6px 10px", borderRadius: "4px", margin: "6px 0", fontSize: "0.825rem" }}>
+                      🎯 <span style={{ color: "var(--muted)" }}>Target:</span>{" "}
+                      <strong style={{ fontFamily: "var(--font-mono, monospace)" }}>
+                        {decision.targets && decision.targets.length > 0 ? decision.targets.join(", ") : "synthetic-demo-user"}
+                      </strong>
+                    </div>
+                    <small style={{ color: "var(--text-soft)", display: "block", marginTop: "4px" }}>
+                      📅 {new Date(decision.created_at).toLocaleString(i18n.language)}
+                    </small>
+                    <small style={{ color: "var(--muted)", display: "block", marginTop: "2px" }}>
+                      Aprobaciones: {decision.decisions.length}/{decision.required_approvals} · Evaluación: {decision.evaluation_outcome}
+                    </small>
+                  </article>
+                ))}
+                <PageState
+                  loading={responseDecisions.isLoading}
+                  error={responseDecisions.isError}
+                  empty={!responseDecisions.isLoading && !responseDecisions.isError && responseDecisions.data?.length === 0}
+                />
+              </div>
+            </div>
+
+            {(playbookExecutions.data?.length ?? 0) > 0 && (
+              <div style={{ marginTop: "1.5rem" }}>
+                <h3 style={{ fontSize: "1rem", marginBottom: "0.75rem" }}>
+                  ▶️ Instancias de Ejecución de Playbooks
+                </h3>
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))",
+                    gap: "12px",
+                  }}
+                >
+                  {playbookExecutions.data?.map((execution) => (
+                    <article className="claim-card" key={execution.id}>
+                      <div className="claim-badges">
+                        <span>{execution.status}</span>
+                        <span>{execution.execution_mode}</span>
+                      </div>
+                      <strong style={{ display: "block", margin: "6px 0", fontFamily: "var(--font-mono, monospace)", fontSize: "0.85rem" }}>
+                        {execution.id}
+                      </strong>
+                      <small style={{ color: "var(--muted)" }}>
+                        📅 {new Date(execution.created_at).toLocaleString(i18n.language)}
+                      </small>
+                      {execution.error_code && <p style={{ color: "var(--status-error)", margin: "4px 0 0" }}>{execution.error_code}</p>}
+                    </article>
+                  ))}
                 </div>
-                <strong style={{ display: "block", margin: "6px 0" }}>{execution.id}</strong>
-                <small style={{ color: "var(--muted)" }}>
-                  {new Date(execution.created_at).toLocaleString(i18n.language)}
-                </small>
-                {execution.error_code && <p style={{ color: "var(--status-error)" }}>{execution.error_code}</p>}
-              </article>
-            ))}
-            <PageState
-              loading={playbookExecutions.isLoading}
-              error={playbookExecutions.isError || executeResponse.isError}
-              empty={
-                !playbookExecutions.isLoading &&
-                !playbookExecutions.isError &&
-                playbookExecutions.data?.length === 0
-              }
-            />
-          </div>
-        </section>
+              </div>
+            )}
+          </section>
+        </div>
       )}
     </>
   );

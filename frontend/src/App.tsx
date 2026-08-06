@@ -1015,9 +1015,12 @@ function IncidentDetailPage() {
       ]);
     },
   });
+  const [hasRolledBack, setHasRolledBack] = useState(false);
+
   const rollbackResponse = useMutation({
     mutationFn: () => executeRollbackProposal(id),
     onSuccess: async () => {
+      setHasRolledBack(true);
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["response-decisions", id] }),
         queryClient.invalidateQueries({ queryKey: ["playbook-executions", id] }),
@@ -1451,7 +1454,7 @@ function IncidentDetailPage() {
                         </button>
                       )}
                       {(() => {
-                        const isRolledBack = decision.status === "ROLLED_BACK" || rollbackResponse.isSuccess;
+                        const isRolledBack = hasRolledBack || decision.status === "ROLLED_BACK" || rollbackResponse.isSuccess;
                         return (
                           <>
                             <button

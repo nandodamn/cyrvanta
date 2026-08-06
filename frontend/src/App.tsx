@@ -1450,20 +1450,39 @@ function IncidentDetailPage() {
                           ▶ {t("simulateResponse")}
                         </button>
                       )}
-                      <button
-                        type="button"
-                        className="ghost"
-                        style={{ width: "100%", marginTop: "8px", minHeight: "36px", color: "var(--accent)" }}
-                        disabled={rollbackResponse.isPending}
-                        onClick={() => rollbackResponse.mutate()}
-                      >
-                        {rollbackResponse.isPending ? t("loading") : `🔄 ${t("rollbackAction", { defaultValue: "Deshacer / Rollback (Restaurar Acceso)" })}`}
-                      </button>
-                      {rollbackResponse.isSuccess && (
-                        <p style={{ margin: "6px 0 0", fontSize: "0.8rem", color: "#10b981", textAlign: "center" }}>
-                          ✓ {t("rollbackExecuted", { defaultValue: "Acceso del usuario restaurado a estado activo." })}
-                        </p>
-                      )}
+                      {(() => {
+                        const isRolledBack = decision.status === "ROLLED_BACK" || rollbackResponse.isSuccess;
+                        return (
+                          <>
+                            <button
+                              type="button"
+                              className="ghost"
+                              style={{
+                                width: "100%",
+                                marginTop: "8px",
+                                minHeight: "38px",
+                                color: isRolledBack ? "#10b981" : "var(--accent)",
+                                borderColor: isRolledBack ? "rgba(16, 185, 129, 0.4)" : undefined,
+                                background: isRolledBack ? "rgba(16, 185, 129, 0.08)" : undefined,
+                                cursor: isRolledBack ? "not-allowed" : "pointer",
+                              }}
+                              disabled={rollbackResponse.isPending || isRolledBack}
+                              onClick={() => rollbackResponse.mutate()}
+                            >
+                              {rollbackResponse.isPending
+                                ? t("loading")
+                                : isRolledBack
+                                ? `✓ ${t("rollbackCompleted", { defaultValue: "Rollback Ejecutado — Acceso Restaurado" })}`
+                                : `🔄 ${t("rollbackAction", { defaultValue: "Deshacer / Rollback (Restaurar Acceso)" })}`}
+                            </button>
+                            {isRolledBack && (
+                              <p style={{ margin: "6px 0 0", fontSize: "0.8rem", color: "#10b981", textAlign: "center", fontWeight: 600 }}>
+                                ✓ {t("rollbackExecuted", { defaultValue: "Acceso del usuario restaurado a estado activo." })}
+                              </p>
+                            )}
+                          </>
+                        );
+                      })()}
                     </div>
                   </article>
                 );

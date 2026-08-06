@@ -385,7 +385,7 @@ class IncidentService:
                 text("UPDATE users SET is_active = true WHERE lower(email) LIKE '%synthetic%' OR lower(email) LIKE '%demo%' OR email IN ('synthetic-demo-user@cyrvanta.uy', 'demo@cyrvanta.uy')")
             )
             await session.execute(
-                text("UPDATE action_proposals SET status = 'AUTHORIZED' WHERE incident_id = :inc_id"),
+                text("UPDATE action_proposals SET status = 'ROLLED_BACK' WHERE incident_id = :inc_id"),
                 {"inc_id": incident_id},
             )
             await session.execute(

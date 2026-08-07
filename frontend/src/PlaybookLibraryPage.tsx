@@ -326,7 +326,7 @@ export function PlaybookLibraryPage() {
                           disabled={approvalMutation.isPending}
                           onClick={() => approvalMutation.mutate({ id: playbook.id, mode: "SINGLE" })}
                         >
-                          👤 Simple (1 Ojo)
+                          👤 Simple
                         </button>
                         <button
                           type="button"

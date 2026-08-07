@@ -1,3 +1,4 @@
+import React, { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 
@@ -5,10 +6,12 @@ import {
   getPlaybookDefinitions,
   getPlaybookManagement,
   getPlaybooks,
+  PlaybookDefinition,
   togglePlaybookBinding,
   updatePlaybookApprovalGovernance,
 } from "./api";
 import "./playbook-library.css";
+import { PlaybookDetailsModal } from "./PlaybookDetailsModal";
 
 const PLAYBOOK_REQUIRED_INTEGRATIONS: Record<string, { connectorName: string; navTab: string }> = {
   "simulate-host-isolation": { connectorName: "Microsoft Defender / EDR", navTab: "Integraciones" },
@@ -20,6 +23,10 @@ const PLAYBOOK_REQUIRED_INTEGRATIONS: Record<string, { connectorName: string; na
 export function PlaybookLibraryPage() {
   const { t, i18n } = useTranslation();
   const queryClient = useQueryClient();
+  const [selectedDetails, setSelectedDetails] = useState<{
+    playbook: PlaybookDefinition;
+    req?: { connectorName: string; navTab: string };
+  } | null>(null);
 
   const nativeLibrary = useQuery({
     queryKey: ["playbook-definitions"],
@@ -116,12 +123,29 @@ export function PlaybookLibraryPage() {
             const isMissingIntegration = Boolean(requiredIntegration);
 
             return (
-              <article key={playbook.id} style={isMissingIntegration ? { opacity: 0.85, border: "1px dashed var(--line)" } : {}}>
+              <article key={playbook.id} style={isMissingIntegration ? { opacity: 0.9, border: "1px dashed #f59e0b" } : {}}>
                 <div className="playbook-heading">
                   <div>
-                    <span className={`demo-badge ${playbook.binding_active && !isMissingIntegration ? "active" : ""}`}>
-                      {isMissingIntegration ? "🔒 REQUERIMIENTO DE INTEGRACIÓN" : playbook.binding_active ? t("active") : t("inactive")}
-                    </span>
+                    {isMissingIntegration ? (
+                      <span
+                        style={{
+                          background: "rgba(245, 158, 11, 0.22)",
+                          color: "#fbbf24",
+                          border: "1px solid #f59e0b",
+                          padding: "3px 8px",
+                          borderRadius: "4px",
+                          fontSize: "0.75rem",
+                          fontWeight: 700,
+                          letterSpacing: "0.02em",
+                        }}
+                      >
+                        🔒 REQUIERE CONFIGURACIÓN
+                      </span>
+                    ) : (
+                      <span className={`demo-badge ${playbook.binding_active ? "active" : ""}`}>
+                        {playbook.binding_active ? t("active") : t("inactive")}
+                      </span>
+                    )}
                     <span
                       className="demo-badge"
                       style={{
@@ -215,7 +239,7 @@ export function PlaybookLibraryPage() {
                 </div>
 
                 {isMissingIntegration && (
-                  <div style={{ background: "rgba(245, 158, 11, 0.08)", border: "1px solid rgba(245, 158, 11, 0.3)", color: "#fbbf24", padding: "8px 12px", borderRadius: "6px", fontSize: "0.8rem", margin: "8px 0", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <div style={{ background: "rgba(245, 158, 11, 0.1)", border: "1px solid rgba(245, 158, 11, 0.4)", color: "#fbbf24", padding: "8px 12px", borderRadius: "6px", fontSize: "0.8rem", margin: "8px 0", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                     <span>
                       🔒 <strong>Conector de Integración Pendiente:</strong> Requiere configurar la URL y llaves de acceso para <strong>{requiredIntegration.connectorName}</strong> en el menú <strong>{requiredIntegration.navTab}</strong> antes de activarse.
                     </span>
@@ -249,7 +273,8 @@ export function PlaybookLibraryPage() {
                   </div>
                 </div>
 
-                <div className="connector-grid">
+                {/* Gobernanza Bar */}
+                <div className="connector-grid" style={{ marginBottom: "1rem" }}>
                   <div style={{ gridColumn: "span 2", background: "rgba(255,255,255,0.02)", padding: "10px 14px", borderRadius: "6px", border: "1px solid var(--line)" }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "8px" }}>
                       <div>
@@ -295,55 +320,39 @@ export function PlaybookLibraryPage() {
                   </div>
                 </div>
 
-                <div>
-                  <strong>{t("mitreTechniques")}</strong>
-                  <small>
-                    {playbook.mitre_codes && playbook.mitre_codes.length
-                      ? playbook.mitre_codes.join(", ")
-                      : "T1078"}
-                  </small>
-                </div>
-                <div>
-                  <strong>{t("mitigatedIncidentTypes")}</strong>
-                  <small>
-                    {playbook.target_incident_types && playbook.target_incident_types.length
-                      ? playbook.target_incident_types.join(", ")
-                      : "all-incidents"}
-                  </small>
-                </div>
-                <div>
-                  <strong>{t("rollback")}</strong>
-                  <small>
-                    <span
-                      className="demo-badge active"
-                      style={{ fontSize: "0.7rem", padding: "2px 6px", marginRight: "4px" }}
-                    >
-                      {t("rollbackSupported")}
+                {/* Card Action Footer: Clean button to open PlaybookDetailsModal */}
+                <div style={{ borderTop: "1px solid var(--line)", paddingTop: "10px", marginTop: "10px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                    <span style={{ fontSize: "0.75rem", background: "rgba(13, 209, 155, 0.1)", color: "var(--accent)", padding: "2px 8px", borderRadius: "4px", fontWeight: 600 }}>
+                      ✓ Rollback Habilitado
                     </span>
-                    {playbook.rollback_guidance_i18n
-                      ? i18n.language.startsWith("en")
-                        ? playbook.rollback_guidance_i18n.en
-                        : playbook.rollback_guidance_i18n.es
-                      : playbook.rollback_target_code
-                        ? `(${playbook.rollback_target_code})`
-                        : ""}
-                  </small>
-                </div>
-                <div>
-                  <strong>{t("automationPolicy")}</strong>
-                  <small>
-                    {playbook.automation_policy_i18n
-                      ? i18n.language.startsWith("en")
-                        ? playbook.automation_policy_i18n.en
-                        : playbook.automation_policy_i18n.es
-                      : t("noParameters")}
-                  </small>
+                    <span style={{ fontSize: "0.75rem", color: "var(--muted)" }}>
+                      MITRE: {playbook.mitre_codes?.length ? playbook.mitre_codes.join(", ") : "T1078"}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    className="ghost"
+                    style={{ fontSize: "0.8rem", padding: "6px 14px", border: "1px solid var(--accent)", color: "var(--accent)", fontWeight: 600 }}
+                    onClick={() => setSelectedDetails({ playbook, req: requiredIntegration })}
+                  >
+                    🔍 Ampliar Información, Parámetros & MITRE
+                  </button>
                 </div>
             </article>
           );
         })}
         </div>
       </section>
+
+      {/* Render PlaybookDetailsModal when selectedDetails is active */}
+      {selectedDetails && (
+        <PlaybookDetailsModal
+          playbook={selectedDetails.playbook}
+          requiredIntegration={selectedDetails.req}
+          onClose={() => setSelectedDetails(null)}
+        />
+      )}
 
       <details className="panel optional-engine">
         <summary>{t("optionalN8n")}</summary>

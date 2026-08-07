@@ -269,6 +269,17 @@ class PlaybookAdministrationService:
             existing = await session.scalar(
                 select(PlaybookDefinitionModel).where(PlaybookDefinitionModel.code == code)
             )
+            default_approval_mode = "FOUR_EYES" if code in {
+                "simulate-user-block",
+                "compromised-account",
+                "simulate-host-isolation",
+                "compromised-endpoint",
+                "privilege-escalation",
+                "ransomware-destructive",
+                "lateral-movement",
+                "security-control-disabled",
+            } else "AUTOMATIC"
+
             if existing is None:
                 def_model = PlaybookDefinitionModel(
                     tenant_id=tenant_id,
@@ -278,6 +289,7 @@ class PlaybookAdministrationService:
                     description_es=cast(str, pb["description_es"]),
                     description_en=cast(str, pb["description_en"]),
                     action_type=code,
+                    approval_mode=default_approval_mode,
                 )
                 session.add(def_model)
                 await session.flush()
@@ -338,6 +350,9 @@ class PlaybookAdministrationService:
                 )
                 session.add(binding_model)
             else:
+                if default_approval_mode == "FOUR_EYES" and existing.approval_mode in (None, "AUTOMATIC"):
+                    existing.approval_mode = "FOUR_EYES"
+
                 version = await session.scalar(
                     select(PlaybookVersionModel)
                     .where(PlaybookVersionModel.definition_id == existing.id)

@@ -288,6 +288,18 @@ class PlaybookAdministrationService:
     async def _ensure_essential_definitions_seeded(
         self, session: AsyncSession, tenant_id: UUID
     ) -> None:
+        for code, desired_approval_mode in PLAYBOOK_GOVERNANCE_TAXONOMY.items():
+            existing_items = list(
+                (
+                    await session.scalars(
+                        select(PlaybookDefinitionModel).where(PlaybookDefinitionModel.code == code)
+                    )
+                ).all()
+            )
+            for existing in existing_items:
+                if existing.approval_mode != desired_approval_mode:
+                    existing.approval_mode = desired_approval_mode
+
         for pb in ESSENTIAL_NATIVE_PLAYBOOKS:
             code = cast(str, pb["code"])
             existing = await session.scalar(
@@ -364,9 +376,6 @@ class PlaybookAdministrationService:
                     last_verified_at=datetime.now(UTC),
                 )
                 session.add(binding_model)
-            else:
-                if existing.approval_mode != desired_approval_mode:
-                    existing.approval_mode = desired_approval_mode
 
                 version = await session.scalar(
                     select(PlaybookVersionModel)

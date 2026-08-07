@@ -236,6 +236,30 @@ class PlaybookAdministrationConflict(Exception):
     pass
 
 
+PLAYBOOK_GOVERNANCE_TAXONOMY: dict[str, str] = {
+    # 👥 FOUR_EYES: Acciones críticas de contención de identidad, aislamiento de hosts y respuesta a evasión/ransomware
+    "simulate-user-block": "FOUR_EYES",
+    "compromised-account": "FOUR_EYES",
+    "simulate-host-isolation": "FOUR_EYES",
+    "compromised-endpoint": "FOUR_EYES",
+    "privilege-escalation": "FOUR_EYES",
+    "ransomware-destructive": "FOUR_EYES",
+    "lateral-movement": "FOUR_EYES",
+    "security-control-disabled": "FOUR_EYES",
+
+    # 👤 SINGLE: Notificaciones de incidentes críticos, tickets SecOps/ITSM y filtrado de IoCs
+    "simulate-critical-incident-notification": "SINGLE",
+    "escalation-notification": "SINGLE",
+    "simulate-itsm-ticket-creation": "SINGLE",
+    "phishing-malicious-email": "SINGLE",
+    "malicious-indicator": "SINGLE",
+
+    # ⚡ AUTOMATIC: Tareas transversales de análisis, preservación inmutable y aprendizaje
+    "automated-enrichment": "AUTOMATIC",
+    "evidence-preservation": "AUTOMATIC",
+    "closure-controlled-learning": "AUTOMATIC",
+}
+
 class PlaybookAdministrationService:
     def __init__(self, settings: Settings | None = None) -> None:
         self.settings = settings or get_settings()
@@ -269,16 +293,7 @@ class PlaybookAdministrationService:
             existing = await session.scalar(
                 select(PlaybookDefinitionModel).where(PlaybookDefinitionModel.code == code)
             )
-            default_approval_mode = "FOUR_EYES" if code in {
-                "simulate-user-block",
-                "compromised-account",
-                "simulate-host-isolation",
-                "compromised-endpoint",
-                "privilege-escalation",
-                "ransomware-destructive",
-                "lateral-movement",
-                "security-control-disabled",
-            } else "AUTOMATIC"
+            desired_approval_mode = PLAYBOOK_GOVERNANCE_TAXONOMY.get(code, "AUTOMATIC")
 
             if existing is None:
                 def_model = PlaybookDefinitionModel(
@@ -289,7 +304,7 @@ class PlaybookAdministrationService:
                     description_es=cast(str, pb["description_es"]),
                     description_en=cast(str, pb["description_en"]),
                     action_type=code,
-                    approval_mode=default_approval_mode,
+                    approval_mode=desired_approval_mode,
                 )
                 session.add(def_model)
                 await session.flush()
@@ -308,7 +323,7 @@ class PlaybookAdministrationService:
                         {
                             "id": "step-1",
                             "type": "ACTION",
-                            "action": "simulate-user-block",
+                            "action": code if code.startswith("simulate-") else "simulate-user-block",
                             "action_version": "1.0.0",
                             "parameters": {},
                         }
@@ -350,8 +365,8 @@ class PlaybookAdministrationService:
                 )
                 session.add(binding_model)
             else:
-                if default_approval_mode == "FOUR_EYES" and existing.approval_mode in (None, "AUTOMATIC"):
-                    existing.approval_mode = "FOUR_EYES"
+                if existing.approval_mode != desired_approval_mode:
+                    existing.approval_mode = desired_approval_mode
 
                 version = await session.scalar(
                     select(PlaybookVersionModel)

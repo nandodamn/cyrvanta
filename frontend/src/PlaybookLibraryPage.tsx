@@ -124,72 +124,94 @@ export function PlaybookLibraryPage() {
 
             return (
               <article key={playbook.id} style={isMissingIntegration ? { opacity: 0.9, border: "1px dashed #f59e0b" } : {}}>
-                <div className="playbook-heading">
+                <div className="playbook-heading" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "12px", flexWrap: "wrap", marginBottom: "0.75rem" }}>
                   <div>
-                    {isMissingIntegration ? (
+                    <div style={{ display: "flex", gap: "6px", alignItems: "center", flexWrap: "wrap", marginBottom: "6px" }}>
+                      {isMissingIntegration ? (
+                        <span
+                          style={{
+                            background: "rgba(245, 158, 11, 0.22)",
+                            color: "#fbbf24",
+                            border: "1px solid #f59e0b",
+                            padding: "3px 8px",
+                            borderRadius: "4px",
+                            fontSize: "0.75rem",
+                            fontWeight: 700,
+                            letterSpacing: "0.02em",
+                          }}
+                        >
+                          🔒 REQUIERE CONFIGURACIÓN
+                        </span>
+                      ) : (
+                        <span className={`demo-badge ${playbook.binding_active ? "active" : ""}`}>
+                          {playbook.binding_active ? t("active") : t("inactive")}
+                        </span>
+                      )}
                       <span
+                        className="demo-badge"
                         style={{
-                          background: "rgba(245, 158, 11, 0.22)",
-                          color: "#fbbf24",
-                          border: "1px solid #f59e0b",
-                          padding: "3px 8px",
-                          borderRadius: "4px",
-                          fontSize: "0.75rem",
-                          fontWeight: 700,
-                          letterSpacing: "0.02em",
+                          background:
+                            currentMode === "SINGLE"
+                              ? "rgba(59, 130, 246, 0.15)"
+                              : currentMode === "FOUR_EYES"
+                                ? "rgba(245, 158, 11, 0.15)"
+                                : "rgba(13, 209, 155, 0.15)",
+                          color:
+                            currentMode === "SINGLE"
+                              ? "#60a5fa"
+                              : currentMode === "FOUR_EYES"
+                                ? "#fbbf24"
+                                : "var(--accent)",
+                          border: `1px solid ${
+                            currentMode === "SINGLE"
+                              ? "#3b82f6"
+                              : currentMode === "FOUR_EYES"
+                                ? "#f59e0b"
+                                : "var(--accent)"
+                          }`,
                         }}
                       >
-                        🔒 REQUIERE CONFIGURACIÓN
+                        {currentMode === "SINGLE"
+                          ? "👤 Aprobación Simple"
+                          : currentMode === "FOUR_EYES"
+                            ? "👥 Principio 4 Ojos"
+                            : "⚡ Automático"}
                       </span>
-                    ) : (
-                      <span className={`demo-badge ${playbook.binding_active ? "active" : ""}`}>
-                        {playbook.binding_active ? t("active") : t("inactive")}
-                      </span>
-                    )}
-                    <span
-                      className="demo-badge"
-                      style={{
-                        marginLeft: "6px",
-                        background:
-                          currentMode === "SINGLE"
-                            ? "rgba(59, 130, 246, 0.15)"
-                            : currentMode === "FOUR_EYES"
-                              ? "rgba(245, 158, 11, 0.15)"
-                              : "rgba(13, 209, 155, 0.15)",
-                        color:
-                          currentMode === "SINGLE"
-                            ? "#60a5fa"
-                            : currentMode === "FOUR_EYES"
-                              ? "#fbbf24"
-                              : "var(--accent)",
-                        border: `1px solid ${
-                          currentMode === "SINGLE"
-                            ? "#3b82f6"
-                            : currentMode === "FOUR_EYES"
-                              ? "#f59e0b"
-                              : "var(--accent)"
-                        }`,
-                      }}
-                    >
-                      {currentMode === "SINGLE"
-                        ? "👤 Aprobación Simple"
-                        : currentMode === "FOUR_EYES"
-                          ? "👥 Principio 4 Ojos"
-                          : "⚡ Automático"}
-                    </span>
-                    <h2>
+                    </div>
+                    <h2 style={{ margin: "4px 0 2px", fontSize: "1.25rem" }}>
                       {i18n.language.startsWith("en")
                         ? playbook.title_i18n.en
                         : playbook.title_i18n.es}
                     </h2>
                     <code>{playbook.code}</code>
                   </div>
-                  <div className="playbook-version" style={{ display: "flex", flexDirection: "column", gap: "6px", alignItems: "flex-end" }}>
+
+                  {/* Top Right Action Button Row (All 3 Buttons Aligned Horizontally) */}
+                  <div style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" }}>
+                    <button
+                      type="button"
+                      className="ghost"
+                      style={{
+                        padding: "6px 12px",
+                        fontSize: "0.775rem",
+                        height: "auto",
+                        minHeight: "unset",
+                        minWidth: "unset",
+                        width: "auto",
+                        whiteSpace: "nowrap",
+                        border: "1px solid var(--accent)",
+                        color: "var(--accent)",
+                        fontWeight: 600,
+                      }}
+                      onClick={() => setSelectedDetails({ playbook, req: requiredIntegration })}
+                    >
+                      🔍 Ampliar Información, Parámetros & MITRE
+                    </button>
                     <button
                       type="button"
                       className={playbook.binding_active && !isMissingIntegration ? "ghost" : "primary"}
                       style={{
-                        padding: "4px 10px",
+                        padding: "6px 12px",
                         fontSize: "0.775rem",
                         height: "auto",
                         minHeight: "unset",
@@ -214,7 +236,7 @@ export function PlaybookLibraryPage() {
                       type="button"
                       className="ghost"
                       style={{
-                        padding: "4px 10px",
+                        padding: "6px 12px",
                         fontSize: "0.775rem",
                         height: "auto",
                         minHeight: "unset",
@@ -274,7 +296,7 @@ export function PlaybookLibraryPage() {
                 </div>
 
                 {/* Gobernanza Bar */}
-                <div className="connector-grid" style={{ marginBottom: "1rem" }}>
+                <div className="connector-grid" style={{ marginBottom: "0.5rem" }}>
                   <div style={{ gridColumn: "span 2", background: "rgba(255,255,255,0.02)", padding: "10px 14px", borderRadius: "6px", border: "1px solid var(--line)" }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "8px" }}>
                       <div>
@@ -320,24 +342,16 @@ export function PlaybookLibraryPage() {
                   </div>
                 </div>
 
-                {/* Card Action Footer: Clean button to open PlaybookDetailsModal */}
-                <div style={{ borderTop: "1px solid var(--line)", paddingTop: "10px", marginTop: "10px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                {/* Card Action Footer */}
+                <div style={{ borderTop: "1px solid var(--line)", paddingTop: "8px", marginTop: "8px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
                     <span style={{ fontSize: "0.75rem", background: "rgba(13, 209, 155, 0.1)", color: "var(--accent)", padding: "2px 8px", borderRadius: "4px", fontWeight: 600 }}>
                       ✓ Rollback Habilitado
                     </span>
                     <span style={{ fontSize: "0.75rem", color: "var(--muted)" }}>
-                      MITRE: {playbook.mitre_codes?.length ? playbook.mitre_codes.join(", ") : "T1078"}
+                      Tácticas MITRE: {playbook.mitre_codes?.length ? playbook.mitre_codes.join(", ") : "T1078"}
                     </span>
                   </div>
-                  <button
-                    type="button"
-                    className="ghost"
-                    style={{ fontSize: "0.8rem", padding: "6px 14px", border: "1px solid var(--accent)", color: "var(--accent)", fontWeight: 600 }}
-                    onClick={() => setSelectedDetails({ playbook, req: requiredIntegration })}
-                  >
-                    🔍 Ampliar Información, Parámetros & MITRE
-                  </button>
                 </div>
             </article>
           );

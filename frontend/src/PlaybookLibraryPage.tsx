@@ -10,6 +10,13 @@ import {
 } from "./api";
 import "./playbook-library.css";
 
+const PLAYBOOK_REQUIRED_INTEGRATIONS: Record<string, { connectorName: string; navTab: string }> = {
+  "simulate-host-isolation": { connectorName: "Microsoft Defender / EDR", navTab: "Integraciones" },
+  "simulate-itsm-ticket-creation": { connectorName: "ServiceNow / Jira ITSM", navTab: "Integraciones" },
+  "malicious-indicator": { connectorName: "Palo Alto / Fortinet Firewall", navTab: "Integraciones" },
+  "lateral-movement": { connectorName: "Microsoft Defender / Firewall Local", navTab: "Integraciones" },
+};
+
 export function PlaybookLibraryPage() {
   const { t, i18n } = useTranslation();
   const queryClient = useQueryClient();
@@ -105,12 +112,15 @@ export function PlaybookLibraryPage() {
         <div className="playbook-list">
           {nativeLibrary.data?.items.map((playbook) => {
             const currentMode = playbook.approval_mode ?? "AUTOMATIC";
+            const requiredIntegration = PLAYBOOK_REQUIRED_INTEGRATIONS[playbook.code];
+            const isMissingIntegration = Boolean(requiredIntegration);
+
             return (
-              <article key={playbook.id}>
+              <article key={playbook.id} style={isMissingIntegration ? { opacity: 0.85, border: "1px dashed var(--line)" } : {}}>
                 <div className="playbook-heading">
                   <div>
-                    <span className={`demo-badge ${playbook.binding_active ? "active" : ""}`}>
-                      {playbook.binding_active ? t("active") : t("inactive")}
+                    <span className={`demo-badge ${playbook.binding_active && !isMissingIntegration ? "active" : ""}`}>
+                      {isMissingIntegration ? "🔒 REQUERIMIENTO DE INTEGRACIÓN" : playbook.binding_active ? t("active") : t("inactive")}
                     </span>
                     <span
                       className="demo-badge"
@@ -153,7 +163,7 @@ export function PlaybookLibraryPage() {
                   <div className="playbook-version" style={{ display: "flex", flexDirection: "column", gap: "6px", alignItems: "flex-end" }}>
                     <button
                       type="button"
-                      className={playbook.binding_active ? "ghost" : "primary"}
+                      className={playbook.binding_active && !isMissingIntegration ? "ghost" : "primary"}
                       style={{
                         padding: "4px 10px",
                         fontSize: "0.775rem",
@@ -162,8 +172,11 @@ export function PlaybookLibraryPage() {
                         minWidth: "unset",
                         width: "auto",
                         whiteSpace: "nowrap",
+                        opacity: isMissingIntegration ? 0.6 : 1,
+                        cursor: isMissingIntegration ? "not-allowed" : "pointer",
                       }}
-                      disabled={toggleMutation.isPending}
+                      disabled={toggleMutation.isPending || isMissingIntegration}
+                      title={isMissingIntegration ? `🔒 Requiere configurar credenciales API para ${requiredIntegration.connectorName} en el menú ${requiredIntegration.navTab}` : undefined}
                       onClick={() =>
                         toggleMutation.mutate({
                           id: playbook.id,
@@ -171,7 +184,7 @@ export function PlaybookLibraryPage() {
                         })
                       }
                     >
-                      {playbook.binding_active ? t("deactivatePlaybook") : t("activatePlaybook")}
+                      {isMissingIntegration ? "🔒 Sin Credenciales API" : playbook.binding_active ? t("deactivatePlaybook") : t("activatePlaybook")}
                     </button>
                     <button
                       type="button"
@@ -185,7 +198,7 @@ export function PlaybookLibraryPage() {
                         width: "auto",
                         whiteSpace: "nowrap",
                       }}
-                      disabled={toggleMutation.isPending}
+                      disabled={toggleMutation.isPending || isMissingIntegration}
                       onClick={() =>
                         toggleMutation.mutate({
                           id: playbook.id,
@@ -200,6 +213,14 @@ export function PlaybookLibraryPage() {
                     </button>
                   </div>
                 </div>
+
+                {isMissingIntegration && (
+                  <div style={{ background: "rgba(245, 158, 11, 0.08)", border: "1px solid rgba(245, 158, 11, 0.3)", color: "#fbbf24", padding: "8px 12px", borderRadius: "6px", fontSize: "0.8rem", margin: "8px 0", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                    <span>
+                      🔒 <strong>Conector de Integración Pendiente:</strong> Requiere configurar la URL y llaves de acceso para <strong>{requiredIntegration.connectorName}</strong> en el menú <strong>{requiredIntegration.navTab}</strong> antes de activarse.
+                    </span>
+                  </div>
+                )}
 
                 <div className="playbook-facts">
                   <div>

@@ -265,20 +265,20 @@ class OperationsService:
             category=incident.classification,
             status=incident.status,
         )
-        techniques = [CATALOG[item] for item in ("T1110", "T1078", "T1098")]
-        severity_weight = {
-            "informational": 10,
-            "low": 25,
-            "medium": 45,
-            "high": 70,
-            "critical": 90,
-        }.get(incident.severity, 25)
-        confidence = 0.86 if incident.is_simulated else 0.65
-        risk = min(100, round(severity_weight * 0.8 + confidence * 20))
-        summary_es = "Cadena compatible con abuso de credenciales y cuenta válida."
-        summary_en = "Sequence consistent with credential abuse and valid-account activity."
-        provider = "deterministic-fallback"
-        mode = "deterministic"
+        techniques: list[Technique] = []
+        confidence = 0.0
+        risk = 0
+        summary_es = (
+            "Evidencia insuficiente: el incidente todav\u00eda no tiene un "
+            "an\u00e1lisis de riesgo persistido."
+        )
+        summary_en = (
+            "Insufficient evidence: the incident does not yet have a persisted risk analysis."
+        )
+        provider = "none"
+        model = "not-applicable"
+        mode = "evidence-unavailable"
+        grounded = False
         async with tenant_session(tenant_id) as session:
             events = SqlEventStore(
                 session_factory=None,  # type: ignore[arg-type]
@@ -293,15 +293,28 @@ class OperationsService:
         if enrichment is not None:
             risk = enrichment.risk.score
             by_locale = {(item.locale, item.mode): item for item in enrichment.explanations}
-            selected_mode = (
-                "AI_REDACTION"
-                if ("es", "AI_REDACTION") in by_locale and ("en", "AI_REDACTION") in by_locale
-                else "DETERMINISTIC"
+            selected_mode = next(
+                (
+                    candidate
+                    for candidate in ("AI_REDACTION", "DETERMINISTIC")
+                    if ("es", candidate) in by_locale
+                    and ("en", candidate) in by_locale
+                    and by_locale[("es", candidate)].grounded
+                    and by_locale[("en", candidate)].grounded
+                ),
+                None,
             )
-            summary_es = by_locale[("es", selected_mode)].text
-            summary_en = by_locale[("en", selected_mode)].text
-            provider = by_locale[("en", selected_mode)].provider
-            mode = selected_mode.casefold()
+            if selected_mode is not None:
+                summary_es = by_locale[("es", selected_mode)].text
+                summary_en = by_locale[("en", selected_mode)].text
+                provider = by_locale[("en", selected_mode)].provider
+                model = (
+                    self.settings.ollama_model
+                    if selected_mode == "AI_REDACTION"
+                    else "not-applicable"
+                )
+                mode = selected_mode.casefold()
+                grounded = True
             techniques = [
                 Technique(
                     external_id=item.external_id,
@@ -314,24 +327,22 @@ class OperationsService:
                     tactic=item.tactic_codes[0] if item.tactic_codes else "unknown",
                 )
                 for item in enrichment.mappings
+                if item.status in {"SUPPORTED", "VALIDATED"}
             ]
         result = AnalysisResponse(
             incident_id=incident.id,
             provider=provider,
-            model=self.settings.ollama_model,
+            model=model,
             mode=mode,
             summary_es=summary_es,
             summary_en=summary_en,
             confidence=confidence,
             risk_score=risk,
             techniques=techniques,
-            recommendations=[
-                "Validar la identidad y el origen antes de contener.",
-                "Revocar sesiones únicamente tras aprobación humana.",
-            ],
-            grounded=True,
+            recommendations=[],
+            grounded=grounded,
         )
-        if record_claims:
+        if record_claims and result.grounded:
             if correlation_id is None:
                 raise ValueError("correlation_id is required when recording claims")
             claim_inputs = (
@@ -385,7 +396,7 @@ class OperationsService:
                 incident_id=incident_id,
                 correlation_id=correlation_id,
                 provider=provider,
-                model=self.settings.ollama_model,
+                model=model,
                 mode=mode,
                 input_fingerprint=normalized_finding.payload_fingerprint,
                 claims=claim_inputs,

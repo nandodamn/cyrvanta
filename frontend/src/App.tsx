@@ -1515,14 +1515,18 @@ function IncidentDetailPage() {
             {analysis.data && (
               <div className="analysis-card" style={{ marginBottom: "1rem" }}>
                 <strong>
-                  {t("risk")}: {analysis.data.risk_score}/100
+                  {analysis.data.grounded
+                    ? `${t("risk")}: ${analysis.data.risk_score}/100`
+                    : t("analysisEvidenceUnavailable")}
                 </strong>
                 <p>
                   {i18n.language.startsWith("es")
                     ? analysis.data.summary_es
                     : analysis.data.summary_en}
                 </p>
-                <small>{analysis.data.techniques.map((item) => item.external_id).join(" · ")}</small>
+                {analysis.data.grounded && analysis.data.techniques.length > 0 && (
+                  <small>{analysis.data.techniques.map((item) => item.external_id).join(" · ")}</small>
+                )}
               </div>
             )}
 

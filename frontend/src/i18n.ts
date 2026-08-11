@@ -209,6 +209,7 @@ const resources = {
       policyOutcome: "Resultado de política",
       downloadReport: "Descargar informe",
       risk: "Riesgo determinístico",
+      analysisEvidenceUnavailable: "Evidencia insuficiente para calcular el riesgo",
       threatEnrichment: "Conocimiento de amenazas y riesgo",
       threatEnrichmentIntro:
         "Mappings sustentados, factores reproducibles y explicación bilingüe verificable.",
@@ -619,6 +620,7 @@ const resources = {
       policyOutcome: "Policy outcome",
       downloadReport: "Download report",
       risk: "Deterministic risk",
+      analysisEvidenceUnavailable: "Insufficient evidence to calculate risk",
       threatEnrichment: "Threat knowledge and risk",
       threatEnrichmentIntro:
         "Supported mappings, reproducible factors, and verifiable bilingual explanation.",

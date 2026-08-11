@@ -777,8 +777,6 @@ class PlaybookAdministrationService:
                 healthy = not self._version_errors(version) and await self._native_actions_ready(
                     session, self._artifact(version)
                 )
-            elif binding.engine_type == "N8N":
-                healthy = self.settings.n8n_enabled and bool(self.settings.n8n_api_key)
             binding.observed_digest = binding.desired_digest if healthy else None
             binding.sync_status = "SYNCHRONIZED" if healthy else "UNAVAILABLE"
             binding.active = healthy
@@ -1103,27 +1101,12 @@ class PlaybookAdministrationService:
                         last_verified_at=datetime.now(UTC) if synchronized else None,
                     )
                 else:
-                    binding = AutomationEngineBindingModel(
-                        tenant_id=tenant_id,
-                        playbook_version_id=version.id,
-                        engine_type="N8N",
-                        instance_code="local-demo",
-                        adapter_workflow_id=definition.code,
-                        webhook_path=definition.code,
-                        key_id="local-demo-v1",
-                        desired_digest=version.artifact_sha256,
-                        observed_digest=version.artifact_sha256,
-                        sync_status="SYNCHRONIZED",
-                        active=desired_active,
-                        last_verified_at=datetime.now(UTC),
-                    )
+                    raise PlaybookAdministrationConflict("PLAYBOOK_BINDING_UNAVAILABLE")
                 session.add(binding)
             else:
-                binding.active = desired_active
                 if desired_active:
-                    binding.sync_status = "SYNCHRONIZED"
-                    binding.observed_digest = binding.desired_digest
-                    binding.last_verified_at = datetime.now(UTC)
+                    self._assert_binding_activatable(binding)
+                binding.active = desired_active
 
             if desired_active:
                 other_bindings = list(
@@ -1206,6 +1189,13 @@ class PlaybookAdministrationService:
             last_verified_at=item.last_verified_at,
             created_at=item.created_at,
         )
+
+    @staticmethod
+    def _assert_binding_activatable(item: AutomationEngineBindingModel) -> None:
+        if item.sync_status != "SYNCHRONIZED" or item.last_verified_at is None:
+            raise PlaybookAdministrationConflict("PLAYBOOK_BINDING_UNAVAILABLE")
+        if item.observed_digest is None or item.observed_digest != item.desired_digest:
+            raise PlaybookAdministrationConflict("PLAYBOOK_BINDING_DRIFTED")
 
     @staticmethod
     def _action_binding_response(

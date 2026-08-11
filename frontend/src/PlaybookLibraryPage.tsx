@@ -109,6 +109,7 @@ export function PlaybookLibraryPage() {
         <div className="playbook-list">
           {nativeLibrary.data?.items.map((playbook) => {
             const currentMode = playbook.approval_mode ?? "AUTOMATIC";
+            const isPublished = playbook.publication_status === "PUBLISHED";
             return (
               <article key={playbook.id}>
                 <div className="playbook-heading" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "12px", flexWrap: "wrap", marginBottom: "0.75rem" }}>
@@ -189,7 +190,7 @@ export function PlaybookLibraryPage() {
                         width: "auto",
                         whiteSpace: "nowrap",
                       }}
-                      disabled={toggleMutation.isPending}
+                      disabled={toggleMutation.isPending || !isPublished}
                       onClick={() =>
                         toggleMutation.mutate({
                           id: playbook.id,
@@ -211,7 +212,7 @@ export function PlaybookLibraryPage() {
                         width: "auto",
                         whiteSpace: "nowrap",
                       }}
-                      disabled={toggleMutation.isPending}
+                      disabled={toggleMutation.isPending || !isPublished}
                       onClick={() =>
                         toggleMutation.mutate({
                           id: playbook.id,
@@ -230,7 +231,11 @@ export function PlaybookLibraryPage() {
                 <div className="playbook-facts">
                   <div>
                     <span>{t("automationEngine")}</span>
-                    <strong>{playbook.engine_type ?? "Cyrvanta Native"}</strong>
+                    <strong>
+                      {playbook.engine_type === "NATIVE"
+                        ? "Cyrvanta Native"
+                        : playbook.engine_type ?? t("engineNotBound")}
+                    </strong>
                   </div>
                   <div>
                     <span>{t("mode")}</span>

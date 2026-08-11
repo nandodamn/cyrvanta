@@ -43,7 +43,12 @@ export function PlaybookDetailsModal({ playbook, onClose }: PlaybookDetailsModal
   const { t, i18n } = useTranslation();
   const english = i18n.language.startsWith("en");
   const title = english ? playbook.title_i18n.en : playbook.title_i18n.es;
-  const description = english ? playbook.description_i18n.en : playbook.description_i18n.es;
+  const description =
+    playbook.publication_status === "PUBLISHED"
+      ? english
+        ? playbook.description_i18n.en
+        : playbook.description_i18n.es
+      : t("draftDescriptionUnavailable");
   const engine =
     playbook.engine_type === "NATIVE"
       ? "Cyrvanta Native"

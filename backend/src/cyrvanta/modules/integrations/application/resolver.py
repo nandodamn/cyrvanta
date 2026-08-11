@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Literal
+from typing import Literal, TypedDict
 from uuid import UUID
 
 from sqlalchemy import select
@@ -21,8 +21,15 @@ class ConnectionResolutionResult:
     blocking: bool = False
 
 
+class CapabilityPolicy(TypedDict):
+    connector_type: str
+    requires_approval: bool
+    simulation_supported: bool
+    verification_supported: bool
+
+
 # Core catalog of known capabilities and default risk policies
-CAPABILITY_POLICIES = {
+CAPABILITY_POLICIES: dict[str, CapabilityPolicy] = {
     "security.alert.read": {
         "connector_type": "wazuh",
         "requires_approval": False,
@@ -49,54 +56,6 @@ CAPABILITY_POLICIES = {
     },
     "notification.email.send": {
         "connector_type": "smtp_lab",
-        "requires_approval": False,
-        "simulation_supported": True,
-        "verification_supported": True,
-    },
-    "identity.local_user.disable": {
-        "connector_type": "windows_local",
-        "requires_approval": True,
-        "simulation_supported": True,
-        "verification_supported": True,
-    },
-    "network.local_firewall.rule.create": {
-        "connector_type": "windows_firewall",
-        "requires_approval": True,
-        "simulation_supported": True,
-        "verification_supported": True,
-    },
-    "endpoint.isolate": {
-        "connector_type": "defender",
-        "requires_approval": True,
-        "simulation_supported": True,
-        "verification_supported": True,
-    },
-    "endpoint.release": {
-        "connector_type": "defender",
-        "requires_approval": True,
-        "simulation_supported": True,
-        "verification_supported": True,
-    },
-    "network.ip.block": {
-        "connector_type": "palo_alto",
-        "requires_approval": True,
-        "simulation_supported": True,
-        "verification_supported": True,
-    },
-    "network.ip.unblock": {
-        "connector_type": "palo_alto",
-        "requires_approval": True,
-        "simulation_supported": True,
-        "verification_supported": True,
-    },
-    "ticket.create": {
-        "connector_type": "servicenow",
-        "requires_approval": False,
-        "simulation_supported": True,
-        "verification_supported": True,
-    },
-    "threatintel.indicator.search": {
-        "connector_type": "misp",
         "requires_approval": False,
         "simulation_supported": True,
         "verification_supported": True,
@@ -138,18 +97,20 @@ class ConnectionResolver:
 
             integrations = list((await session.scalars(stmt)).all())
 
-            # Filter for matching capability or connector_type
-            matching = [
-                integ
-                for integ in integrations
-                if integ.connector_type == policy["connector_type"]
-                or required_capability
-                in (
-                    integ.capabilities_snapshot.get("declared", [])
-                    if isinstance(integ.capabilities_snapshot, dict)
-                    else []
-                )
-            ]
+            # Filter for matching capability or connector_type. Snapshot material is
+            # untrusted JSON and must be narrowed before capability matching.
+            matching: list[IntegrationModel] = []
+            for integration in integrations:
+                declared_capabilities: list[str] = []
+                if isinstance(integration.capabilities_snapshot, dict):
+                    declared = integration.capabilities_snapshot.get("declared")
+                    if isinstance(declared, list):
+                        declared_capabilities = [item for item in declared if isinstance(item, str)]
+                if (
+                    integration.connector_type == policy["connector_type"]
+                    or required_capability in declared_capabilities
+                ):
+                    matching.append(integration)
 
             if matching:
                 selected = matching[0]

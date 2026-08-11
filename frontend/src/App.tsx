@@ -1,6 +1,6 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, lazy, Suspense, useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { useTranslation } from "react-i18next";
 import { NavLink, Navigate, Outlet, Route, Routes, useNavigate, useParams } from "react-router-dom";
@@ -46,14 +46,24 @@ import {
   transitionIncident,
   updateAlertTriage,
 } from "./api";
-import { ApiKeysPage } from "./ApiKeysPage";
-import { GovernedMemoryPage } from "./GovernedMemoryPage";
-import { PlaybookLibraryPage } from "./PlaybookLibraryPage";
 import { OperationalPulse } from "./OperationalPulse";
 import { SecurityTopologyPanel } from "./SecurityTopologyPanel";
 import { useAuth } from "./AuthContext";
-import { VerifiedIntegrationsPage } from "./VerifiedIntegrationsPage";
 
+const ApiKeysPage = lazy(() =>
+  import("./ApiKeysPage").then((module) => ({ default: module.ApiKeysPage })),
+);
+const GovernedMemoryPage = lazy(() =>
+  import("./GovernedMemoryPage").then((module) => ({ default: module.GovernedMemoryPage })),
+);
+const PlaybookLibraryPage = lazy(() =>
+  import("./PlaybookLibraryPage").then((module) => ({ default: module.PlaybookLibraryPage })),
+);
+const VerifiedIntegrationsPage = lazy(() =>
+  import("./VerifiedIntegrationsPage").then((module) => ({
+    default: module.VerifiedIntegrationsPage,
+  })),
+);
 const NAV_ITEMS: ReadonlyArray<{ to: string; icon: React.ReactNode; key: string; end?: boolean }> = [
   {
     to: "/",
@@ -2711,25 +2721,36 @@ function NotFound() {
   );
 }
 
+function RouteLoadingFallback() {
+  const { t } = useTranslation();
+  return (
+    <main className="center" role="status">
+      <p>{t("loading")}</p>
+    </main>
+  );
+}
+
 export default function App() {
   return (
-    <Routes>
-      <Route path="/login" element={<LoginPage />} />
-      <Route element={<ProtectedRoute />}>
-        <Route element={<Layout />}>
-          <Route index element={<Overview />} />
-          <Route path="alerts" element={<AlertsPage />} />
-          <Route path="incidents" element={<IncidentsPage />} />
-          <Route path="incidents/:id" element={<IncidentDetailPage />} />
-          <Route path="playbooks" element={<PlaybooksPage />} />
-          <Route path="integrations" element={<VerifiedIntegrationsPage />} />
-          <Route path="memory" element={<GovernedMemoryPage />} />
-          <Route path="api-keys" element={<ApiKeysPage />} />
-          <Route path="audit" element={<AuditPage />} />
-          <Route path="administration" element={<Administration />} />
+    <Suspense fallback={<RouteLoadingFallback />}>
+      <Routes>
+        <Route path="/login" element={<LoginPage />} />
+        <Route element={<ProtectedRoute />}>
+          <Route element={<Layout />}>
+            <Route index element={<Overview />} />
+            <Route path="alerts" element={<AlertsPage />} />
+            <Route path="incidents" element={<IncidentsPage />} />
+            <Route path="incidents/:id" element={<IncidentDetailPage />} />
+            <Route path="playbooks" element={<PlaybooksPage />} />
+            <Route path="integrations" element={<VerifiedIntegrationsPage />} />
+            <Route path="memory" element={<GovernedMemoryPage />} />
+            <Route path="api-keys" element={<ApiKeysPage />} />
+            <Route path="audit" element={<AuditPage />} />
+            <Route path="administration" element={<Administration />} />
+          </Route>
         </Route>
-      </Route>
-      <Route path="*" element={<NotFound />} />
-    </Routes>
+        <Route path="*" element={<NotFound />} />
+      </Routes>
+    </Suspense>
   );
 }

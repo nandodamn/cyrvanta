@@ -76,7 +76,8 @@ class PlaybookExecutionService:
         async with tenant_session(tenant_id) as session:
             existing = await session.scalar(
                 select(PlaybookExecutionModel).where(
-                    PlaybookExecutionModel.idempotency_key == idempotency_key
+                    PlaybookExecutionModel.tenant_id == tenant_id,
+                    PlaybookExecutionModel.idempotency_key == idempotency_key,
                 )
             )
             if existing is not None:
@@ -85,7 +86,10 @@ class PlaybookExecutionService:
                 return self._response(existing)
             authorization = await session.scalar(
                 select(ActionAuthorizationModel)
-                .where(ActionAuthorizationModel.id == authorization_id)
+                .where(
+                    ActionAuthorizationModel.tenant_id == tenant_id,
+                    ActionAuthorizationModel.id == authorization_id,
+                )
                 .with_for_update()
             )
             if authorization is None:
@@ -96,7 +100,8 @@ class PlaybookExecutionService:
                 raise PlaybookConflict("Authorization has expired")
             proposal = await session.scalar(
                 select(ActionProposalModel).where(
-                    ActionProposalModel.id == authorization.proposal_id
+                    ActionProposalModel.tenant_id == tenant_id,
+                    ActionProposalModel.id == authorization.proposal_id,
                 )
             )
             if proposal is None:
@@ -107,13 +112,15 @@ class PlaybookExecutionService:
                 raise PlaybookConflict("Authorization fingerprint no longer matches")
             definition = await session.scalar(
                 select(PlaybookDefinitionModel).where(
-                    PlaybookDefinitionModel.action_type == proposal.action_type
+                    PlaybookDefinitionModel.tenant_id == tenant_id,
+                    PlaybookDefinitionModel.action_type == proposal.action_type,
                 )
             )
             if definition is None:
                 raise PlaybookConflict("No released playbook matches the authorized action")
             version = await session.scalar(
                 select(PlaybookVersionModel).where(
+                    PlaybookVersionModel.tenant_id == tenant_id,
                     PlaybookVersionModel.definition_id == definition.id,
                     PlaybookVersionModel.version == proposal.workflow_version,
                     PlaybookVersionModel.status == "APPROVED",
@@ -128,6 +135,7 @@ class PlaybookExecutionService:
             binding = await session.scalar(
                 select(AutomationEngineBindingModel)
                 .where(
+                    AutomationEngineBindingModel.tenant_id == tenant_id,
                     AutomationEngineBindingModel.playbook_version_id == version.id,
                     AutomationEngineBindingModel.active.is_(True),
                     AutomationEngineBindingModel.sync_status == "SYNCHRONIZED",
@@ -203,8 +211,12 @@ class PlaybookExecutionService:
         offset: int,
     ) -> PlaybookExecutionList:
         async with tenant_session(tenant_id) as session:
-            query = select(PlaybookExecutionModel)
-            count_query = select(func.count(PlaybookExecutionModel.id))
+            query = select(PlaybookExecutionModel).where(
+                PlaybookExecutionModel.tenant_id == tenant_id
+            )
+            count_query = select(func.count(PlaybookExecutionModel.id)).where(
+                PlaybookExecutionModel.tenant_id == tenant_id
+            )
             if incident_id is not None:
                 query = query.where(PlaybookExecutionModel.incident_id == incident_id)
                 count_query = count_query.where(PlaybookExecutionModel.incident_id == incident_id)
@@ -226,7 +238,10 @@ class PlaybookExecutionService:
     async def get(self, tenant_id: UUID, execution_id: UUID) -> PlaybookExecutionResponse:
         async with tenant_session(tenant_id) as session:
             execution = await session.scalar(
-                select(PlaybookExecutionModel).where(PlaybookExecutionModel.id == execution_id)
+                select(PlaybookExecutionModel).where(
+                    PlaybookExecutionModel.tenant_id == tenant_id,
+                    PlaybookExecutionModel.id == execution_id,
+                )
             )
             if execution is None:
                 raise PlaybookNotFound("Execution was not found")
@@ -243,7 +258,7 @@ class PlaybookExecutionService:
     ) -> PlaybookExecutionResponse:
         now = datetime.now(UTC)
         async with tenant_session(tenant_id) as session:
-            execution = await self._locked_execution(session, execution_id)
+            execution = await self._locked_execution(session, tenant_id, execution_id)
             if execution.status != expected_status.value:
                 raise PlaybookConflict("Execution status changed; refresh and retry")
             if expected_status is ExecutionStatus.CANCELLED:
@@ -256,7 +271,8 @@ class PlaybookExecutionService:
                 raise PlaybookConflict("A terminal execution cannot be cancelled")
             binding = await session.scalar(
                 select(AutomationEngineBindingModel).where(
-                    AutomationEngineBindingModel.id == execution.binding_id
+                    AutomationEngineBindingModel.tenant_id == tenant_id,
+                    AutomationEngineBindingModel.id == execution.binding_id,
                 )
             )
             if binding is None:
@@ -270,6 +286,7 @@ class PlaybookExecutionService:
                     await session.scalars(
                         select(PlaybookStepExecutionModel)
                         .where(
+                            PlaybookStepExecutionModel.tenant_id == tenant_id,
                             PlaybookStepExecutionModel.execution_id == execution.id,
                             PlaybookStepExecutionModel.status.in_(
                                 ("PENDING", "READY", "CLAIMED", "RUNNING")
@@ -347,9 +364,13 @@ class PlaybookExecutionService:
         correlation_id: UUID,
     ) -> PlaybookExecutionResponse:
         async with tenant_session(tenant_id) as session:
-            execution = await self._locked_execution(session, execution_id)
-            binding = await self._binding(session, execution.binding_id, key_id)
-            replay_digest = await self._nonce_digest(session, "DISPATCH", key_id, nonce)
+            execution = await self._locked_execution(session, tenant_id, execution_id)
+            binding = await self._binding(
+                session, tenant_id, execution.binding_id, key_id
+            )
+            replay_digest = await self._nonce_digest(
+                session, tenant_id, "DISPATCH", key_id, nonce
+            )
             if replay_digest is not None:
                 if (
                     replay_digest == body_digest
@@ -365,6 +386,7 @@ class PlaybookExecutionService:
                 raise PlaybookSecurityError("Claim fingerprint does not match")
             attempt = await session.scalar(
                 select(PlaybookExecutionAttemptModel).where(
+                    PlaybookExecutionAttemptModel.tenant_id == tenant_id,
                     PlaybookExecutionAttemptModel.execution_id == execution.id,
                     PlaybookExecutionAttemptModel.dispatch_id == payload.dispatch_id,
                 )
@@ -416,15 +438,20 @@ class PlaybookExecutionService:
         correlation_id: UUID,
     ) -> PlaybookExecutionResponse:
         async with tenant_session(tenant_id) as session:
-            execution = await self._locked_execution(session, execution_id)
-            binding = await self._binding(session, execution.binding_id, key_id)
+            execution = await self._locked_execution(session, tenant_id, execution_id)
+            binding = await self._binding(
+                session, tenant_id, execution.binding_id, key_id
+            )
             duplicate = await session.scalar(
                 select(PlaybookExecutionUpdateModel).where(
-                    PlaybookExecutionUpdateModel.adapter_event_id == payload.adapter_event_id
+                    PlaybookExecutionUpdateModel.tenant_id == tenant_id,
+                    PlaybookExecutionUpdateModel.adapter_event_id == payload.adapter_event_id,
                 )
             )
             if duplicate is not None:
-                replay_digest = await self._nonce_digest(session, "CALLBACK", key_id, nonce)
+                replay_digest = await self._nonce_digest(
+                    session, tenant_id, "CALLBACK", key_id, nonce
+                )
                 if replay_digest == body_digest:
                     return self._response(execution)
                 raise PlaybookSecurityError("Callback event was replayed with different material")
@@ -473,11 +500,14 @@ class PlaybookExecutionService:
 
     @staticmethod
     async def _locked_execution(
-        session: AsyncSession, execution_id: UUID
+        session: AsyncSession, tenant_id: UUID, execution_id: UUID
     ) -> PlaybookExecutionModel:
         execution = await session.scalar(
             select(PlaybookExecutionModel)
-            .where(PlaybookExecutionModel.id == execution_id)
+            .where(
+                PlaybookExecutionModel.tenant_id == tenant_id,
+                PlaybookExecutionModel.id == execution_id,
+            )
             .with_for_update()
         )
         if execution is None:
@@ -486,10 +516,11 @@ class PlaybookExecutionService:
 
     @staticmethod
     async def _binding(
-        session: AsyncSession, binding_id: UUID, key_id: str
+        session: AsyncSession, tenant_id: UUID, binding_id: UUID, key_id: str
     ) -> AutomationEngineBindingModel:
         binding = await session.scalar(
             select(AutomationEngineBindingModel).where(
+                AutomationEngineBindingModel.tenant_id == tenant_id,
                 AutomationEngineBindingModel.id == binding_id,
                 AutomationEngineBindingModel.active.is_(True),
             )
@@ -506,7 +537,8 @@ class PlaybookExecutionService:
     ) -> None:
         version = await session.scalar(
             select(PlaybookVersionModel).where(
-                PlaybookVersionModel.id == execution.playbook_version_id
+                PlaybookVersionModel.tenant_id == execution.tenant_id,
+                PlaybookVersionModel.id == execution.playbook_version_id,
             )
         )
         if version is None:
@@ -537,10 +569,11 @@ class PlaybookExecutionService:
 
     @staticmethod
     async def _nonce_digest(
-        session: AsyncSession, direction: str, key_id: str, nonce: UUID
+        session: AsyncSession, tenant_id: UUID, direction: str, key_id: str, nonce: UUID
     ) -> str | None:
         value = await session.scalar(
             select(AutomationReplayNonceModel.body_sha256).where(
+                AutomationReplayNonceModel.tenant_id == tenant_id,
                 AutomationReplayNonceModel.direction == direction,
                 AutomationReplayNonceModel.key_id == key_id,
                 AutomationReplayNonceModel.nonce == nonce,
@@ -560,6 +593,7 @@ class PlaybookExecutionService:
     ) -> None:
         replay = await session.scalar(
             select(AutomationReplayNonceModel.id).where(
+                AutomationReplayNonceModel.tenant_id == tenant_id,
                 AutomationReplayNonceModel.direction == direction,
                 AutomationReplayNonceModel.key_id == key_id,
                 AutomationReplayNonceModel.nonce == nonce,

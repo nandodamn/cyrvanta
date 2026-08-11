@@ -3,7 +3,6 @@ import pytest
 from cyrvanta.modules.integrations.infrastructure.connectors.enterprise_connectors import (
     CrowdStrikeFalconConnector,
     DefenderEndpointConnector,
-    JiraServiceManagementConnector,
     MispConnector,
     PaloAltoFirewallConnector,
     ServiceNowConnector,
@@ -47,7 +46,9 @@ async def test_palo_alto_firewall_connector():
 @pytest.mark.asyncio
 async def test_servicenow_connector():
     connector = ServiceNowConnector()
-    res = await connector.create_incident_ticket("Suspicious Login Alert", "Multiple failed logins from 203.0.113.50")
+    res = await connector.create_incident_ticket(
+        "Suspicious Login Alert", "Multiple failed logins from 203.0.113.50"
+    )
     assert res.status == "simulated"
     assert res.capability == "ticket.create"
     assert res.provider == "ServiceNow ITSM"

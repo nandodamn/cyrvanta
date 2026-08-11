@@ -311,6 +311,7 @@ class NativePlaybookDispatcher:
             binding = await session.scalar(
                 select(NativeActionBindingModel).where(
                     NativeActionBindingModel.action_code == step.action,
+                    NativeActionBindingModel.tenant_id == tenant_id,
                     NativeActionBindingModel.action_version == step.action_version,
                     NativeActionBindingModel.connector_type == "SIMULATED",
                     NativeActionBindingModel.active.is_(True),
@@ -339,6 +340,7 @@ class NativePlaybookDispatcher:
             binding = await session.scalar(
                 select(NativeActionBindingModel).where(
                     NativeActionBindingModel.action_code == step.action,
+                    NativeActionBindingModel.tenant_id == context.tenant_id,
                     NativeActionBindingModel.action_version == step.action_version,
                     NativeActionBindingModel.connector_type == "SIMULATED",
                     NativeActionBindingModel.active.is_(True),

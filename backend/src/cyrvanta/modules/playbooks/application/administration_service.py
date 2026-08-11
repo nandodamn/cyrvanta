@@ -27,86 +27,6 @@ from cyrvanta.modules.playbooks.application.administration_schemas import (
     VersionResponse,
 )
 
-PLAYBOOK_INCIDENT_TYPES: dict[str, list[str]] = {
-    "simulate-user-block": ["credential-access", "unauthorized-access"],
-    "notify-critical-incident": ["critical-incidents", "high-risk-detection"],
-    "create-security-ticket": ["operational-tracking", "all-incidents"],
-    "request-dual-approval": ["high-impact-containment", "destructive-actions"],
-    "incident-report-email": ["incident-reporting", "stakeholder-briefing"],
-}
-
-PLAYBOOK_MITRE_CODES: dict[str, list[str]] = {
-    "simulate-user-block": ["T1110", "T1078", "T1098"],
-    "notify-critical-incident": ["T1078", "T1110", "T1499"],
-    "create-security-ticket": ["T1059", "T1078"],
-    "request-dual-approval": ["T1098", "T1485"],
-    "incident-report-email": ["T1078", "T1110"],
-}
-
-PLAYBOOK_AUTOMATION_POLICY_MAP: dict[str, dict[str, str]] = {
-    "compromised-account": {
-        "es": "Revocar sesiones: automática (riesgo medio/alto). Bloqueo de cuenta común: con aprobación. Bloqueo de cuenta privilegiada: aprobación obligatoria.",
-        "en": "Revoke sessions: automatic (medium/high risk). Standard account block: approval-based. Privileged account block: mandatory approval.",
-    },
-    "compromised-endpoint": {
-        "es": "Recolección de evidencia e IoCs: automática. Cuarentena de archivos: automática (confianza alta). Aislamiento de host: automático en estaciones, aprobación en servidores.",
-        "en": "Evidence and IoC collection: automatic. File quarantine: automatic (high confidence). Host isolation: automatic for workstations, approval for servers.",
-    },
-    "phishing-malicious-email": {
-        "es": "Enriquecimiento y búsqueda: automática. Eliminación masiva de correo: aprobación humana obligatoria. Bloqueo de dominio: automático con tiempo acotado.",
-        "en": "Enrichment & search: automatic. Mass email deletion: mandatory human approval. Domain blocking: automatic with time limit.",
-    },
-    "ransomware-destructive": {
-        "es": "Enriquecimiento y alerta crítica: automática. Aislamiento de estaciones: automático con evidencia fuerte. Servidores críticos y backups: aprobación explícita.",
-        "en": "Enrichment & critical alert: automatic. Station isolation: automatic with strong evidence. Critical servers and backups: explicit approval.",
-    },
-    "lateral-movement": {
-        "es": "Correlación y revocación de sesiones: automática. Bloqueo de conexiones laterales y aislamiento de host: aprobación previa.",
-        "en": "Correlation and session revocation: automatic. Lateral connection block and host isolation: prior approval required.",
-    },
-    "malicious-indicator": {
-        "es": "Búsqueda y enriquecimiento: automático. Bloqueo temporal: automático con alta confianza. Bloqueo permanente: aprobación humana.",
-        "en": "Search and enrichment: automatic. Temporary block: automatic with high confidence. Permanent block: human approval.",
-    },
-    "privilege-escalation": {
-        "es": "Contraste con tickets de cambio: automático. Reversión de privilegios y suspensión de cuenta administrada: aprobación obligatoria.",
-        "en": "Contrast with change tickets: automatic. Privilege reversal and admin account suspension: mandatory approval.",
-    },
-    "security-control-disabled": {
-        "es": "Restauración de control EDR/Logs: automática. Suspensión preventiva del sistema: aprobación según severidad.",
-        "en": "EDR/Logs control restoration: automatic. Preventive system suspension: approval according to severity.",
-    },
-    "automated-enrichment": {
-        "es": "Totalmente automática (sin mutación de estado). Prepara el contexto para la decisión humana.",
-        "en": "Fully automatic (non-mutating). Prepares context for human decision.",
-    },
-    "escalation-notification": {
-        "es": "Automática según SLAs del tenant y matriz de severidad del incidente.",
-        "en": "Automatic based on tenant SLAs and incident severity matrix.",
-    },
-    "evidence-preservation": {
-        "es": "Automática al crearse incidentes de alta/crítica severidad. Almacén inmutable cifrado.",
-        "en": "Automatic upon high/critical incident creation. Immutable encrypted vault.",
-    },
-    "closure-controlled-learning": {
-        "es": "Verificación de contención automática. Integración de aprendizaje a la memoria gobernada: aprobación humana obligatoria.",
-        "en": "Automatic containment verification. Memory candidate learning integration: mandatory human approval.",
-    },
-}
-
-PLAYBOOK_ROLLBACK_MAP: dict[str, dict[str, str]] = {
-    "compromised-account": {
-        "code": "rollback-compromised-account",
-        "es": "Restauración de cuenta y desbloqueo de sesiones.",
-        "en": "Account restoration and session unblock.",
-    },
-    "compromised-endpoint": {
-        "code": "rollback-compromised-endpoint",
-        "es": "Liberación de aislamiento de host y restauración de cuarentena.",
-        "en": "Host isolation release and quarantine restoration.",
-    },
-}
-
 ESSENTIAL_NATIVE_PLAYBOOKS: list[dict[str, object]] = [
     {
         "code": "compromised-account",
@@ -1012,17 +932,6 @@ class PlaybookAdministrationService:
         )
         artifact = self._artifact(version) if version.portable_artifact is not None else None
         required = version.input_schema.get("required", [])
-        target_types = PLAYBOOK_INCIDENT_TYPES.get(item.code, [])
-        mitre = PLAYBOOK_MITRE_CODES.get(item.code, [])
-        rollback_guidance = None
-        policy_info = PLAYBOOK_AUTOMATION_POLICY_MAP.get(
-            item.code,
-            {
-                "es": "Ejecución por defecto supervisada con aprobación humana según severidad.",
-                "en": "Default supervised execution with human approval based on severity.",
-            },
-        )
-        policy_guidance = LocalizedDescription(es=policy_info["es"], en=policy_info["en"])
         resolved_engine_type = (
             "N8N"
             if (binding is not None and binding.active and binding.engine_type == "N8N")
@@ -1047,12 +956,12 @@ class PlaybookAdministrationService:
                 "credential_aliases": (
                     list(artifact.credential_aliases) if artifact is not None else []
                 ),
-                "target_incident_types": target_types,
-                "mitre_codes": mitre,
+                "target_incident_types": [],
+                "mitre_codes": [],
                 "rollback_supported": False,
                 "rollback_target_code": None,
-                "rollback_guidance_i18n": rollback_guidance,
-                "automation_policy_i18n": policy_guidance,
+                "rollback_guidance_i18n": None,
+                "automation_policy_i18n": None,
                 "approval_mode": getattr(item, "approval_mode", "AUTOMATIC") or "AUTOMATIC",
                 "last_execution_status": (execution.status if execution is not None else None),
                 "last_executed_at": (execution.created_at if execution is not None else None),

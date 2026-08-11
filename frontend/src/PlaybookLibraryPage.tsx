@@ -175,7 +175,7 @@ export function PlaybookLibraryPage() {
                       }}
                       onClick={() => setSelectedDetails(playbook)}
                     >
-                      🔍 Ampliar Información, Parámetros & MITRE
+                      {t("viewPlaybookDetails")}
                     </button>
                     <button
                       type="button"
@@ -324,7 +324,6 @@ export function PlaybookLibraryPage() {
       {selectedDetails && (
         <PlaybookDetailsModal
           playbook={selectedDetails}
-          requiredIntegration={undefined}
           onClose={() => setSelectedDetails(null)}
         />
       )}

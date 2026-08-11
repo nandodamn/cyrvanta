@@ -45,7 +45,10 @@ def test_definition_projection_has_no_fabricated_readiness_defaults() -> None:
         "async def update_approval_governance", maxsplit=1
     )[0]
 
-    assert "PLAYBOOK_MITRE_CODES.get(item.code, [])" in projection
+    assert "PLAYBOOK_MITRE_CODES" not in projection
+    assert '"target_incident_types": []' in projection
+    assert '"mitre_codes": []' in projection
+    assert '"automation_policy_i18n": None' in projection
     assert 'else "PENDING"' in projection
     assert "else False" in projection
     assert '"rollback_supported": False' in projection

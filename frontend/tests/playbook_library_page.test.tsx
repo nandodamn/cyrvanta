@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import * as api from "../src/api";
@@ -64,5 +64,23 @@ describe("native playbook library", () => {
     expect(screen.getByText(/Sin mappings sustentados|No supported mappings/i)).toBeVisible();
     expect(screen.queryByText("T1078")).not.toBeInTheDocument();
     expect(screen.queryByText(/Rollback habilitado|Rollback enabled/i)).not.toBeInTheDocument();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /Ver detalles del playbook|View playbook details/i }),
+    );
+    const dialog = await screen.findByRole("dialog");
+    expect(
+      within(dialog).getByText(/Sin mappings sustentados|No supported mappings/i),
+    ).toBeVisible();
+    expect(
+      within(dialog).getByText(/No existe un procedimiento|No reversal procedure is published/i),
+    ).toBeVisible();
+    expect(within(dialog).queryByText("T1078")).not.toBeInTheDocument();
+    expect(
+      within(dialog).queryByText(/LISTO PARA PRODUC|READY FOR PRODUCTION/i),
+    ).not.toBeInTheDocument();
+    expect(
+      within(dialog).queryByText(/HABILITADO Y OPERATIVO|ENABLED AND OPERATIONAL/i),
+    ).not.toBeInTheDocument();
   });
 });

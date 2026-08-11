@@ -868,19 +868,6 @@ export async function getPlaybookExecutions(incidentId: string): Promise<Playboo
   ).items;
 }
 
-export async function executeRollbackProposal(
-  incidentId: string,
-): Promise<{ status: string; message: string }> {
-  return (await checked(
-    await authenticatedFetch(`/api/v1/incidents/${incidentId}/rollback`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-    }),
-  )) as { status: string; message: string };
-}
-
 export async function executeAuthorizedResponse(
   authorizationId: string,
 ): Promise<PlaybookExecution> {

@@ -16,7 +16,6 @@ import {
   directoryLogin,
   downloadIncidentReport,
   executeAuthorizedResponse,
-  executeRollbackProposal,
   generateCanonicalDemoScenario,
   generateIncidentExplanation,
   getAlerts,
@@ -1018,19 +1017,6 @@ function IncidentDetailPage() {
       ]);
     },
   });
-  const [hasRolledBack, setHasRolledBack] = useState(false);
-
-  const rollbackResponse = useMutation({
-    mutationFn: () => executeRollbackProposal(id),
-    onSuccess: async () => {
-      setHasRolledBack(true);
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["response-decisions", id] }),
-        queryClient.invalidateQueries({ queryKey: ["playbook-executions", id] }),
-        queryClient.invalidateQueries({ queryKey: ["timeline", id] }),
-      ]);
-    },
-  });
   const approvalDecision = useMutation({
     mutationFn: ({
       requestId,
@@ -1364,9 +1350,12 @@ function IncidentDetailPage() {
               }}
             >
               {responseDecisions.data?.map((decision) => {
-                const isCompleted = ["AUTHORIZED", "ROLLED_BACK", "EXECUTED"].includes(decision.status) || decision.approval_status === "APPROVED";
-                const countApproved = isCompleted ? 2 : Math.max(decision.decisions.filter((d) => d.decision === "APPROVE").length, 0);
-                const totalApprovals = 2;
+                const countApproved = decision.decisions.filter(
+                  (entry) => entry.decision === "APPROVE",
+                ).length;
+                const totalApprovals = decision.required_approvals;
+                const hasRequiredApprovals =
+                  totalApprovals > 0 && countApproved >= totalApprovals;
                 return (
                   <article
                     className="claim-card"
@@ -1394,12 +1383,12 @@ function IncidentDetailPage() {
                           🎯 {t("targetBlockedEntity", { defaultValue: "Usuario / Entidad objetivo del bloqueo:" })}
                         </span>
                         <strong style={{ fontSize: "0.9rem", color: "var(--text-bright)", fontFamily: "var(--font-mono, monospace)" }}>
-                          {decision.targets && decision.targets.length > 0 ? decision.targets.join(", ") : "synthetic-demo-user"}
+                          {decision.targets && decision.targets.length > 0 ? decision.targets.join(", ") : t("notAvailable")}
                         </strong>
                       </div>
                       <p style={{ margin: "6px 0", fontSize: "0.9rem" }}>
                         <strong>{t("approvalProgress")}:</strong> {countApproved}/{totalApprovals}
-                        {isCompleted && <span style={{ color: "var(--accent)", marginLeft: "6px", fontWeight: 600 }}>✓ Aprobado por 4-Ojos</span>}
+                        {hasRequiredApprovals && <span style={{ color: "var(--accent)", marginLeft: "6px", fontWeight: 600 }}>✓ Aprobado por 4-Ojos</span>}
                       </p>
                       <small style={{ color: "var(--muted)", display: "block", marginTop: "6px" }}>
                         {t("policyOutcome")}: {decision.evaluation_outcome} · {decision.reason_codes.join(" · ")}
@@ -1456,39 +1445,7 @@ function IncidentDetailPage() {
                           ▶ {t("simulateResponse")}
                         </button>
                       )}
-                      {(() => {
-                        const isRolledBack = hasRolledBack || decision.status === "ROLLED_BACK" || rollbackResponse.isSuccess;
-                        return (
-                          <>
-                            <button
-                              type="button"
-                              className="ghost"
-                              style={{
-                                width: "100%",
-                                marginTop: "8px",
-                                minHeight: "38px",
-                                color: isRolledBack ? "#10b981" : "var(--accent)",
-                                borderColor: isRolledBack ? "rgba(16, 185, 129, 0.4)" : undefined,
-                                background: isRolledBack ? "rgba(16, 185, 129, 0.08)" : undefined,
-                                cursor: isRolledBack ? "not-allowed" : "pointer",
-                              }}
-                              disabled={rollbackResponse.isPending || isRolledBack}
-                              onClick={() => rollbackResponse.mutate()}
-                            >
-                              {rollbackResponse.isPending
-                                ? t("loading")
-                                : isRolledBack
-                                ? `✓ ${t("rollbackCompleted", { defaultValue: "Rollback Ejecutado — Acceso Restaurado" })}`
-                                : `🔄 ${t("rollbackAction", { defaultValue: "Deshacer / Rollback (Restaurar Acceso)" })}`}
-                            </button>
-                            {isRolledBack && (
-                              <p style={{ margin: "6px 0 0", fontSize: "0.8rem", color: "#10b981", textAlign: "center", fontWeight: 600 }}>
-                                ✓ {t("rollbackExecuted", { defaultValue: "Acceso del usuario restaurado a estado activo." })}
-                              </p>
-                            )}
-                          </>
-                        );
-                      })()}
+
                     </div>
                   </article>
                 );
@@ -1969,9 +1926,12 @@ function IncidentDetailPage() {
                 }}
               >
                 {responseDecisions.data?.map((decision) => {
-                  const isCompleted = ["AUTHORIZED", "ROLLED_BACK", "EXECUTED"].includes(decision.status) || decision.approval_status === "APPROVED";
-                  const countApproved = isCompleted ? 2 : Math.max(decision.decisions.filter((d) => d.decision === "APPROVE").length, 0);
-                  const totalApprovals = 2;
+                  const countApproved = decision.decisions.filter(
+                    (entry) => entry.decision === "APPROVE",
+                  ).length;
+                  const totalApprovals = decision.required_approvals;
+                  const hasRequiredApprovals =
+                    totalApprovals > 0 && countApproved >= totalApprovals;
                   return (
                     <article className="claim-card" key={decision.id} style={{ borderLeft: "3px solid var(--accent)" }}>
                       <div className="claim-badges" style={{ marginBottom: "8px" }}>
@@ -1985,19 +1945,30 @@ function IncidentDetailPage() {
                       <div style={{ background: "var(--panel-raised)", padding: "6px 10px", borderRadius: "4px", margin: "6px 0", fontSize: "0.825rem" }}>
                         🎯 <span style={{ color: "var(--muted)" }}>Target:</span>{" "}
                         <strong style={{ fontFamily: "var(--font-mono, monospace)" }}>
-                          {decision.targets && decision.targets.length > 0 ? decision.targets.join(", ") : "synthetic-demo-user"}
+                          {decision.targets && decision.targets.length > 0 ? decision.targets.join(", ") : t("notAvailable")}
                         </strong>
                       </div>
                       <small style={{ color: "var(--text-soft)", display: "block", marginTop: "4px" }}>
                         📅 {new Date(decision.created_at).toLocaleString(i18n.language)}
                       </small>
                       <small style={{ color: "var(--muted)", display: "block", marginTop: "2px" }}>
-                        Aprobaciones: {countApproved}/{totalApprovals} {isCompleted && <span style={{ color: "var(--accent)", marginLeft: "4px" }}>✓ Aprobado por 4-Ojos</span>} · Evaluación: {decision.evaluation_outcome}
+                        Aprobaciones: {countApproved}/{totalApprovals} {hasRequiredApprovals && <span style={{ color: "var(--accent)", marginLeft: "4px" }}>✓ Aprobado por 4-Ojos</span>} · Evaluación: {decision.evaluation_outcome}
                       </small>
                       <div style={{ fontSize: "0.8rem", color: "var(--muted)", marginTop: "6px", display: "flex", flexDirection: "column", gap: "2px", background: "var(--panel-raised)", padding: "6px 10px", borderRadius: "4px" }}>
-                        <span>👤 <strong>Solicitante:</strong> {decision.requester_user_id === currentUser.data?.id ? `${currentUser.data?.email} (Analista SOC)` : "demo@cyrvanta.uy"}</span>
-                        {isCompleted && <span>✍️ <strong>Firma 4-Ojos:</strong> ldap-demo@cyrvanta.uy (2º Analista Aprobador)</span>}
-                        {decision.status === "ROLLED_BACK" && <span style={{ color: "#10b981", fontWeight: 600 }}>🔄 <strong>Rollback por:</strong> {currentUser.data?.email || "demo@cyrvanta.uy"}</span>}
+                        <span>
+                          <strong>{t("requester")}:</strong>{" "}
+                          {decision.requester_user_id === currentUser.data?.id
+                            ? currentUser.data?.email ?? decision.requester_user_id
+                            : decision.requester_user_id}
+                        </span>
+                        {decision.decisions.map((entry) => (
+                          <span key={entry.id}>
+                            {t("decisionRecordedBy", {
+                              decision: entry.decision,
+                              actor: entry.actor_user_id,
+                            })}
+                          </span>
+                        ))}
                       </div>
                       {decision.approval_request_id && decision.approval_status === "PENDING" && (
                         currentUser.data?.id !== decision.requester_user_id ? (
@@ -2131,8 +2102,16 @@ function AuditPage() {
         />
         <div className="data-list">
           {items.map((event) => {
-            const actorEmail = (event.details?.actor_email as string) || (event.actor_user_id ? "demo@cyrvanta.uy" : "system@cyrvanta.local");
-            const clientIp = (event.details?.client_ip as string) || "127.0.0.1";
+            const recordedActor = event.details?.actor_email;
+            const actorLabel =
+              typeof recordedActor === "string" && recordedActor.trim()
+                ? recordedActor
+                : event.actor_user_id ?? t("systemActor");
+            const recordedClientIp = event.details?.client_ip;
+            const clientIp =
+              typeof recordedClientIp === "string" && recordedClientIp.trim()
+                ? recordedClientIp
+                : t("notAvailable");
             return (
               <article key={event.id} style={{ display: "grid", gridTemplateColumns: "100px 1.5fr 1.2fr 1fr 160px", alignItems: "center", gap: "12px" }}>
                 <span className="severity" style={{ textAlign: "center" }}>{event.outcome}</span>
@@ -2142,7 +2121,7 @@ function AuditPage() {
                 </div>
                 <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: "6px", fontSize: "0.85rem", color: "var(--text-soft)" }}>
                   <span style={{ fontSize: "0.95rem", lineHeight: 1 }}>👤</span>
-                  <strong style={{ whiteSpace: "nowrap" }}>{actorEmail}</strong>
+                  <strong style={{ whiteSpace: "nowrap" }}>{actorLabel}</strong>
                 </div>
                 <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: "6px", fontSize: "0.85rem", color: "var(--muted)", fontFamily: "var(--font-mono, monospace)" }}>
                   <span style={{ fontSize: "0.95rem", lineHeight: 1 }}>🌐</span>

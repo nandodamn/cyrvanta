@@ -254,24 +254,6 @@ async def add_timeline(
     return TimelineResponse.model_validate(entry)
 
 
-@router.post("/incidents/{incident_id}/rollback")
-async def execute_incident_rollback(
-    incident_id: UUID,
-    request: Request,
-    context: IncidentUpdatePermission,
-    service: Service,
-) -> dict[str, object]:
-    try:
-        return await service.execute_rollback(
-            context.tenant_id,
-            context.user_id,
-            incident_id,
-            correlation_id(request),
-        )
-    except IncidentNotFound as exc:
-        raise translate_error(exc) from exc
-
-
 @router.post("/demo/scenarios/credential-attack", response_model=DemoScenarioResponse)
 async def generate_credential_attack_demo(
     request: Request, context: IncidentCreatePermission, service: Service

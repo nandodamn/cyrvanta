@@ -61,7 +61,7 @@ function MemoryCard({ item }: { item: MemoryCandidate }) {
       style={{
         display: "flex",
         flexDirection: "column",
-        justify: "space-between",
+        justifyContent: "space-between",
         border: "1px solid var(--panel-border)",
         borderRadius: "8px",
         padding: "1.25rem",
@@ -71,7 +71,7 @@ function MemoryCard({ item }: { item: MemoryCandidate }) {
         <div
           style={{
             display: "flex",
-            justify: "space-between",
+            justifyContent: "space-between",
             alignItems: "flex-start",
             gap: "10px",
             marginBottom: "12px",
@@ -362,7 +362,7 @@ export function GovernedMemoryPage() {
         className="page-title"
         style={{
           display: "flex",
-          justify: "space-between",
+          justifyContent: "space-between",
           alignItems: "flex-end",
           flexWrap: "wrap",
           gap: "1rem",
@@ -470,7 +470,7 @@ export function GovernedMemoryPage() {
           padding: "10px 14px",
           marginBottom: "1.25rem",
           display: "flex",
-          justify: "space-between",
+          justifyContent: "space-between",
           alignItems: "center",
           flexWrap: "wrap",
           gap: "12px",

@@ -134,7 +134,7 @@ const operationalActivity24hSchema = z.object({
 });
 const integrationHealthSchema = z.object({
   code: z.string(),
-  mode: z.string(),
+  mode: z.enum(["disabled", "simulated", "live"]),
   healthy: z.boolean(),
   detail: z.string(),
 });
@@ -304,7 +304,7 @@ const playbookDefinitionSchema = z.object({
   credential_aliases: z.array(z.string()),
   target_incident_types: z.array(z.string()).default([]),
   mitre_codes: z.array(z.string()).default([]),
-  rollback_supported: z.boolean().default(true),
+  rollback_supported: z.boolean().default(false),
   rollback_target_code: z.string().nullable().default(null),
   rollback_guidance_i18n: z.object({ es: z.string(), en: z.string() }).nullable().default(null),
   automation_policy_i18n: z.object({ es: z.string(), en: z.string() }).nullable().default(null),
@@ -696,7 +696,7 @@ export async function getIncidents(options?: ListQuery): Promise<Incident[]> {
 export async function getIncident(id: string): Promise<Incident> {
   return incidentSchema.parse(await authorized(`/api/v1/incidents/${id}`));
 }
-export async function getIncidentAlerts(id: string): Promise<AlertReference[]> {
+export async function getIncidentAlerts(id: string): Promise<Alert[]> {
   return z.array(alertSchema).parse(await authorized(`/api/v1/incidents/${id}/alerts`));
 }
 export async function getTimeline(id: string): Promise<TimelineEntry[]> {
@@ -871,14 +871,14 @@ export async function getPlaybookExecutions(incidentId: string): Promise<Playboo
 export async function executeRollbackProposal(
   incidentId: string,
 ): Promise<{ status: string; message: string }> {
-  return checked(
+  return (await checked(
     await authenticatedFetch(`/api/v1/incidents/${incidentId}/rollback`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
     }),
-  ) as { status: string; message: string };
+  )) as { status: string; message: string };
 }
 
 export async function executeAuthorizedResponse(

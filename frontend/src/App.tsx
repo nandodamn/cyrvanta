@@ -7,6 +7,7 @@ import { NavLink, Navigate, Outlet, Route, Routes, useNavigate, useParams } from
 import { z } from "zod";
 
 import {
+  Alert,
   createRole,
   createUser,
   createDemoResponseProposal,
@@ -15,6 +16,7 @@ import {
   directoryLogin,
   downloadIncidentReport,
   executeAuthorizedResponse,
+  executeRollbackProposal,
   generateCanonicalDemoScenario,
   generateIncidentExplanation,
   getAlerts,
@@ -23,9 +25,9 @@ import {
   getCorrelations,
   getDirectoryConfiguration,
   getIncident,
+  getIncidentAlerts,
   getIncidentEnrichment,
   getIncidents,
-  getIntegrationHealth,
   getMe,
   getPermissions,
   getPlaybookExecutions,
@@ -43,6 +45,7 @@ import {
   saveDirectoryConfiguration,
   testDirectoryConfiguration,
   transitionIncident,
+  updateAlertTriage,
 } from "./api";
 import { ApiKeysPage } from "./ApiKeysPage";
 import { GovernedMemoryPage } from "./GovernedMemoryPage";
@@ -50,7 +53,7 @@ import { PlaybookLibraryPage } from "./PlaybookLibraryPage";
 import { OperationalPulse } from "./OperationalPulse";
 import { SecurityTopologyPanel } from "./SecurityTopologyPanel";
 import { useAuth } from "./AuthContext";
-import { ConnectionModal, ConnectionMeta } from "./ConnectionModal";
+import { VerifiedIntegrationsPage } from "./VerifiedIntegrationsPage";
 
 const NAV_ITEMS: ReadonlyArray<{ to: string; icon: React.ReactNode; key: string; end?: boolean }> = [
   {
@@ -679,7 +682,7 @@ function AlertsPage() {
                     display: "flex",
                     alignItems: "center",
                     gap: "8px",
-                    justify: "flex-end",
+                    justifyContent: "flex-end",
                     flexWrap: "wrap",
                   }}
                 >
@@ -760,7 +763,7 @@ function AlertsPage() {
                     <div
                       style={{
                         display: "flex",
-                        justify: "space-between",
+                        justifyContent: "space-between",
                         alignItems: "center",
                         marginBottom: "12px",
                       }}
@@ -1104,7 +1107,7 @@ function IncidentDetailPage() {
           aria-label="Incident Detail Sections"
           style={{
             display: "flex",
-            justify: "space-between",
+            justifyContent: "space-between",
             alignItems: "center",
             background: "var(--panel-raised)",
             border: "1px solid var(--line)",
@@ -1289,7 +1292,7 @@ function IncidentDetailPage() {
             <div
               style={{
                 display: "flex",
-                justify: "space-between",
+                justifyContent: "space-between",
                 alignItems: "flex-start",
                 marginBottom: "1rem",
                 flexWrap: "wrap",
@@ -1371,7 +1374,7 @@ function IncidentDetailPage() {
                     style={{
                       display: "flex",
                       flexDirection: "column",
-                      justify: "space-between",
+                      justifyContent: "space-between",
                       padding: "1.25rem",
                       border: "1px solid var(--panel-border)",
                       borderRadius: "8px",
@@ -2062,8 +2065,8 @@ function IncidentDetailPage() {
                       <span className="severity" style={{ fontSize: "0.75rem", textTransform: "uppercase" }}>
                         {entry.entry_type}
                       </span>
-                      <time dateTime={entry.created_at} style={{ fontSize: "0.8rem", color: "var(--muted)" }}>
-                        📅 {new Date(entry.created_at).toLocaleString(i18n.language)}
+                      <time dateTime={entry.recorded_at} style={{ fontSize: "0.8rem", color: "var(--muted)" }}>
+                        📅 {new Date(entry.recorded_at).toLocaleString(i18n.language)}
                       </time>
                     </div>
                     <p style={{ margin: "4px 0 0", fontSize: "0.875rem", color: "var(--text)" }}>
@@ -2080,384 +2083,6 @@ function IncidentDetailPage() {
             </div>
           </section>
         </div>
-      )}
-    </>
-  );
-}
-
-function IntegrationsPage() {
-  const { t } = useTranslation();
-  const health = useQuery({ queryKey: ["integration-health"], queryFn: getIntegrationHealth });
-  const wazuh = health.data?.find((item) => item.code === "wazuh");
-  const platformServices = health.data?.filter((item) => item.code !== "wazuh") ?? [];
-  const plannedConnectors = [
-    "IBM QRadar",
-    "Splunk Enterprise Security",
-    "Microsoft Sentinel",
-    "Elastic Security",
-    "ArcSight",
-    "LogRhythm",
-    "Google Security Operations",
-  ];
-  
-  // Interactive Connection Modal & Category Filter state
-  const [activeConn, setActiveConn] = useState<ConnectionMeta | null>(null);
-  const [modalMode, setModalMode] = useState<"config" | "test">("config");
-  const [selectedCategory, setSelectedCategory] = useState<string>("ALL");
-
-  const openModal = (conn: ConnectionMeta, mode: "config" | "test") => {
-    setActiveConn(conn);
-    setModalMode(mode);
-  };
-
-  return (
-    <>
-      <div className="page-title">
-        <div>
-          <p className="eyebrow">{t("securityDataSources")}</p>
-          <h1>{t("integrations")}</h1>
-          <p className="muted">Gestión de Conexiones, Secretos Cifrados y Resoluctor de Capacidades SOAR</p>
-        </div>
-      </div>
-      <PageState
-        loading={health.isLoading}
-        error={health.isError}
-        empty={!health.isLoading && !health.isError && health.data?.length === 0}
-      />
-
-      {/* Hero Executive Summary Header */}
-      <section
-        style={{
-          marginBottom: "1.5rem",
-          background: "var(--panel)",
-          border: "1px solid var(--panel-border)",
-          borderRadius: "8px",
-          padding: "1.25rem 1.5rem",
-        }}
-      >
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "12px", marginBottom: "1rem" }}>
-          <div>
-            <span style={{ fontSize: "0.75rem", color: "var(--accent)", fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase" }}>
-              ARCHITECTURAL SINGLE SOURCE OF TRUTH
-            </span>
-            <h2 style={{ margin: "2px 0 0", fontSize: "1.3rem" }}>
-              🏛️ Biblioteca de Conexiones & Secretos del Tenant
-            </h2>
-            <p style={{ margin: "4px 0 0", fontSize: "0.85rem", color: "var(--muted)" }}>
-              Catálogo centralizado de conectores, credenciales cifradas por tenant (AES-256-GCM) y resoluctor de capacidades SOAR.
-            </p>
-          </div>
-          <span style={{ fontSize: "0.75rem", background: "rgba(13, 209, 155, 0.1)", color: "var(--accent)", padding: "6px 12px", borderRadius: "6px", fontWeight: 700, border: "1px solid rgba(13, 209, 155, 0.2)" }}>
-            🔒 AES-256-GCM ENCRYPTED
-          </span>
-        </div>
-
-        {/* 4 Summary Metric Pills */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "10px" }}>
-          <div style={{ background: "var(--panel-raised)", padding: "10px 14px", borderRadius: "6px", border: "1px solid var(--line)" }}>
-            <span style={{ fontSize: "0.75rem", color: "var(--muted)", textTransform: "uppercase" }}>Total Conexiones</span>
-            <strong style={{ display: "block", fontSize: "1.2rem", color: "var(--text)", marginTop: "2px" }}>9 Configuradas</strong>
-          </div>
-          <div style={{ background: "var(--panel-raised)", padding: "10px 14px", borderRadius: "6px", border: "1px solid var(--line)" }}>
-            <span style={{ fontSize: "0.75rem", color: "var(--muted)", textTransform: "uppercase" }}>Estado de Salud</span>
-            <strong style={{ display: "block", fontSize: "1.2rem", color: "var(--accent)", marginTop: "2px" }}>● 9 Saludables</strong>
-          </div>
-          <div style={{ background: "var(--panel-raised)", padding: "10px 14px", borderRadius: "6px", border: "1px solid var(--line)" }}>
-            <span style={{ fontSize: "0.75rem", color: "var(--muted)", textTransform: "uppercase" }}>Ambiente de Lab</span>
-            <strong style={{ display: "block", fontSize: "1.2rem", color: "#ffb703", marginTop: "2px" }}>3 Conectores Lab</strong>
-          </div>
-          <div style={{ background: "var(--panel-raised)", padding: "10px 14px", borderRadius: "6px", border: "1px solid var(--line)" }}>
-            <span style={{ fontSize: "0.75rem", color: "var(--muted)", textTransform: "uppercase" }}>Gestor de Secretos</span>
-            <strong style={{ display: "block", fontSize: "1.2rem", color: "var(--text)", marginTop: "2px" }}>SecretCipher DB</strong>
-          </div>
-        </div>
-      </section>
-
-      {/* Connection Type Filter Bar */}
-      <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "1.5rem", flexWrap: "wrap" }}>
-        <span style={{ fontSize: "0.85rem", color: "var(--muted)", fontWeight: 600 }}>Filtrar por tipo de conexión:</span>
-        <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-          {[
-            { id: "ALL", label: "Todas" },
-            { id: "SIEM", label: "🛡️ SIEM & Evidencias" },
-            { id: "AI_SOAR", label: "🧠 IA & Automatización" },
-            { id: "LAB_IDENTITY", label: "🔒 Identidad & Lab" },
-            { id: "ENTERPRISE", label: "🌐 Enterprise & EDR" },
-          ].map((cat) => {
-            const isSelected = selectedCategory === cat.id;
-            return (
-              <button
-                key={cat.id}
-                type="button"
-                onClick={() => setSelectedCategory(cat.id)}
-                style={{
-                  width: "auto",
-                  minWidth: "unset",
-                  height: "auto",
-                  padding: "6px 14px",
-                  fontSize: "0.825rem",
-                  borderRadius: "6px",
-                  border: isSelected ? "1px solid var(--accent)" : "1px solid var(--line)",
-                  background: isSelected ? "rgba(13, 209, 155, 0.15)" : "var(--panel)",
-                  color: isSelected ? "var(--accent)" : "var(--text)",
-                  fontWeight: isSelected ? 700 : 500,
-                  cursor: "pointer",
-                  whiteSpace: "nowrap",
-                  transition: "all 0.15s ease",
-                }}
-              >
-                {cat.label}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Category 1: Fuentes de Seguridad & SIEM */}
-      {(selectedCategory === "ALL" || selectedCategory === "SIEM") && (
-        <div style={{ marginBottom: "1.5rem" }}>
-          <h3 style={{ fontSize: "1rem", color: "var(--text)", marginBottom: "0.75rem", display: "flex", alignItems: "center", gap: "8px" }}>
-            <span>🛡️</span> Fuentes de Seguridad, SIEM & Evidencias Forenses
-          </h3>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: "1rem" }}>
-            {/* Wazuh */}
-            <div style={{ background: "var(--panel)", border: "1px solid var(--line)", borderRadius: "8px", padding: "1rem" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
-                <strong style={{ fontSize: "0.95rem" }}>Wazuh SIEM Manager</strong>
-                <span style={{ fontSize: "0.7rem", color: "var(--accent)", fontWeight: 700, background: "rgba(13, 209, 155, 0.1)", padding: "2px 6px", borderRadius: "4px" }}>ACTIVE</span>
-              </div>
-              <p style={{ fontSize: "0.8rem", color: "var(--muted)", margin: "0 0 10px" }}>
-                Conector: <code>wazuh</code> · Ambiente: <span style={{ color: "var(--text)" }}>Producción / Lab</span>
-              </p>
-              <div style={{ fontSize: "0.75rem", background: "#06120f", padding: "6px 8px", borderRadius: "4px", marginBottom: "10px", fontFamily: "monospace", color: "var(--accent)" }}>
-                security.alert.read, security.evidence.retrieve
-              </div>
-              <div style={{ display: "flex", gap: "6px" }}>
-                <button type="button" className="ghost" style={{ fontSize: "0.75rem", padding: "4px 10px" }} onClick={() => openModal({ id: "wazuh", name: "Wazuh SIEM Manager", connectorType: "wazuh", environment: "Producción / Lab", capabilities: "security.alert.read, security.evidence.retrieve", defaultUrl: "https://127.0.0.1:55000", secretLabel: "Wazuh API User / Password" }, "config")}>🔑 Credenciales</button>
-                <button type="button" className="ghost" style={{ fontSize: "0.75rem", padding: "4px 10px" }} onClick={() => openModal({ id: "wazuh", name: "Wazuh SIEM Manager", connectorType: "wazuh", environment: "Producción / Lab", capabilities: "security.alert.read, security.evidence.retrieve" }, "test")}>⚡ Probar Conexión</button>
-              </div>
-            </div>
-
-            {/* OpenSearch */}
-            <div style={{ background: "var(--panel)", border: "1px solid var(--line)", borderRadius: "8px", padding: "1rem" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
-                <strong style={{ fontSize: "0.95rem" }}>OpenSearch Indexer</strong>
-                <span style={{ fontSize: "0.7rem", color: "var(--accent)", fontWeight: 700, background: "rgba(13, 209, 155, 0.1)", padding: "2px 6px", borderRadius: "4px" }}>ACTIVE</span>
-              </div>
-              <p style={{ fontSize: "0.8rem", color: "var(--muted)", margin: "0 0 10px" }}>
-                Conector: <code>opensearch</code> · Ambiente: <span style={{ color: "var(--text)" }}>Producción</span>
-              </p>
-              <div style={{ fontSize: "0.75rem", background: "#06120f", padding: "6px 8px", borderRadius: "4px", marginBottom: "10px", fontFamily: "monospace", color: "var(--accent)" }}>
-                security.evidence.search
-              </div>
-              <div style={{ display: "flex", gap: "6px" }}>
-                <button type="button" className="ghost" style={{ fontSize: "0.75rem", padding: "4px 10px" }} onClick={() => openModal({ id: "opensearch", name: "OpenSearch Indexer", connectorType: "opensearch", environment: "Producción", capabilities: "security.evidence.search", defaultUrl: "http://127.0.0.1:9200", secretLabel: "Cluster Auth Key" }, "config")}>🔑 Credenciales</button>
-                <button type="button" className="ghost" style={{ fontSize: "0.75rem", padding: "4px 10px" }} onClick={() => openModal({ id: "opensearch", name: "OpenSearch Indexer", connectorType: "opensearch", environment: "Producción", capabilities: "security.evidence.search" }, "test")}>⚡ Probar Conexión</button>
-              </div>
-            </div>
-
-            {/* MISP */}
-            <div style={{ background: "var(--panel)", border: "1px solid var(--line)", borderRadius: "8px", padding: "1rem" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
-                <strong style={{ fontSize: "0.95rem" }}>MISP Threat Intelligence</strong>
-                <span style={{ fontSize: "0.7rem", color: "var(--accent)", fontWeight: 700, background: "rgba(13, 209, 155, 0.1)", padding: "2px 6px", borderRadius: "4px" }}>ACTIVE</span>
-              </div>
-              <p style={{ fontSize: "0.8rem", color: "var(--muted)", margin: "0 0 10px" }}>
-                Conector: <code>misp</code> · Ambiente: <span style={{ color: "var(--text)" }}>Producción</span>
-              </p>
-              <div style={{ fontSize: "0.75rem", background: "#06120f", padding: "6px 8px", borderRadius: "4px", marginBottom: "10px", fontFamily: "monospace", color: "var(--accent)" }}>
-                threatintel.indicator.search
-              </div>
-              <div style={{ display: "flex", gap: "6px" }}>
-                <button type="button" className="ghost" style={{ fontSize: "0.75rem", padding: "4px 10px" }} onClick={() => openModal({ id: "misp", name: "MISP Threat Intelligence", connectorType: "misp", environment: "Producción", capabilities: "threatintel.indicator.search", defaultUrl: "https://misp.local/attributes/restSearch", secretLabel: "MISP Auth Key" }, "config")}>🔑 Credenciales API Key</button>
-                <button type="button" className="ghost" style={{ fontSize: "0.75rem", padding: "4px 10px" }} onClick={() => openModal({ id: "misp", name: "MISP Threat Intelligence", connectorType: "misp", environment: "Producción", capabilities: "threatintel.indicator.search" }, "test")}>⚡ Probar Conexión</button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Category 2: IA & Automatización */}
-      {(selectedCategory === "ALL" || selectedCategory === "AI_SOAR") && (
-        <div style={{ marginBottom: "1.5rem" }}>
-          <h3 style={{ fontSize: "1rem", color: "var(--text)", marginBottom: "0.75rem", display: "flex", alignItems: "center", gap: "8px" }}>
-            <span>🧠</span> Inteligencia Artificial & Automatización SOAR
-          </h3>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: "1rem" }}>
-            {/* Ollama */}
-            <div style={{ background: "var(--panel)", border: "1px solid var(--line)", borderRadius: "8px", padding: "1rem" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
-                <strong style={{ fontSize: "0.95rem" }}>Ollama AI Engine (Gemma 4)</strong>
-                <span style={{ fontSize: "0.7rem", color: "var(--accent)", fontWeight: 700, background: "rgba(13, 209, 155, 0.1)", padding: "2px 6px", borderRadius: "4px" }}>ACTIVE</span>
-              </div>
-              <p style={{ fontSize: "0.8rem", color: "var(--muted)", margin: "0 0 10px" }}>
-                Conector: <code>ollama</code> · Ambiente: <span style={{ color: "var(--text)" }}>Local On-Premise</span>
-              </p>
-              <div style={{ fontSize: "0.75rem", background: "#06120f", padding: "6px 8px", borderRadius: "4px", marginBottom: "10px", fontFamily: "monospace", color: "var(--accent)" }}>
-                ai.inference.execute
-              </div>
-              <div style={{ display: "flex", gap: "6px" }}>
-                <button type="button" className="ghost" style={{ fontSize: "0.75rem", padding: "4px 10px" }} onClick={() => openModal({ id: "ollama", name: "Ollama AI Engine (Gemma 4)", connectorType: "ollama", environment: "Local On-Premise", capabilities: "ai.inference.execute", defaultUrl: "http://127.0.0.1:11434", secretLabel: "API Token / Key (Opcional)" }, "config")}>🔑 Endpoint & Model</button>
-                <button type="button" className="ghost" style={{ fontSize: "0.75rem", padding: "4px 10px" }} onClick={() => openModal({ id: "ollama", name: "Ollama AI Engine (Gemma 4)", connectorType: "ollama", environment: "Local On-Premise", capabilities: "ai.inference.execute" }, "test")}>⚡ Probar Conexión</button>
-              </div>
-            </div>
-
-            {/* n8n */}
-            <div style={{ background: "var(--panel)", border: "1px solid var(--line)", borderRadius: "8px", padding: "1rem" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
-                <strong style={{ fontSize: "0.95rem" }}>n8n Workflows Engine</strong>
-                <span style={{ fontSize: "0.7rem", color: "var(--accent)", fontWeight: 700, background: "rgba(13, 209, 155, 0.1)", padding: "2px 6px", borderRadius: "4px" }}>ACTIVE</span>
-              </div>
-              <p style={{ fontSize: "0.8rem", color: "var(--muted)", margin: "0 0 10px" }}>
-                Conector: <code>n8n</code> · Ambiente: <span style={{ color: "var(--text)" }}>Producción / Lab</span>
-              </p>
-              <div style={{ fontSize: "0.75rem", background: "#06120f", padding: "6px 8px", borderRadius: "4px", marginBottom: "10px", fontFamily: "monospace", color: "var(--accent)" }}>
-                automation.workflow.execute
-              </div>
-              <div style={{ display: "flex", gap: "6px" }}>
-                <button type="button" className="ghost" style={{ fontSize: "0.75rem", padding: "4px 10px" }} onClick={() => openModal({ id: "n8n", name: "n8n Workflows Engine", connectorType: "n8n", environment: "Producción / Lab", capabilities: "automation.workflow.execute", defaultUrl: "http://127.0.0.1:5678", secretLabel: "X-N8N-API-KEY" }, "config")}>🔑 Credenciales API Key</button>
-                <button type="button" className="ghost" style={{ fontSize: "0.75rem", padding: "4px 10px" }} onClick={() => openModal({ id: "n8n", name: "n8n Workflows Engine", connectorType: "n8n", environment: "Producción / Lab", capabilities: "automation.workflow.execute" }, "test")}>⚡ Probar Conexión</button>
-              </div>
-            </div>
-
-            {/* ServiceNow */}
-            <div style={{ background: "var(--panel)", border: "1px solid var(--line)", borderRadius: "8px", padding: "1rem" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
-                <strong style={{ fontSize: "0.95rem" }}>ServiceNow ITSM / SecOps</strong>
-                <span style={{ fontSize: "0.7rem", color: "var(--accent)", fontWeight: 700, background: "rgba(13, 209, 155, 0.1)", padding: "2px 6px", borderRadius: "4px" }}>ENTERPRISE</span>
-              </div>
-              <p style={{ fontSize: "0.8rem", color: "var(--muted)", margin: "0 0 10px" }}>
-                Conector: <code>servicenow</code> · Ambiente: <span style={{ color: "var(--text)" }}>Producción</span>
-              </p>
-              <div style={{ fontSize: "0.75rem", background: "#06120f", padding: "6px 8px", borderRadius: "4px", marginBottom: "10px", fontFamily: "monospace", color: "var(--accent)" }}>
-                ticket.create, ticket.update
-              </div>
-              <div style={{ display: "flex", gap: "6px" }}>
-                <button type="button" className="ghost" style={{ fontSize: "0.75rem", padding: "4px 10px" }} onClick={() => openModal({ id: "servicenow", name: "ServiceNow ITSM / SecOps", connectorType: "servicenow", environment: "Producción", capabilities: "ticket.create, ticket.update", defaultUrl: "https://instance.service-now.com/api/now/table/incident", secretLabel: "Basic Auth / OAuth Token" }, "config")}>🔑 Credenciales Basic/OAuth</button>
-                <button type="button" className="ghost" style={{ fontSize: "0.75rem", padding: "4px 10px" }} onClick={() => openModal({ id: "servicenow", name: "ServiceNow ITSM / SecOps", connectorType: "servicenow", environment: "Producción", capabilities: "ticket.create, ticket.update" }, "test")}>⚡ Probar Conexión</button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Category 3: Identidad, Red & Aislamiento Local (Lab) */}
-      {(selectedCategory === "ALL" || selectedCategory === "LAB_IDENTITY") && (
-        <div style={{ marginBottom: "1.5rem" }}>
-          <h3 style={{ fontSize: "1rem", color: "var(--text)", marginBottom: "0.75rem", display: "flex", alignItems: "center", gap: "8px" }}>
-            <span>🔒</span> Identidad, Notificaciones & Respuesta Local (Laboratorio)
-          </h3>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: "1rem" }}>
-            {/* SMTP Lab */}
-            <div style={{ background: "var(--panel)", border: "1px solid var(--line)", borderRadius: "8px", padding: "1rem" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
-                <strong style={{ fontSize: "0.95rem" }}>SMTP Lab Mailer</strong>
-                <span style={{ fontSize: "0.7rem", color: "#ffb703", fontWeight: 700, background: "rgba(255, 183, 3, 0.1)", padding: "2px 6px", borderRadius: "4px" }}>LABORATORY</span>
-              </div>
-              <p style={{ fontSize: "0.8rem", color: "var(--muted)", margin: "0 0 10px" }}>
-                Conector: <code>smtp_lab</code> · Ambiente: <span style={{ color: "var(--text)" }}>Laboratory</span>
-              </p>
-              <div style={{ fontSize: "0.75rem", background: "#06120f", padding: "6px 8px", borderRadius: "4px", marginBottom: "10px", fontFamily: "monospace", color: "var(--accent)" }}>
-                notification.email.send
-              </div>
-              <div style={{ display: "flex", gap: "6px" }}>
-                <button type="button" className="ghost" style={{ fontSize: "0.75rem", padding: "4px 10px" }} onClick={() => openModal({ id: "smtp_lab", name: "SMTP Lab Mailer", connectorType: "smtp_lab", environment: "Laboratory", capabilities: "notification.email.send", defaultUrl: "smtp://127.0.0.1:1025", secretLabel: "SMTP Auth Password" }, "config")}>🔑 Configuración SMTP</button>
-                <button type="button" className="ghost" style={{ fontSize: "0.75rem", padding: "4px 10px" }} onClick={() => openModal({ id: "smtp_lab", name: "SMTP Lab Mailer", connectorType: "smtp_lab", environment: "Laboratory", capabilities: "notification.email.send" }, "test")}>⚡ Probar Conexión</button>
-              </div>
-            </div>
-
-            {/* Windows Local Account */}
-            <div style={{ background: "var(--panel)", border: "1px solid var(--line)", borderRadius: "8px", padding: "1rem" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
-                <strong style={{ fontSize: "0.95rem" }}>Windows Local Account (Lab)</strong>
-                <span style={{ fontSize: "0.7rem", color: "#ffb703", fontWeight: 700, background: "rgba(255, 183, 3, 0.1)", padding: "2px 6px", borderRadius: "4px" }}>LABORATORY</span>
-              </div>
-              <p style={{ fontSize: "0.8rem", color: "var(--muted)", margin: "0 0 10px" }}>
-                Conector: <code>windows_local</code> · Ambiente: <span style={{ color: "var(--text)" }}>Laboratory</span>
-              </p>
-              <div style={{ fontSize: "0.75rem", background: "#06120f", padding: "6px 8px", borderRadius: "4px", marginBottom: "10px", fontFamily: "monospace", color: "#ffb703" }}>
-                identity.local_user.disable (Req. Aprobación)
-              </div>
-              <div style={{ display: "flex", gap: "6px" }}>
-                <button type="button" className="ghost" style={{ fontSize: "0.75rem", padding: "4px 10px" }} onClick={() => openModal({ id: "windows_local", name: "Windows Local Account (Lab)", connectorType: "windows_local", environment: "Laboratory", capabilities: "identity.local_user.disable", defaultUrl: "http://127.0.0.1:8000/api/v1/windows-local", secretLabel: "Local Admin Credential Token" }, "config")}>🔑 Credenciales</button>
-                <button type="button" className="ghost" style={{ fontSize: "0.75rem", padding: "4px 10px" }} onClick={() => openModal({ id: "windows_local", name: "Windows Local Account (Lab)", connectorType: "windows_local", environment: "Laboratory", capabilities: "identity.local_user.disable" }, "test")}>⚡ Probar Conexión</button>
-              </div>
-            </div>
-
-            {/* Windows Local Firewall */}
-            <div style={{ background: "var(--panel)", border: "1px solid var(--line)", borderRadius: "8px", padding: "1rem" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
-                <strong style={{ fontSize: "0.95rem" }}>Windows Local Firewall (Lab)</strong>
-                <span style={{ fontSize: "0.7rem", color: "#ffb703", fontWeight: 700, background: "rgba(255, 183, 3, 0.1)", padding: "2px 6px", borderRadius: "4px" }}>LABORATORY</span>
-              </div>
-              <p style={{ fontSize: "0.8rem", color: "var(--muted)", margin: "0 0 10px" }}>
-                Conector: <code>windows_firewall</code> · Ambiente: <span style={{ color: "var(--text)" }}>Laboratory</span>
-              </p>
-              <div style={{ fontSize: "0.75rem", background: "#06120f", padding: "6px 8px", borderRadius: "4px", marginBottom: "10px", fontFamily: "monospace", color: "#ffb703" }}>
-                network.local_firewall.rule.create (Req. Aprobación)
-              </div>
-              <div style={{ display: "flex", gap: "6px" }}>
-                <button type="button" className="ghost" style={{ fontSize: "0.75rem", padding: "4px 10px" }} onClick={() => openModal({ id: "windows_firewall", name: "Windows Local Firewall (Lab)", connectorType: "windows_firewall", environment: "Laboratory", capabilities: "network.local_firewall.rule.create", defaultUrl: "http://127.0.0.1:8000/api/v1/windows-firewall", secretLabel: "Rule Policy Authorization Secret" }, "config")}>🔑 Configuración</button>
-                <button type="button" className="ghost" style={{ fontSize: "0.75rem", padding: "4px 10px" }} onClick={() => openModal({ id: "windows_firewall", name: "Windows Local Firewall (Lab)", connectorType: "windows_firewall", environment: "Laboratory", capabilities: "network.local_firewall.rule.create" }, "test")}>⚡ Probar Conexión</button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Category 4: Conectores Perimetrales Enterprise & EDR */}
-      {(selectedCategory === "ALL" || selectedCategory === "ENTERPRISE") && (
-        <div style={{ marginBottom: "1.5rem" }}>
-          <h3 style={{ fontSize: "1rem", color: "var(--text)", marginBottom: "0.75rem", display: "flex", alignItems: "center", gap: "8px" }}>
-            <span>🌐</span> Conectores Perimetrales Enterprise & EDR
-          </h3>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: "1rem" }}>
-            {/* Microsoft Defender EDR */}
-            <div style={{ background: "var(--panel)", border: "1px solid var(--line)", borderRadius: "8px", padding: "1rem" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
-                <strong style={{ fontSize: "0.95rem" }}>Microsoft Defender EDR</strong>
-                <span style={{ fontSize: "0.7rem", color: "var(--accent)", fontWeight: 700, background: "rgba(13, 209, 155, 0.1)", padding: "2px 6px", borderRadius: "4px" }}>ENTERPRISE</span>
-              </div>
-              <p style={{ fontSize: "0.8rem", color: "var(--muted)", margin: "0 0 10px" }}>
-                Conector: <code>defender</code> · Ambiente: <span style={{ color: "var(--text)" }}>Producción</span>
-              </p>
-              <div style={{ fontSize: "0.75rem", background: "#06120f", padding: "6px 8px", borderRadius: "4px", marginBottom: "10px", fontFamily: "monospace", color: "#ffb703" }}>
-                endpoint.isolate, endpoint.release
-              </div>
-              <div style={{ display: "flex", gap: "6px" }}>
-                <button type="button" className="ghost" style={{ fontSize: "0.75rem", padding: "4px 10px" }} onClick={() => openModal({ id: "defender", name: "Microsoft Defender EDR", connectorType: "defender", environment: "Producción", capabilities: "endpoint.isolate, endpoint.release", defaultUrl: "https://api.securitycenter.microsoft.com", secretLabel: "Client Secret / OAuth2 Token" }, "config")}>🔑 Credenciales OAuth2</button>
-                <button type="button" className="ghost" style={{ fontSize: "0.75rem", padding: "4px 10px" }} onClick={() => openModal({ id: "defender", name: "Microsoft Defender EDR", connectorType: "defender", environment: "Producción", capabilities: "endpoint.isolate, endpoint.release" }, "test")}>⚡ Probar Conexión</button>
-              </div>
-            </div>
-
-            {/* Palo Alto PA-3200 */}
-            <div style={{ background: "var(--panel)", border: "1px solid var(--line)", borderRadius: "8px", padding: "1rem" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
-                <strong style={{ fontSize: "0.95rem" }}>Palo Alto PA-3200 Firewall</strong>
-                <span style={{ fontSize: "0.7rem", color: "var(--accent)", fontWeight: 700, background: "rgba(13, 209, 155, 0.1)", padding: "2px 6px", borderRadius: "4px" }}>ENTERPRISE</span>
-              </div>
-              <p style={{ fontSize: "0.8rem", color: "var(--muted)", margin: "0 0 10px" }}>
-                Conector: <code>palo_alto</code> · Ambiente: <span style={{ color: "var(--text)" }}>Producción</span>
-              </p>
-              <div style={{ fontSize: "0.75rem", background: "#06120f", padding: "6px 8px", borderRadius: "4px", marginBottom: "10px", fontFamily: "monospace", color: "#ffb703" }}>
-                network.ip.block, network.ip.unblock
-              </div>
-              <div style={{ display: "flex", gap: "6px" }}>
-                <button type="button" className="ghost" style={{ fontSize: "0.75rem", padding: "4px 10px" }} onClick={() => openModal({ id: "palo_alto", name: "Palo Alto PA-3200 Firewall", connectorType: "palo_alto", environment: "Producción", capabilities: "network.ip.block, network.ip.unblock", defaultUrl: "https://panorama.local/api", secretLabel: "Panorama API Key" }, "config")}>🔑 Credenciales API Key</button>
-                <button type="button" className="ghost" style={{ fontSize: "0.75rem", padding: "4px 10px" }} onClick={() => openModal({ id: "palo_alto", name: "Palo Alto PA-3200 Firewall", connectorType: "palo_alto", environment: "Producción", capabilities: "network.ip.block, network.ip.unblock" }, "test")}>⚡ Probar Conexión</button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Render Modal when activeConn is selected */}
-      {activeConn && (
-        <ConnectionModal
-          connection={activeConn}
-          mode={modalMode}
-          onClose={() => setActiveConn(null)}
-        />
       )}
     </>
   );
@@ -3114,7 +2739,7 @@ export default function App() {
           <Route path="incidents" element={<IncidentsPage />} />
           <Route path="incidents/:id" element={<IncidentDetailPage />} />
           <Route path="playbooks" element={<PlaybooksPage />} />
-          <Route path="integrations" element={<IntegrationsPage />} />
+          <Route path="integrations" element={<VerifiedIntegrationsPage />} />
           <Route path="memory" element={<GovernedMemoryPage />} />
           <Route path="api-keys" element={<ApiKeysPage />} />
           <Route path="audit" element={<AuditPage />} />

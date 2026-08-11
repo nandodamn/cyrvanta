@@ -34,6 +34,8 @@ AnalysisRequester = Annotated[SecurityContext, Depends(require_permission("analy
 ResponseExecutor = Annotated[SecurityContext, Depends(require_permission("response.execute"))]
 PlaybookReader = Annotated[SecurityContext, Depends(require_permission("playbook.read"))]
 PlaybookManager = Annotated[SecurityContext, Depends(require_permission("playbook.manage"))]
+IntegrationReader = Annotated[SecurityContext, Depends(require_permission("integration.read"))]
+IntegrationManager = Annotated[SecurityContext, Depends(require_permission("integration.manage"))]
 
 
 def correlation_id(request: Request) -> UUID:
@@ -41,17 +43,18 @@ def correlation_id(request: Request) -> UUID:
 
 
 @router.get("/integrations/health", response_model=list[IntegrationHealth])
-async def integration_health(context: IncidentReader) -> list[IntegrationHealth]:
+async def integration_health(context: IntegrationReader) -> list[IntegrationHealth]:
     return await OperationsService(configured_wazuh_connector(context.tenant_id)).health()
 
 
 @router.get("/integrations/connections/resolve")
 async def resolve_connection(
-    context: IncidentReader,
+    context: IntegrationReader,
     capability: Annotated[str, Query(max_length=120)],
     environment: Annotated[str, Query(max_length=40)] = "laboratory",
 ) -> dict[str, object]:
     from cyrvanta.modules.integrations.application.resolver import ConnectionResolver
+
     result = await ConnectionResolver().resolve(
         tenant_id=context.tenant_id,
         required_capability=capability,
@@ -73,38 +76,22 @@ async def resolve_connection(
 @router.post("/integrations/connections/{connection_id}/test")
 async def test_connection(
     connection_id: str,
-    context: IncidentReader,
+    context: IntegrationManager,
 ) -> dict[str, object]:
-    """Runs real-time 4-level health and functional diagnostics for the target connection."""
-    import asyncio
-    await asyncio.sleep(0.3)
-    return {
-        "connection_id": connection_id,
-        "healthy": True,
-        "latency_ms": 14,
-        "levels": [
-            {"level": 1, "name": "Formato de Configuración & URL Syntax", "status": "passed", "detail": "Valores válidos"},
-            {"level": 2, "name": "Conectividad de Red TCP / TLS Handshake", "status": "passed", "detail": "Puerto alcanzable"},
-            {"level": 3, "name": "Autenticación & Permisos de Credencial", "status": "passed", "detail": "Token / Key autorizado"},
-            {"level": 4, "name": "Prueba Funcional de Capacidad & Latencia", "status": "passed", "detail": "Latencia: 14ms"},
-        ],
-        "message": f"Conexión '{connection_id}' verificada exitosamente en 4 niveles de diagnóstico.",
-    }
+    """Fail closed until a connector-specific, non-destructive probe is registered."""
+    del connection_id, context
+    raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, "INTEGRATION_PROBE_UNAVAILABLE")
 
 
 @router.post("/integrations/connections/{connection_id}/configure")
 async def configure_connection(
     connection_id: str,
     payload: dict[str, object],
-    context: IncidentReader,
+    context: IntegrationManager,
 ) -> dict[str, object]:
-    """Configures connection credentials and endpoints securely for the tenant."""
-    return {
-        "connection_id": connection_id,
-        "status": "configured",
-        "message": f"Configuración de conexión '{connection_id}' guardada y cifrada (AES-256-GCM) exitosamente.",
-        "updated_at": "2026-08-03T22:44:00Z",
-    }
+    """Reject configuration until the write-only secret-store contract is implemented."""
+    del connection_id, payload, context
+    raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, "INTEGRATION_CONFIGURATION_UNAVAILABLE")
 
 
 @router.get("/operations/activity-24h", response_model=OperationalActivity24h)

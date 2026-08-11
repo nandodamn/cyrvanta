@@ -38,9 +38,10 @@ class DefinitionResponse(StrictModel):
     credential_aliases: list[str] = Field(default_factory=list)
     target_incident_types: list[str] = Field(default_factory=list)
     mitre_codes: list[str] = Field(default_factory=list)
-    rollback_supported: bool = True
+    rollback_supported: bool = False
     rollback_target_code: str | None = None
     rollback_guidance_i18n: LocalizedDescription | None = None
+    automation_policy_i18n: LocalizedDescription | None = None
     approval_mode: Literal["AUTOMATIC", "SINGLE", "FOUR_EYES"] = "AUTOMATIC"
     last_execution_status: str | None = None
     last_executed_at: datetime | None = None
@@ -53,7 +54,6 @@ class ToggleBindingPayload(StrictModel):
 
 class UpdateApprovalGovernancePayload(StrictModel):
     approval_mode: Literal["AUTOMATIC", "SINGLE", "FOUR_EYES"]
-
 
 
 class DefinitionList(StrictModel):

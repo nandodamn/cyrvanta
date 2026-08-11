@@ -194,6 +194,21 @@ ESSENTIAL_NATIVE_PLAYBOOKS: list[dict[str, object]] = [
     },
 ]
 
+ESSENTIAL_NATIVE_ACTIONS: dict[str, str] = {
+    "compromised-account": "ticket.create",
+    "compromised-endpoint": "endpoint.isolate_simulated",
+    "phishing-malicious-email": "ticket.create",
+    "ransomware-destructive": "notification.send",
+    "lateral-movement": "incident.report.generate",
+    "malicious-indicator": "ticket.create",
+    "privilege-escalation": "notification.send",
+    "security-control-disabled": "notification.send",
+    "automated-enrichment": "incident.report.generate",
+    "escalation-notification": "notification.send",
+    "evidence-preservation": "incident.report.generate",
+    "closure-controlled-learning": "incident.report.generate",
+}
+
 from cyrvanta.modules.playbooks.application.portable import (
     ActionStep,
     LocalizedDescription,
@@ -246,19 +261,18 @@ PLAYBOOK_GOVERNANCE_TAXONOMY: dict[str, str] = {
     "ransomware-destructive": "FOUR_EYES",
     "lateral-movement": "FOUR_EYES",
     "security-control-disabled": "FOUR_EYES",
-
     # 👤 SINGLE: Notificaciones de incidentes críticos, tickets SecOps/ITSM y filtrado de IoCs
     "simulate-critical-incident-notification": "SINGLE",
     "escalation-notification": "SINGLE",
     "simulate-itsm-ticket-creation": "SINGLE",
     "phishing-malicious-email": "SINGLE",
     "malicious-indicator": "SINGLE",
-
     # ⚡ AUTOMATIC: Tareas transversales de análisis, preservación inmutable y aprendizaje
     "automated-enrichment": "AUTOMATIC",
     "evidence-preservation": "AUTOMATIC",
     "closure-controlled-learning": "AUTOMATIC",
 }
+
 
 class PlaybookAdministrationService:
     def __init__(self, settings: Settings | None = None) -> None:
@@ -335,7 +349,7 @@ class PlaybookAdministrationService:
                         {
                             "id": "step-1",
                             "type": "ACTION",
-                            "action": code if code.startswith("simulate-") else "simulate-user-block",
+                            "action": ESSENTIAL_NATIVE_ACTIONS[code],
                             "action_version": "1.0.0",
                             "parameters": {},
                         }
@@ -351,59 +365,19 @@ class PlaybookAdministrationService:
                     version="1.0.0",
                     impact="MODERATE",
                     classification="SYNTHETIC",
-                    status="APPROVED",
-                    approved_at=datetime.now(UTC),
+                    status="DRAFT",
+                    approved_at=None,
                     workflow_code=code,
                     artifact_sha256=digest,
                     portable_artifact=artifact.model_dump(mode="json", exclude_none=True),
                     portable_schema_version="1.0",
-                    input_schema={"type": "object", "properties": {}},
-                    result_schema={"type": "object", "properties": {}},
+                    input_schema=resolve_schema("security/incident-notification-input-v1"),
+                    result_schema=resolve_schema("security/incident-notification-result-v1"),
                     timeout_seconds=60,
                 )
                 session.add(version_model)
                 await session.flush()
 
-                binding_model = AutomationEngineBindingModel(
-                    tenant_id=tenant_id,
-                    playbook_version_id=version_model.id,
-                    engine_type="NATIVE",
-                    instance_code="cyrvanta-native",
-                    desired_digest=digest,
-                    observed_digest=digest,
-                    sync_status="SYNCHRONIZED",
-                    active=True,
-                    last_verified_at=datetime.now(UTC),
-                )
-                session.add(binding_model)
-
-                version = await session.scalar(
-                    select(PlaybookVersionModel)
-                    .where(PlaybookVersionModel.definition_id == existing.id)
-                    .order_by(PlaybookVersionModel.created_at.desc())
-                    .limit(1)
-                )
-                if version is not None:
-                    native_binding = await session.scalar(
-                        select(AutomationEngineBindingModel).where(
-                            AutomationEngineBindingModel.playbook_version_id == version.id,
-                            AutomationEngineBindingModel.engine_type == "NATIVE",
-                        )
-                    )
-                    if native_binding is None:
-                        session.add(
-                            AutomationEngineBindingModel(
-                                tenant_id=tenant_id,
-                                playbook_version_id=version.id,
-                                engine_type="NATIVE",
-                                instance_code="cyrvanta-native",
-                                desired_digest=version.artifact_sha256,
-                                observed_digest=version.artifact_sha256,
-                                sync_status="SYNCHRONIZED",
-                                active=True,
-                                last_verified_at=datetime.now(UTC),
-                            )
-                        )
         await session.flush()
 
     async def get_definition(self, tenant_id: UUID, definition_id: UUID) -> DefinitionResponse:
@@ -567,6 +541,7 @@ class PlaybookAdministrationService:
         version_id: UUID,
     ) -> list[dict[str, object]]:
         from cyrvanta.modules.integrations.application.resolver import ConnectionResolver
+
         resolver = ConnectionResolver()
         results: list[dict[str, object]] = []
         async with tenant_session(tenant_id) as session:
@@ -577,17 +552,19 @@ class PlaybookAdministrationService:
                     if isinstance(step, ActionStep):
                         capability = f"action.{step.action}"
                         res = await resolver.resolve(tenant_id, capability)
-                        results.append({
-                            "step_id": step.id,
-                            "action": step.action,
-                            "required_capability": capability,
-                            "resolution_status": res.resolution_status,
-                            "connection_id": res.connection_id,
-                            "connector_type": res.connector_type,
-                            "requires_approval": res.requires_approval,
-                            "simulation_supported": res.simulation_supported,
-                            "verification_supported": res.verification_supported,
-                        })
+                        results.append(
+                            {
+                                "step_id": step.id,
+                                "action": step.action,
+                                "required_capability": capability,
+                                "resolution_status": res.resolution_status,
+                                "connection_id": res.connection_id,
+                                "connector_type": res.connector_type,
+                                "requires_approval": res.requires_approval,
+                                "simulation_supported": res.simulation_supported,
+                                "verification_supported": res.verification_supported,
+                            }
+                        )
             except Exception:
                 pass
         return results
@@ -1178,7 +1155,6 @@ class PlaybookAdministrationService:
                 },
             )
             return await self._enriched_definition_response(session, definition)
-
 
     @staticmethod
     def _definition_response(item: PlaybookDefinitionModel) -> DefinitionResponse:

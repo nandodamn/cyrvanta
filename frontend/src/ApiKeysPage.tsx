@@ -35,7 +35,7 @@ export function ApiKeysPage() {
           background: "rgba(13, 209, 155, 0.06)",
           border: "1.5px solid var(--accent)",
           display: "flex",
-          justify: "space-between",
+          justifyContent: "space-between",
           alignItems: "center",
           flexWrap: "wrap",
           gap: "1rem",

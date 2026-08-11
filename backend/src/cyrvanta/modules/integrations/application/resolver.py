@@ -112,21 +112,26 @@ class ConnectionResolver:
         environment: str = "laboratory",
         explicit_connection_id: UUID | None = None,
     ) -> ConnectionResolutionResult:
-        policy = CAPABILITY_POLICIES.get(
-            required_capability,
-            {
-                "connector_type": "generic",
-                "requires_approval": False,
-                "simulation_supported": True,
-                "verification_supported": True,
-            },
-        )
+        del environment
+        policy = CAPABILITY_POLICIES.get(required_capability)
+        if policy is None:
+            return ConnectionResolutionResult(
+                resolution_status="not_resolved",
+                connection_id=None,
+                connector_type=None,
+                capability=required_capability,
+                selection_reason="capability_not_registered",
+                requires_approval=False,
+                simulation_supported=False,
+                verification_supported=False,
+                blocking=True,
+            )
 
         async with tenant_session(tenant_id) as session:
             # Query configured active integrations for tenant
             stmt = select(IntegrationModel).where(
                 IntegrationModel.tenant_id == tenant_id,
-                IntegrationModel.status != "disabled",
+                IntegrationModel.status == "active",
             )
             if explicit_connection_id:
                 stmt = stmt.where(IntegrationModel.id == explicit_connection_id)
@@ -138,7 +143,12 @@ class ConnectionResolver:
                 integ
                 for integ in integrations
                 if integ.connector_type == policy["connector_type"]
-                or required_capability in (integ.capabilities_snapshot.get("declared", []) if isinstance(integ.capabilities_snapshot, dict) else [])
+                or required_capability
+                in (
+                    integ.capabilities_snapshot.get("declared", [])
+                    if isinstance(integ.capabilities_snapshot, dict)
+                    else []
+                )
             ]
 
             if matching:
@@ -155,15 +165,18 @@ class ConnectionResolver:
                     blocking=False,
                 )
 
-        # Fallback resolution for system default laboratory connectors
         return ConnectionResolutionResult(
-            resolution_status="resolved",
-            connection_id=f"conn-lab-{policy['connector_type']}",
+            resolution_status="not_resolved",
+            connection_id=None,
             connector_type=policy["connector_type"],
             capability=required_capability,
-            selection_reason="laboratory_default_fallback",
+            selection_reason=(
+                "explicit_connection_unavailable"
+                if explicit_connection_id is not None
+                else "tenant_connection_unavailable"
+            ),
             requires_approval=policy["requires_approval"],
             simulation_supported=policy["simulation_supported"],
             verification_supported=policy["verification_supported"],
-            blocking=False,
+            blocking=True,
         )

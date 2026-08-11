@@ -218,7 +218,7 @@ export function NetworkTopologyModal({ isOpen, onClose }: Props) {
         background: "rgba(3, 10, 8, 0.88)",
         backdropFilter: "blur(8px)",
         display: "flex",
-        justify: "center",
+        justifyContent: "center",
         alignItems: "center",
         padding: "1.5rem",
       }}
@@ -245,7 +245,7 @@ export function NetworkTopologyModal({ isOpen, onClose }: Props) {
             padding: "1rem 1.5rem",
             borderBottom: "1px solid var(--line, #13241f)",
             display: "flex",
-            justify: "space-between",
+            justifyContent: "space-between",
             alignItems: "center",
             background: "var(--panel-raised, #081714)",
           }}

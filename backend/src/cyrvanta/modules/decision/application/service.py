@@ -80,17 +80,24 @@ class DecisionService:
         now = datetime.now(UTC)
         async with tenant_session(tenant_id) as session:
             incident = await session.scalar(
-                select(IncidentModel).where(IncidentModel.id == payload.incident_id)
+                select(IncidentModel).where(
+                    IncidentModel.tenant_id == tenant_id,
+                    IncidentModel.id == payload.incident_id,
+                )
             )
             requester = await session.scalar(
                 select(UserModel).where(
+                    UserModel.tenant_id == tenant_id,
                     UserModel.id == requester_user_id,
                     UserModel.is_active.is_(True),
                 )
             )
             policy = await session.scalar(
                 select(ResponsePolicyVersionModel)
-                .where(ResponsePolicyVersionModel.status == "ACTIVE")
+                .where(
+                    ResponsePolicyVersionModel.tenant_id == tenant_id,
+                    ResponsePolicyVersionModel.status == "ACTIVE",
+                )
                 .order_by(ResponsePolicyVersionModel.created_at.desc())
                 .limit(1)
             )
@@ -114,7 +121,10 @@ class DecisionService:
             }
             fingerprint = canonical_fingerprint(material)
             existing = await session.scalar(
-                select(ActionProposalModel).where(ActionProposalModel.fingerprint == fingerprint)
+                select(ActionProposalModel).where(
+                    ActionProposalModel.tenant_id == tenant_id,
+                    ActionProposalModel.fingerprint == fingerprint,
+                )
             )
             if existing is not None:
                 return await self._response(session, existing)
@@ -237,8 +247,12 @@ class DecisionService:
         self, tenant_id: UUID, *, incident_id: UUID | None, limit: int, offset: int
     ) -> ActionProposalList:
         async with tenant_session(tenant_id) as session:
-            statement = select(ActionProposalModel)
-            count_statement = select(func.count(ActionProposalModel.id))
+            statement = select(ActionProposalModel).where(
+                ActionProposalModel.tenant_id == tenant_id
+            )
+            count_statement = select(func.count(ActionProposalModel.id)).where(
+                ActionProposalModel.tenant_id == tenant_id
+            )
             if incident_id is not None:
                 statement = statement.where(ActionProposalModel.incident_id == incident_id)
                 count_statement = count_statement.where(
@@ -262,7 +276,10 @@ class DecisionService:
     async def get_proposal(self, tenant_id: UUID, proposal_id: UUID) -> ActionProposalResponse:
         async with tenant_session(tenant_id) as session:
             proposal = await session.scalar(
-                select(ActionProposalModel).where(ActionProposalModel.id == proposal_id)
+                select(ActionProposalModel).where(
+                    ActionProposalModel.tenant_id == tenant_id,
+                    ActionProposalModel.id == proposal_id,
+                )
             )
             if proposal is None:
                 raise DecisionNotFound("Proposal was not found")
@@ -281,16 +298,23 @@ class DecisionService:
         async with tenant_session(tenant_id) as session:
             request = await session.scalar(
                 select(ApprovalRequestModel)
-                .where(ApprovalRequestModel.id == approval_request_id)
+                .where(
+                    ApprovalRequestModel.tenant_id == tenant_id,
+                    ApprovalRequestModel.id == approval_request_id,
+                )
                 .with_for_update()
             )
             if request is None:
                 raise DecisionNotFound("Approval request was not found")
             proposal = await session.scalar(
-                select(ActionProposalModel).where(ActionProposalModel.id == request.proposal_id)
+                select(ActionProposalModel).where(
+                    ActionProposalModel.tenant_id == tenant_id,
+                    ActionProposalModel.id == request.proposal_id,
+                )
             )
             actor = await session.scalar(
                 select(UserModel).where(
+                    UserModel.tenant_id == tenant_id,
                     UserModel.id == actor_user_id,
                     UserModel.is_active.is_(True),
                 )
@@ -309,6 +333,7 @@ class DecisionService:
                 raise DecisionConflict("Requester cannot approve the proposal")
             existing = await session.scalar(
                 select(ApprovalDecisionModel).where(
+                    ApprovalDecisionModel.tenant_id == tenant_id,
                     ApprovalDecisionModel.approval_request_id == request.id,
                     ApprovalDecisionModel.actor_user_id == actor_user_id,
                 )
@@ -335,6 +360,7 @@ class DecisionService:
                 approvals = int(
                     await session.scalar(
                         select(func.count(ApprovalDecisionModel.id)).where(
+                            ApprovalDecisionModel.tenant_id == tenant_id,
                             ApprovalDecisionModel.approval_request_id == request.id,
                             ApprovalDecisionModel.decision == "APPROVE",
                         )
@@ -412,7 +438,10 @@ class DecisionService:
         async with tenant_session(tenant_id) as session:
             authorization = await session.scalar(
                 select(ActionAuthorizationModel)
-                .where(ActionAuthorizationModel.id == authorization_id)
+                .where(
+                    ActionAuthorizationModel.tenant_id == tenant_id,
+                    ActionAuthorizationModel.id == authorization_id,
+                )
                 .with_for_update()
             )
             if authorization is None:
@@ -423,7 +452,8 @@ class DecisionService:
             authorization.revoked_at = now
             proposal = await session.scalar(
                 select(ActionProposalModel).where(
-                    ActionProposalModel.id == authorization.proposal_id
+                    ActionProposalModel.tenant_id == tenant_id,
+                    ActionProposalModel.id == authorization.proposal_id,
                 )
             )
             if proposal is None:
@@ -458,14 +488,20 @@ class DecisionService:
     ) -> ActionProposalResponse:
         evaluation = await session.scalar(
             select(PolicyEvaluationModel)
-            .where(PolicyEvaluationModel.proposal_id == proposal.id)
+            .where(
+                PolicyEvaluationModel.tenant_id == proposal.tenant_id,
+                PolicyEvaluationModel.proposal_id == proposal.id,
+            )
             .order_by(PolicyEvaluationModel.created_at.desc())
             .limit(1)
         )
         if evaluation is None:
             raise RuntimeError("Proposal evaluation is missing")
         request = await session.scalar(
-            select(ApprovalRequestModel).where(ApprovalRequestModel.proposal_id == proposal.id)
+            select(ApprovalRequestModel).where(
+                ApprovalRequestModel.tenant_id == proposal.tenant_id,
+                ApprovalRequestModel.proposal_id == proposal.id,
+            )
         )
         decisions: list[ApprovalDecisionModel] = []
         authorization = None
@@ -474,14 +510,18 @@ class DecisionService:
                 (
                     await session.scalars(
                         select(ApprovalDecisionModel)
-                        .where(ApprovalDecisionModel.approval_request_id == request.id)
+                        .where(
+                            ApprovalDecisionModel.tenant_id == proposal.tenant_id,
+                            ApprovalDecisionModel.approval_request_id == request.id,
+                        )
                         .order_by(ApprovalDecisionModel.created_at)
                     )
                 ).all()
             )
             authorization = await session.scalar(
                 select(ActionAuthorizationModel).where(
-                    ActionAuthorizationModel.approval_request_id == request.id
+                    ActionAuthorizationModel.tenant_id == proposal.tenant_id,
+                    ActionAuthorizationModel.approval_request_id == request.id,
                 )
             )
         return ActionProposalResponse(

@@ -1,13 +1,13 @@
 import asyncio
+from datetime import UTC, datetime
 from uuid import uuid4
-from datetime import datetime, UTC
+
 from sqlalchemy import text
 
 import cyrvanta.modules.identity.infrastructure.models  # noqa
 import cyrvanta.modules.incident.infrastructure.models  # noqa
 import cyrvanta.modules.integrations.infrastructure.models  # noqa
 import cyrvanta.modules.threat_knowledge.infrastructure.models  # noqa
-
 from cyrvanta.modules.incident.application.schemas import AlertTriageUpdate
 from cyrvanta.modules.incident.application.service import IncidentService
 from cyrvanta.modules.incident.infrastructure.models import AlertReferenceModel
@@ -21,7 +21,9 @@ async def test_alert_triage_flow():
         tenant_id = tenant_row.scalar()
         user_row = await session.execute(text("SELECT id FROM users LIMIT 1"))
         actor_id = user_row.scalar()
-        await session.execute(text(f"SELECT set_config('app.current_tenant_id', '{tenant_id}', true)"))
+        await session.execute(
+            text(f"SELECT set_config('app.current_tenant_id', '{tenant_id}', true)")
+        )
 
         alert = AlertReferenceModel(
             tenant_id=tenant_id,
@@ -51,6 +53,7 @@ async def test_alert_triage_flow():
     assert res.reviewed_by_user_id == actor_id
     assert res.reviewed_at is not None
     print("ALERT_TRIAGE_TEST_PASSED_SUCCESSFULLY")
+
 
 if __name__ == "__main__":
     asyncio.run(test_alert_triage_flow())

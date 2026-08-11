@@ -26,109 +26,6 @@ from cyrvanta.modules.playbooks.application.administration_schemas import (
     VersionCreate,
     VersionResponse,
 )
-
-ESSENTIAL_NATIVE_PLAYBOOKS: list[dict[str, object]] = [
-    {
-        "code": "compromised-account",
-        "title_es": "Cuenta comprometida",
-        "title_en": "Compromised Account",
-        "description_es": "Contención de identidad: revoca sesiones, bloquea cuenta y solicita cambio de contraseña/MFA.",
-        "description_en": "Identity containment: revokes sessions, blocks account, and forces password/MFA reset.",
-    },
-    {
-        "code": "compromised-endpoint",
-        "title_es": "Endpoint comprometido o malware detectado",
-        "title_en": "Compromised Endpoint or Malware Detected",
-        "description_es": "Contención EDR/Host: recolecta evidencia, busca IoCs, aisla el host y pone archivos en cuarentena.",
-        "description_en": "EDR/Host containment: collects evidence, searches IoCs, isolates host, and quarantines files.",
-    },
-    {
-        "code": "phishing-malicious-email",
-        "title_es": "Phishing y correo malicioso",
-        "title_en": "Phishing and Malicious Email",
-        "description_es": "Análisis de correo, eliminación masiva de mensajes similares en buzones y bloqueo de URL/Dominio.",
-        "description_en": "Email analysis, mass removal of similar messages in mailboxes, and URL/Domain blocking.",
-    },
-    {
-        "code": "ransomware-destructive",
-        "title_es": "Ransomware o actividad destructiva",
-        "title_en": "Ransomware or Destructive Activity",
-        "description_es": "Procedimiento crítico de contención masiva, aislamiento de red, preservación de backups y gestión de crisis.",
-        "description_en": "Critical mass containment procedure, network isolation, backup protection, and crisis management.",
-    },
-    {
-        "code": "lateral-movement",
-        "title_es": "Movimiento lateral",
-        "title_en": "Lateral Movement",
-        "description_es": "Correlación multi-fuente (identidad, host, red): rompe la cadena origen-destino y revoca sesiones.",
-        "description_en": "Multi-source correlation (identity, host, network): breaks origin-destination chain and revokes sessions.",
-    },
-    {
-        "code": "malicious-indicator",
-        "title_es": "IP, dominio o indicador malicioso (IoC)",
-        "title_en": "Malicious IP, Domain, or Indicator (IoC)",
-        "description_es": "Enriquecimiento Threat Intel, búsqueda en todo el entorno y bloqueo temporal automático de IoCs.",
-        "description_en": "Threat Intel enrichment, environment-wide search, and automatic temporary IoC blocking.",
-    },
-    {
-        "code": "privilege-escalation",
-        "title_es": "Escalamiento de privilegios o cuenta anómala",
-        "title_en": "Privilege Escalation or Anomalous Privileged Account",
-        "description_es": "Contraste con tickets de cambio autorizado, reversión de permisos y suspensión de cuenta privilegiada.",
-        "description_en": "Contrast with authorized change tickets, privilege reversal, and privileged account suspension.",
-    },
-    {
-        "code": "security-control-disabled",
-        "title_es": "Desactivación de controles de seguridad",
-        "title_en": "Security Controls Disabled",
-        "description_es": "Detección de evasión: reactivación inmediata de EDR/Logs/Auditoría y elevación de riesgo.",
-        "description_en": "Evasion detection: immediate reactivation of EDR/Logs/Audit and risk score elevation.",
-    },
-    {
-        "code": "automated-enrichment",
-        "title_es": "Enriquecimiento automático de incidentes",
-        "title_en": "Automated Incident Enrichment",
-        "description_es": "Playbook transversal: reúne activos, dueños, vulnerabilidades, reputación y mappings MITRE.",
-        "description_en": "Transversal playbook: gathers assets, owners, vulnerabilities, reputation, and MITRE mappings.",
-    },
-    {
-        "code": "escalation-notification",
-        "title_es": "Escalamiento y notificación",
-        "title_en": "Escalation and Notification",
-        "description_es": "Playbook transversal: notifica por correo, Teams, Slack e ITSM según SLAs de severidad y tenant.",
-        "description_en": "Transversal playbook: notifies via email, Teams, Slack, and ITSM based on severity and tenant SLAs.",
-    },
-    {
-        "code": "evidence-preservation",
-        "title_es": "Preservación de evidencia e inmutabilidad",
-        "title_en": "Evidence Preservation and Immutability",
-        "description_es": "Playbook transversal: sella alertas originales, hashes, snapshots y logs en almacén inmutable.",
-        "description_en": "Transversal playbook: seals raw alerts, hashes, snapshots, and logs in an immutable store.",
-    },
-    {
-        "code": "closure-controlled-learning",
-        "title_es": "Cierre de incidente y aprendizaje controlado",
-        "title_en": "Incident Closure and Controlled Learning",
-        "description_es": "Playbook transversal: verifica contención, documenta causa raíz y propone mejoras con aprobación humana.",
-        "description_en": "Transversal playbook: verifies containment, documents root cause, and proposes candidate memories with human approval.",
-    },
-]
-
-ESSENTIAL_NATIVE_ACTIONS: dict[str, str] = {
-    "compromised-account": "ticket.create",
-    "compromised-endpoint": "endpoint.isolate_simulated",
-    "phishing-malicious-email": "ticket.create",
-    "ransomware-destructive": "notification.send",
-    "lateral-movement": "incident.report.generate",
-    "malicious-indicator": "ticket.create",
-    "privilege-escalation": "notification.send",
-    "security-control-disabled": "notification.send",
-    "automated-enrichment": "incident.report.generate",
-    "escalation-notification": "notification.send",
-    "evidence-preservation": "incident.report.generate",
-    "closure-controlled-learning": "incident.report.generate",
-}
-
 from cyrvanta.modules.playbooks.application.portable import (
     ActionStep,
     LocalizedDescription,
@@ -157,6 +54,179 @@ from cyrvanta.shared.database import SessionFactory, tenant_session
 from cyrvanta.shared.domain.events import DomainEvent
 from cyrvanta.shared.infrastructure.event_store import SqlEventStore
 
+ESSENTIAL_NATIVE_PLAYBOOKS: list[dict[str, object]] = [
+    {
+        "code": "compromised-account",
+        "title_es": "Cuenta comprometida",
+        "title_en": "Compromised Account",
+        "description_es": (
+            "Contención de identidad: revoca sesiones, bloquea cuenta y solicita "
+            "cambio de contraseña/MFA."
+        ),
+        "description_en": (
+            "Identity containment: revokes sessions, blocks account, and forces password/MFA reset."
+        ),
+    },
+    {
+        "code": "compromised-endpoint",
+        "title_es": "Endpoint comprometido o malware detectado",
+        "title_en": "Compromised Endpoint or Malware Detected",
+        "description_es": (
+            "Contención EDR/Host: recolecta evidencia, busca IoCs, aisla el host y "
+            "pone archivos en cuarentena."
+        ),
+        "description_en": (
+            "EDR/Host containment: collects evidence, searches IoCs, isolates host, "
+            "and quarantines files."
+        ),
+    },
+    {
+        "code": "phishing-malicious-email",
+        "title_es": "Phishing y correo malicioso",
+        "title_en": "Phishing and Malicious Email",
+        "description_es": (
+            "Análisis de correo, eliminación masiva de mensajes similares en buzones "
+            "y bloqueo de URL/Dominio."
+        ),
+        "description_en": (
+            "Email analysis, mass removal of similar messages in mailboxes, and "
+            "URL/Domain blocking."
+        ),
+    },
+    {
+        "code": "ransomware-destructive",
+        "title_es": "Ransomware o actividad destructiva",
+        "title_en": "Ransomware or Destructive Activity",
+        "description_es": (
+            "Procedimiento crítico de contención masiva, aislamiento de red, "
+            "preservación de backups y gestión de crisis."
+        ),
+        "description_en": (
+            "Critical mass containment procedure, network isolation, backup "
+            "protection, and crisis management."
+        ),
+    },
+    {
+        "code": "lateral-movement",
+        "title_es": "Movimiento lateral",
+        "title_en": "Lateral Movement",
+        "description_es": (
+            "Correlación multi-fuente (identidad, host, red): rompe la cadena "
+            "origen-destino y revoca sesiones."
+        ),
+        "description_en": (
+            "Multi-source correlation (identity, host, network): breaks "
+            "origin-destination chain and revokes sessions."
+        ),
+    },
+    {
+        "code": "malicious-indicator",
+        "title_es": "IP, dominio o indicador malicioso (IoC)",
+        "title_en": "Malicious IP, Domain, or Indicator (IoC)",
+        "description_es": (
+            "Enriquecimiento Threat Intel, búsqueda en todo el entorno y bloqueo "
+            "temporal automático de IoCs."
+        ),
+        "description_en": (
+            "Threat Intel enrichment, environment-wide search, and automatic "
+            "temporary IoC blocking."
+        ),
+    },
+    {
+        "code": "privilege-escalation",
+        "title_es": "Escalamiento de privilegios o cuenta anómala",
+        "title_en": "Privilege Escalation or Anomalous Privileged Account",
+        "description_es": (
+            "Contraste con tickets de cambio autorizado, reversión de permisos y "
+            "suspensión de cuenta privilegiada."
+        ),
+        "description_en": (
+            "Contrast with authorized change tickets, privilege reversal, and "
+            "privileged account suspension."
+        ),
+    },
+    {
+        "code": "security-control-disabled",
+        "title_es": "Desactivación de controles de seguridad",
+        "title_en": "Security Controls Disabled",
+        "description_es": (
+            "Detección de evasión: reactivación inmediata de EDR/Logs/Auditoría y "
+            "elevación de riesgo."
+        ),
+        "description_en": (
+            "Evasion detection: immediate reactivation of EDR/Logs/Audit and risk score elevation."
+        ),
+    },
+    {
+        "code": "automated-enrichment",
+        "title_es": "Enriquecimiento automático de incidentes",
+        "title_en": "Automated Incident Enrichment",
+        "description_es": (
+            "Playbook transversal: reúne activos, dueños, vulnerabilidades, "
+            "reputación y mappings MITRE."
+        ),
+        "description_en": (
+            "Transversal playbook: gathers assets, owners, vulnerabilities, "
+            "reputation, and MITRE mappings."
+        ),
+    },
+    {
+        "code": "escalation-notification",
+        "title_es": "Escalamiento y notificación",
+        "title_en": "Escalation and Notification",
+        "description_es": (
+            "Playbook transversal: notifica por correo, Teams, Slack e ITSM según "
+            "SLAs de severidad y tenant."
+        ),
+        "description_en": (
+            "Transversal playbook: notifies via email, Teams, Slack, and ITSM based "
+            "on severity and tenant SLAs."
+        ),
+    },
+    {
+        "code": "evidence-preservation",
+        "title_es": "Preservación de evidencia e inmutabilidad",
+        "title_en": "Evidence Preservation and Immutability",
+        "description_es": (
+            "Playbook transversal: sella alertas originales, hashes, snapshots y logs "
+            "en almacén inmutable."
+        ),
+        "description_en": (
+            "Transversal playbook: seals raw alerts, hashes, snapshots, and logs in "
+            "an immutable store."
+        ),
+    },
+    {
+        "code": "closure-controlled-learning",
+        "title_es": "Cierre de incidente y aprendizaje controlado",
+        "title_en": "Incident Closure and Controlled Learning",
+        "description_es": (
+            "Playbook transversal: verifica contención, documenta causa raíz y "
+            "propone mejoras con aprobación humana."
+        ),
+        "description_en": (
+            "Transversal playbook: verifies containment, documents root cause, and "
+            "proposes candidate memories with human approval."
+        ),
+    },
+]
+
+ESSENTIAL_NATIVE_ACTIONS: dict[str, str] = {
+    "compromised-account": "ticket.create",
+    "compromised-endpoint": "endpoint.isolate_simulated",
+    "phishing-malicious-email": "ticket.create",
+    "ransomware-destructive": "notification.send",
+    "lateral-movement": "incident.report.generate",
+    "malicious-indicator": "ticket.create",
+    "privilege-escalation": "notification.send",
+    "security-control-disabled": "notification.send",
+    "automated-enrichment": "incident.report.generate",
+    "escalation-notification": "notification.send",
+    "evidence-preservation": "incident.report.generate",
+    "closure-controlled-learning": "incident.report.generate",
+}
+
+
 SENSITIVE_KEY = re.compile(
     r"(?:authorization|cookie|password|secret|token|api[_-]?key|private[_-]?key|credential)",
     re.IGNORECASE,
@@ -172,7 +242,8 @@ class PlaybookAdministrationConflict(Exception):
 
 
 PLAYBOOK_GOVERNANCE_TAXONOMY: dict[str, str] = {
-    # 👥 FOUR_EYES: Acciones críticas de contención de identidad, aislamiento de hosts y respuesta a evasión/ransomware
+    # FOUR_EYES: critical identity containment and host-isolation actions,
+    # including evasion and ransomware response.
     "simulate-user-block": "FOUR_EYES",
     "compromised-account": "FOUR_EYES",
     "simulate-host-isolation": "FOUR_EYES",
@@ -250,7 +321,7 @@ class PlaybookAdministrationService:
 
         for pb in ESSENTIAL_NATIVE_PLAYBOOKS:
             code = cast(str, pb["code"])
-            existing = await session.scalar(
+            definition = await session.scalar(
                 select(PlaybookDefinitionModel).where(
                     PlaybookDefinitionModel.tenant_id == tenant_id,
                     PlaybookDefinitionModel.code == code,
@@ -258,7 +329,7 @@ class PlaybookAdministrationService:
             )
             desired_approval_mode = PLAYBOOK_GOVERNANCE_TAXONOMY.get(code, "AUTOMATIC")
 
-            if existing is None:
+            if definition is None:
                 def_model = PlaybookDefinitionModel(
                     tenant_id=tenant_id,
                     code=code,

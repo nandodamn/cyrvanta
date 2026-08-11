@@ -104,7 +104,10 @@ def test_toggle_binding_payload_and_definition_metadata() -> None:
             "rollback_supported": True,
             "rollback_target_code": "simulate-user-unblock",
             "rollback_guidance_i18n": {"es": "Desbloquea al usuario.", "en": "Unblocks user."},
-            "automation_policy_i18n": {"es": "Aprobación obligatoria.", "en": "Mandatory approval."},
+            "automation_policy_i18n": {
+                "es": "Aprobación obligatoria.",
+                "en": "Mandatory approval.",
+            },
         }
     )
     assert definition.target_incident_types == ["credential-access"]
@@ -113,4 +116,3 @@ def test_toggle_binding_payload_and_definition_metadata() -> None:
     assert definition.rollback_target_code == "simulate-user-unblock"
     assert definition.rollback_guidance_i18n.es == "Desbloquea al usuario."
     assert definition.automation_policy_i18n.en == "Mandatory approval."
-

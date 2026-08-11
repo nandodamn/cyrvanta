@@ -55,10 +55,9 @@ class IncidentService:
         self, tenant_id: UUID, limit: int, offset: int = 0, search: str | None = None
     ) -> list[AlertResponse]:
         async with tenant_session(tenant_id) as session:
-            statement = (
-                select(AlertReferenceModel, UserModel.email, UserModel.display_name)
-                .outerjoin(UserModel, AlertReferenceModel.reviewed_by_user_id == UserModel.id)
-            )
+            statement = select(
+                AlertReferenceModel, UserModel.email, UserModel.display_name
+            ).outerjoin(UserModel, AlertReferenceModel.reviewed_by_user_id == UserModel.id)
             if pattern := self._search_pattern(search):
                 statement = statement.where(
                     or_(
@@ -101,9 +100,7 @@ class IncidentService:
             dto.reviewer_display_name = display_name or email
             return dto
 
-    async def list_incident_alerts(
-        self, tenant_id: UUID, incident_id: UUID
-    ) -> list[AlertResponse]:
+    async def list_incident_alerts(self, tenant_id: UUID, incident_id: UUID) -> list[AlertResponse]:
         async with tenant_session(tenant_id) as session:
             await self._get(session, incident_id)
             statement = (
@@ -141,9 +138,7 @@ class IncidentService:
             if alert is None:
                 raise IncidentNotFound
 
-            user_exists = await session.scalar(
-                select(UserModel.id).where(UserModel.id == actor_id)
-            )
+            user_exists = await session.scalar(select(UserModel.id).where(UserModel.id == actor_id))
             effective_actor_id = actor_id if user_exists is not None else None
 
             alert.triage_status = payload.triage_status
@@ -152,7 +147,12 @@ class IncidentService:
             alert.updated_at = now
             if effective_actor_id is not None:
                 self._audit(
-                    session, tenant_id, effective_actor_id, "alert.triage.updated", alert.id, correlation_id
+                    session,
+                    tenant_id,
+                    effective_actor_id,
+                    "alert.triage.updated",
+                    alert.id,
+                    correlation_id,
                 )
             await session.flush()
         return await self.get_alert(tenant_id, alert_id)

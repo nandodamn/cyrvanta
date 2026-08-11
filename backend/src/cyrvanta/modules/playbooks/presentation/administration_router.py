@@ -89,7 +89,9 @@ async def get_definition(definition_id: UUID, context: PlaybookViewer) -> Defini
         raise _translate(exc) from exc
 
 
-@router.post("/playbook-definitions/{definition_id}/toggle-binding", response_model=DefinitionResponse)
+@router.post(
+    "/playbook-definitions/{definition_id}/toggle-binding", response_model=DefinitionResponse
+)
 async def toggle_definition_binding(
     definition_id: UUID,
     payload: ToggleBindingPayload,
@@ -108,7 +110,9 @@ async def toggle_definition_binding(
         raise _translate(exc) from exc
 
 
-@router.post("/playbook-definitions/{definition_id}/approval-governance", response_model=DefinitionResponse)
+@router.post(
+    "/playbook-definitions/{definition_id}/approval-governance", response_model=DefinitionResponse
+)
 async def update_approval_governance(
     definition_id: UUID,
     payload: UpdateApprovalGovernancePayload,
@@ -125,7 +129,6 @@ async def update_approval_governance(
         )
     except (PlaybookAdministrationConflict, PlaybookAdministrationNotFound) as exc:
         raise _translate(exc) from exc
-
 
 
 @router.post(

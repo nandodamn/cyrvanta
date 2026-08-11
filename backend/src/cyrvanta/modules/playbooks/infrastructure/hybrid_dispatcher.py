@@ -56,7 +56,10 @@ class HybridPlaybookDispatcher:
                     (
                         await session.scalars(
                             select(PlaybookExecutionModel.id)
-                            .where(PlaybookExecutionModel.status == ExecutionStatus.QUEUED.value)
+                            .where(
+                                PlaybookExecutionModel.tenant_id == tenant_id,
+                                PlaybookExecutionModel.status == ExecutionStatus.QUEUED.value,
+                            )
                             .order_by(PlaybookExecutionModel.created_at)
                             .limit(limit - dispatched)
                         )
@@ -83,9 +86,17 @@ class HybridPlaybookDispatcher:
                 select(AutomationEngineBindingModel.engine_type)
                 .join(
                     PlaybookExecutionModel,
-                    PlaybookExecutionModel.binding_id == AutomationEngineBindingModel.id,
+                    (
+                        PlaybookExecutionModel.binding_id == AutomationEngineBindingModel.id
+                    )
+                    & (
+                        PlaybookExecutionModel.tenant_id
+                        == AutomationEngineBindingModel.tenant_id
+                    ),
                 )
                 .where(
+                    PlaybookExecutionModel.tenant_id == tenant_id,
+                    AutomationEngineBindingModel.tenant_id == tenant_id,
                     PlaybookExecutionModel.id == execution_id,
                     PlaybookExecutionModel.status.in_(
                         (ExecutionStatus.QUEUED.value, ExecutionStatus.RUNNING.value)

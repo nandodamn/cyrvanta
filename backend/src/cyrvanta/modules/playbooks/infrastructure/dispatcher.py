@@ -70,7 +70,10 @@ class N8nPlaybookDispatcher:
                     (
                         await session.scalars(
                             select(PlaybookExecutionModel.id)
-                            .where(PlaybookExecutionModel.status == ExecutionStatus.QUEUED.value)
+                            .where(
+                                PlaybookExecutionModel.tenant_id == tenant_id,
+                                PlaybookExecutionModel.status == ExecutionStatus.QUEUED.value,
+                            )
                             .order_by(PlaybookExecutionModel.created_at)
                             .limit(limit - dispatched)
                         )
@@ -105,6 +108,7 @@ class N8nPlaybookDispatcher:
                         await session.scalars(
                             select(PlaybookExecutionModel)
                             .where(
+                                PlaybookExecutionModel.tenant_id == tenant_id,
                                 PlaybookExecutionModel.status.not_in(terminal),
                                 PlaybookExecutionModel.deadline_at <= now,
                             )
@@ -159,7 +163,10 @@ class N8nPlaybookDispatcher:
         async with tenant_session(tenant_id) as session:
             execution = await session.scalar(
                 select(PlaybookExecutionModel)
-                .where(PlaybookExecutionModel.id == execution_id)
+                .where(
+                    PlaybookExecutionModel.tenant_id == tenant_id,
+                    PlaybookExecutionModel.id == execution_id,
+                )
                 .with_for_update(skip_locked=True)
             )
             if execution is None or execution.status != ExecutionStatus.QUEUED.value:
@@ -168,6 +175,7 @@ class N8nPlaybookDispatcher:
                 return None
             binding = await session.scalar(
                 select(AutomationEngineBindingModel).where(
+                    AutomationEngineBindingModel.tenant_id == tenant_id,
                     AutomationEngineBindingModel.id == execution.binding_id,
                     AutomationEngineBindingModel.engine_type == "N8N",
                     AutomationEngineBindingModel.active.is_(True),
@@ -176,6 +184,7 @@ class N8nPlaybookDispatcher:
             )
             version = await session.scalar(
                 select(PlaybookVersionModel).where(
+                    PlaybookVersionModel.tenant_id == tenant_id,
                     PlaybookVersionModel.id == execution.playbook_version_id,
                     PlaybookVersionModel.status == "APPROVED",
                 )
@@ -190,6 +199,7 @@ class N8nPlaybookDispatcher:
                 int(
                     await session.scalar(
                         select(func.count(PlaybookExecutionAttemptModel.id)).where(
+                            PlaybookExecutionAttemptModel.tenant_id == tenant_id,
                             PlaybookExecutionAttemptModel.execution_id == execution.id
                         )
                     )
@@ -311,11 +321,15 @@ class N8nPlaybookDispatcher:
         async with tenant_session(tenant_id) as session:
             execution = await session.scalar(
                 select(PlaybookExecutionModel)
-                .where(PlaybookExecutionModel.id == execution_id)
+                .where(
+                    PlaybookExecutionModel.tenant_id == tenant_id,
+                    PlaybookExecutionModel.id == execution_id,
+                )
                 .with_for_update()
             )
             attempt = await session.scalar(
                 select(PlaybookExecutionAttemptModel).where(
+                    PlaybookExecutionAttemptModel.tenant_id == tenant_id,
                     PlaybookExecutionAttemptModel.dispatch_id == dispatch_id
                 )
             )
@@ -366,11 +380,15 @@ class N8nPlaybookDispatcher:
         async with tenant_session(tenant_id) as session:
             execution = await session.scalar(
                 select(PlaybookExecutionModel)
-                .where(PlaybookExecutionModel.id == execution_id)
+                .where(
+                    PlaybookExecutionModel.tenant_id == tenant_id,
+                    PlaybookExecutionModel.id == execution_id,
+                )
                 .with_for_update()
             )
             attempt = await session.scalar(
                 select(PlaybookExecutionAttemptModel).where(
+                    PlaybookExecutionAttemptModel.tenant_id == tenant_id,
                     PlaybookExecutionAttemptModel.dispatch_id == dispatch_id
                 )
             )

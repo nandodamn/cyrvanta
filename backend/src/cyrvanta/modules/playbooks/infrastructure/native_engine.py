@@ -130,7 +130,8 @@ class NativePlaybookDispatcher:
                 (
                     await session.scalars(
                         select(PlaybookStepExecutionModel).where(
-                            PlaybookStepExecutionModel.execution_id == execution_id
+                            PlaybookStepExecutionModel.tenant_id == tenant_id,
+                            PlaybookStepExecutionModel.execution_id == execution_id,
                         )
                     )
                 ).all()
@@ -171,7 +172,10 @@ class NativePlaybookDispatcher:
         async with tenant_session(tenant_id) as session:
             execution = await session.scalar(
                 select(PlaybookExecutionModel)
-                .where(PlaybookExecutionModel.id == execution_id)
+                .where(
+                    PlaybookExecutionModel.tenant_id == tenant_id,
+                    PlaybookExecutionModel.id == execution_id,
+                )
                 .with_for_update(skip_locked=True)
             )
             if execution is None or execution.status not in {
@@ -183,6 +187,7 @@ class NativePlaybookDispatcher:
             self._guard_global(tenant_id, execution)
             binding = await session.scalar(
                 select(AutomationEngineBindingModel).where(
+                    AutomationEngineBindingModel.tenant_id == tenant_id,
                     AutomationEngineBindingModel.id == execution.binding_id,
                     AutomationEngineBindingModel.engine_type == "NATIVE",
                     AutomationEngineBindingModel.active.is_(True),
@@ -191,6 +196,7 @@ class NativePlaybookDispatcher:
             )
             version = await session.scalar(
                 select(PlaybookVersionModel).where(
+                    PlaybookVersionModel.tenant_id == tenant_id,
                     PlaybookVersionModel.id == execution.playbook_version_id,
                     PlaybookVersionModel.status == "APPROVED",
                 )
@@ -218,7 +224,8 @@ class NativePlaybookDispatcher:
                     (
                         await session.scalars(
                             select(PlaybookStepExecutionModel.step_id).where(
-                                PlaybookStepExecutionModel.execution_id == execution.id
+                                PlaybookStepExecutionModel.tenant_id == tenant_id,
+                                PlaybookStepExecutionModel.execution_id == execution.id,
                             )
                         )
                     ).all()
@@ -334,9 +341,13 @@ class NativePlaybookDispatcher:
         now = datetime.now(UTC)
         step_input: dict[str, object]
         async with tenant_session(context.tenant_id) as session:
-            execution = await self._active_execution(session, execution_id)
+            execution = await self._active_execution(
+                session, context.tenant_id, execution_id
+            )
             self._guard_global(context.tenant_id, execution)
-            step_row = await self._locked_step(session, execution_id, step.id)
+            step_row = await self._locked_step(
+                session, context.tenant_id, execution_id, step.id
+            )
             binding = await session.scalar(
                 select(NativeActionBindingModel).where(
                     NativeActionBindingModel.action_code == step.action,
@@ -353,6 +364,7 @@ class NativePlaybookDispatcher:
             input_digest = self._digest(step_input)
             attempt = await session.scalar(
                 select(PlaybookStepAttemptModel).where(
+                    PlaybookStepAttemptModel.tenant_id == context.tenant_id,
                     PlaybookStepAttemptModel.step_execution_id == step_row.id,
                     PlaybookStepAttemptModel.attempt_number == 1,
                 )
@@ -360,7 +372,8 @@ class NativePlaybookDispatcher:
             if attempt is not None:
                 outcome_exists = await session.scalar(
                     select(PlaybookStepAttemptOutcomeModel.id).where(
-                        PlaybookStepAttemptOutcomeModel.attempt_id == attempt.id
+                        PlaybookStepAttemptOutcomeModel.tenant_id == context.tenant_id,
+                        PlaybookStepAttemptOutcomeModel.attempt_id == attempt.id,
                     )
                 )
                 self._validate_recoverable_attempt(
@@ -426,6 +439,7 @@ class NativePlaybookDispatcher:
             step_row = await session.scalar(
                 select(PlaybookStepExecutionModel)
                 .where(
+                    PlaybookStepExecutionModel.tenant_id == context.tenant_id,
                     PlaybookStepExecutionModel.execution_id == execution_id,
                     PlaybookStepExecutionModel.step_id == step.id,
                 )
@@ -519,7 +533,9 @@ class NativePlaybookDispatcher:
         matched: bool,
     ) -> None:
         async with tenant_session(context.tenant_id) as session:
-            row = await self._locked_step(session, execution_id, step.id)
+            row = await self._locked_step(
+                session, context.tenant_id, execution_id, step.id
+            )
             row.status = "SUCCEEDED"
             row.result = {"matched": matched}
             row.completed_at = datetime.now(UTC)
@@ -534,7 +550,9 @@ class NativePlaybookDispatcher:
         step: ActionStep | ConditionStep,
     ) -> None:
         async with tenant_session(context.tenant_id) as session:
-            row = await self._locked_step(session, execution_id, step.id)
+            row = await self._locked_step(
+                session, context.tenant_id, execution_id, step.id
+            )
             row.status = "SKIPPED"
             row.completed_at = datetime.now(UTC)
             await self._record_step_completion(
@@ -551,7 +569,9 @@ class NativePlaybookDispatcher:
         error_code: str | None,
     ) -> None:
         async with tenant_session(context.tenant_id) as session:
-            execution = await self._active_execution(session, execution_id, allow_terminal=True)
+            execution = await self._active_execution(
+                session, context.tenant_id, execution_id, allow_terminal=True
+            )
             if execution.status in {
                 ExecutionStatus.SUCCEEDED.value,
                 ExecutionStatus.FAILED.value,
@@ -601,7 +621,10 @@ class NativePlaybookDispatcher:
         async with tenant_session(tenant_id) as session:
             execution = await session.scalar(
                 select(PlaybookExecutionModel)
-                .where(PlaybookExecutionModel.id == execution_id)
+                .where(
+                    PlaybookExecutionModel.tenant_id == tenant_id,
+                    PlaybookExecutionModel.id == execution_id,
+                )
                 .with_for_update()
             )
             if execution is None or execution.status not in {
@@ -622,6 +645,7 @@ class NativePlaybookDispatcher:
                 (
                     await session.scalars(
                         select(PlaybookStepExecutionModel).where(
+                            PlaybookStepExecutionModel.tenant_id == tenant_id,
                             PlaybookStepExecutionModel.execution_id == execution_id,
                             PlaybookStepExecutionModel.status.in_(
                                 ("PENDING", "READY", "CLAIMED", "RUNNING")
@@ -734,11 +758,18 @@ class NativePlaybookDispatcher:
 
     @staticmethod
     async def _active_execution(
-        session: Any, execution_id: UUID, *, allow_terminal: bool = False
+        session: Any,
+        tenant_id: UUID,
+        execution_id: UUID,
+        *,
+        allow_terminal: bool = False,
     ) -> PlaybookExecutionModel:
         execution = await session.scalar(
             select(PlaybookExecutionModel)
-            .where(PlaybookExecutionModel.id == execution_id)
+            .where(
+                PlaybookExecutionModel.tenant_id == tenant_id,
+                PlaybookExecutionModel.id == execution_id,
+            )
             .with_for_update()
         )
         if execution is None:
@@ -748,10 +779,13 @@ class NativePlaybookDispatcher:
         return execution
 
     @staticmethod
-    async def _locked_step(session: Any, execution_id: UUID, step_id: str) -> Any:
+    async def _locked_step(
+        session: Any, tenant_id: UUID, execution_id: UUID, step_id: str
+    ) -> Any:
         row = await session.scalar(
             select(PlaybookStepExecutionModel)
             .where(
+                PlaybookStepExecutionModel.tenant_id == tenant_id,
                 PlaybookStepExecutionModel.execution_id == execution_id,
                 PlaybookStepExecutionModel.step_id == step_id,
             )

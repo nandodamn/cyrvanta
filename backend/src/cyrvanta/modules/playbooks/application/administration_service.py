@@ -287,13 +287,21 @@ class PlaybookAdministrationService:
                 (
                     await session.scalars(
                         select(PlaybookDefinitionModel)
+                        .where(PlaybookDefinitionModel.tenant_id == tenant_id)
                         .order_by(PlaybookDefinitionModel.created_at.desc())
                         .limit(limit)
                         .offset(offset)
                     )
                 ).all()
             )
-            total = int(await session.scalar(select(func.count(PlaybookDefinitionModel.id))) or 0)
+            total = int(
+                await session.scalar(
+                    select(func.count(PlaybookDefinitionModel.id)).where(
+                        PlaybookDefinitionModel.tenant_id == tenant_id
+                    )
+                )
+                or 0
+            )
             return DefinitionList(
                 items=[await self._enriched_definition_response(session, item) for item in items],
                 total=total,
@@ -306,7 +314,10 @@ class PlaybookAdministrationService:
             existing_items = list(
                 (
                     await session.scalars(
-                        select(PlaybookDefinitionModel).where(PlaybookDefinitionModel.code == code)
+                        select(PlaybookDefinitionModel).where(
+                            PlaybookDefinitionModel.tenant_id == tenant_id,
+                            PlaybookDefinitionModel.code == code,
+                        )
                     )
                 ).all()
             )
@@ -320,7 +331,10 @@ class PlaybookAdministrationService:
         for pb in ESSENTIAL_NATIVE_PLAYBOOKS:
             code = cast(str, pb["code"])
             existing = await session.scalar(
-                select(PlaybookDefinitionModel).where(PlaybookDefinitionModel.code == code)
+                select(PlaybookDefinitionModel).where(
+                    PlaybookDefinitionModel.tenant_id == tenant_id,
+                    PlaybookDefinitionModel.code == code,
+                )
             )
             desired_approval_mode = PLAYBOOK_GOVERNANCE_TAXONOMY.get(code, "AUTOMATIC")
 
@@ -386,7 +400,10 @@ class PlaybookAdministrationService:
     async def get_definition(self, tenant_id: UUID, definition_id: UUID) -> DefinitionResponse:
         async with tenant_session(tenant_id) as session:
             definition = await session.scalar(
-                select(PlaybookDefinitionModel).where(PlaybookDefinitionModel.id == definition_id)
+                select(PlaybookDefinitionModel).where(
+                    PlaybookDefinitionModel.tenant_id == tenant_id,
+                    PlaybookDefinitionModel.id == definition_id,
+                )
             )
             if definition is None:
                 raise PlaybookAdministrationNotFound("PLAYBOOK_NOT_FOUND")
@@ -403,7 +420,8 @@ class PlaybookAdministrationService:
         async with tenant_session(tenant_id) as session:
             existing = await session.scalar(
                 select(PlaybookDefinitionModel.id).where(
-                    PlaybookDefinitionModel.code == payload.code
+                    PlaybookDefinitionModel.tenant_id == tenant_id,
+                    PlaybookDefinitionModel.code == payload.code,
                 )
             )
             if existing is not None:
@@ -449,7 +467,10 @@ class PlaybookAdministrationService:
         digest = portable_playbook_sha256(artifact)
         async with tenant_session(tenant_id) as session:
             definition = await session.scalar(
-                select(PlaybookDefinitionModel).where(PlaybookDefinitionModel.id == definition_id)
+                select(PlaybookDefinitionModel).where(
+                    PlaybookDefinitionModel.tenant_id == tenant_id,
+                    PlaybookDefinitionModel.id == definition_id,
+                )
             )
             if definition is None:
                 raise PlaybookAdministrationNotFound("PLAYBOOK_NOT_FOUND")
@@ -457,6 +478,7 @@ class PlaybookAdministrationService:
                 raise PlaybookAdministrationConflict("PLAYBOOK_INVALID")
             duplicate = await session.scalar(
                 select(PlaybookVersionModel.id).where(
+                    PlaybookVersionModel.tenant_id == tenant_id,
                     PlaybookVersionModel.definition_id == definition_id,
                     PlaybookVersionModel.version == artifact.version,
                 )
@@ -502,7 +524,7 @@ class PlaybookAdministrationService:
         correlation_id: UUID,
     ) -> tuple[VersionResponse, list[str]]:
         async with tenant_session(tenant_id) as session:
-            version = await self._locked_version(session, version_id)
+            version = await self._locked_version(session, tenant_id, version_id)
             errors = self._version_errors(version)
             if (
                 version.impact in {"HIGH", "CRITICAL"}
@@ -548,7 +570,7 @@ class PlaybookAdministrationService:
         resolver = ConnectionResolver()
         results: list[dict[str, object]] = []
         async with tenant_session(tenant_id) as session:
-            version = await self._locked_version(session, version_id)
+            version = await self._locked_version(session, tenant_id, version_id)
             try:
                 artifact = self._artifact(version)
                 for step in artifact.steps:
@@ -582,7 +604,7 @@ class PlaybookAdministrationService:
         correlation_id: UUID,
     ) -> VersionResponse:
         async with tenant_session(tenant_id) as session:
-            version = await self._locked_version(session, version_id)
+            version = await self._locked_version(session, tenant_id, version_id)
             if version.status != "DRAFT":
                 raise PlaybookAdministrationConflict("PLAYBOOK_IMMUTABLE")
             if expected_digest != version.artifact_sha256:
@@ -634,7 +656,10 @@ class PlaybookAdministrationService:
     ) -> DryRunResponse:
         async with tenant_session(tenant_id) as session:
             version = await session.scalar(
-                select(PlaybookVersionModel).where(PlaybookVersionModel.id == version_id)
+                select(PlaybookVersionModel).where(
+                    PlaybookVersionModel.tenant_id == tenant_id,
+                    PlaybookVersionModel.id == version_id,
+                )
             )
             if version is None:
                 raise PlaybookAdministrationNotFound("PLAYBOOK_NOT_FOUND")
@@ -687,6 +712,7 @@ class PlaybookAdministrationService:
                 (
                     await session.scalars(
                         select(AutomationEngineBindingModel)
+                        .where(AutomationEngineBindingModel.tenant_id == tenant_id)
                         .order_by(AutomationEngineBindingModel.created_at.desc())
                         .limit(limit)
                         .offset(offset)
@@ -694,7 +720,12 @@ class PlaybookAdministrationService:
                 ).all()
             )
             total = int(
-                await session.scalar(select(func.count(AutomationEngineBindingModel.id))) or 0
+                await session.scalar(
+                    select(func.count(AutomationEngineBindingModel.id)).where(
+                        AutomationEngineBindingModel.tenant_id == tenant_id
+                    )
+                )
+                or 0
             )
             return BindingList(items=[self._binding_response(i) for i in items], total=total)
 
@@ -709,7 +740,8 @@ class PlaybookAdministrationService:
         async with tenant_session(tenant_id) as session:
             version = await session.scalar(
                 select(PlaybookVersionModel).where(
-                    PlaybookVersionModel.id == payload.playbook_version_id
+                    PlaybookVersionModel.tenant_id == tenant_id,
+                    PlaybookVersionModel.id == payload.playbook_version_id,
                 )
             )
             if version is None:
@@ -720,7 +752,9 @@ class PlaybookAdministrationService:
                 if self._version_errors(version):
                     raise PlaybookAdministrationConflict("PLAYBOOK_INVALID")
                 adapter_workflow_id = webhook_path = key_id = None
-                synchronized = await self._native_actions_ready(session, self._artifact(version))
+                synchronized = await self._native_actions_ready(
+                    session, tenant_id, self._artifact(version)
+                )
             else:
                 adapter_workflow_id = payload.adapter_workflow_id
                 webhook_path = payload.webhook_path
@@ -765,20 +799,24 @@ class PlaybookAdministrationService:
         async with tenant_session(tenant_id) as session:
             binding = await session.scalar(
                 select(AutomationEngineBindingModel)
-                .where(AutomationEngineBindingModel.id == binding_id)
+                .where(
+                    AutomationEngineBindingModel.tenant_id == tenant_id,
+                    AutomationEngineBindingModel.id == binding_id,
+                )
                 .with_for_update()
             )
             if binding is None:
                 raise PlaybookAdministrationNotFound("PLAYBOOK_NOT_FOUND")
             version = await session.scalar(
                 select(PlaybookVersionModel).where(
-                    PlaybookVersionModel.id == binding.playbook_version_id
+                    PlaybookVersionModel.tenant_id == tenant_id,
+                    PlaybookVersionModel.id == binding.playbook_version_id,
                 )
             )
             healthy = False
             if binding.engine_type == "NATIVE" and version is not None:
                 healthy = not self._version_errors(version) and await self._native_actions_ready(
-                    session, self._artifact(version)
+                    session, tenant_id, self._artifact(version)
                 )
             binding.observed_digest = binding.desired_digest if healthy else None
             binding.sync_status = "SYNCHRONIZED" if healthy else "UNAVAILABLE"
@@ -829,6 +867,7 @@ class PlaybookAdministrationService:
         async with tenant_session(tenant_id) as session:
             existing = await session.scalar(
                 select(NativeActionBindingModel.id).where(
+                    NativeActionBindingModel.tenant_id == tenant_id,
                     NativeActionBindingModel.action_code == payload.action_code,
                     NativeActionBindingModel.action_version == payload.action_version,
                 )
@@ -866,13 +905,14 @@ class PlaybookAdministrationService:
             return self._action_binding_response(binding)
 
     async def _native_actions_ready(
-        self, session: AsyncSession, artifact: PortablePlaybookV1
+        self, session: AsyncSession, tenant_id: UUID, artifact: PortablePlaybookV1
     ) -> bool:
         for step in artifact.steps:
             if not isinstance(step, ActionStep):
                 continue
             binding = await session.scalar(
                 select(NativeActionBindingModel).where(
+                    NativeActionBindingModel.tenant_id == tenant_id,
                     NativeActionBindingModel.action_code == step.action,
                     NativeActionBindingModel.action_version == step.action_version,
                     NativeActionBindingModel.connector_type == "SIMULATED",
@@ -918,10 +958,15 @@ class PlaybookAdministrationService:
         return PortablePlaybookV1.model_validate(version.portable_artifact)
 
     @staticmethod
-    async def _locked_version(session: AsyncSession, version_id: UUID) -> PlaybookVersionModel:
+    async def _locked_version(
+        session: AsyncSession, tenant_id: UUID, version_id: UUID
+    ) -> PlaybookVersionModel:
         version = await session.scalar(
             select(PlaybookVersionModel)
-            .where(PlaybookVersionModel.id == version_id)
+            .where(
+                PlaybookVersionModel.tenant_id == tenant_id,
+                PlaybookVersionModel.id == version_id,
+            )
             .with_for_update()
         )
         if version is None:
@@ -934,7 +979,10 @@ class PlaybookAdministrationService:
         response = self._definition_response(item)
         version = await session.scalar(
             select(PlaybookVersionModel)
-            .where(PlaybookVersionModel.definition_id == item.id)
+            .where(
+                PlaybookVersionModel.tenant_id == item.tenant_id,
+                PlaybookVersionModel.definition_id == item.id,
+            )
             .order_by(PlaybookVersionModel.created_at.desc())
             .limit(1)
         )
@@ -942,7 +990,10 @@ class PlaybookAdministrationService:
             return response
         binding = await session.scalar(
             select(AutomationEngineBindingModel)
-            .where(AutomationEngineBindingModel.playbook_version_id == version.id)
+            .where(
+                AutomationEngineBindingModel.tenant_id == item.tenant_id,
+                AutomationEngineBindingModel.playbook_version_id == version.id,
+            )
             .order_by(
                 AutomationEngineBindingModel.active.desc(),
                 (AutomationEngineBindingModel.engine_type == "NATIVE").desc(),
@@ -952,7 +1003,10 @@ class PlaybookAdministrationService:
         )
         execution = await session.scalar(
             select(PlaybookExecutionModel)
-            .where(PlaybookExecutionModel.playbook_version_id == version.id)
+            .where(
+                PlaybookExecutionModel.tenant_id == item.tenant_id,
+                PlaybookExecutionModel.playbook_version_id == version.id,
+            )
             .order_by(PlaybookExecutionModel.created_at.desc())
             .limit(1)
         )
@@ -1016,7 +1070,10 @@ class PlaybookAdministrationService:
     ) -> DefinitionResponse:
         async with tenant_session(tenant_id) as session:
             definition = await session.scalar(
-                select(PlaybookDefinitionModel).where(PlaybookDefinitionModel.id == definition_id)
+                select(PlaybookDefinitionModel).where(
+                    PlaybookDefinitionModel.tenant_id == tenant_id,
+                    PlaybookDefinitionModel.id == definition_id,
+                )
             )
             if definition is None:
                 raise PlaybookAdministrationNotFound("PLAYBOOK_NOT_FOUND")
@@ -1051,13 +1108,17 @@ class PlaybookAdministrationService:
     ) -> DefinitionResponse:
         async with tenant_session(tenant_id) as session:
             definition = await session.scalar(
-                select(PlaybookDefinitionModel).where(PlaybookDefinitionModel.id == definition_id)
+                select(PlaybookDefinitionModel).where(
+                    PlaybookDefinitionModel.tenant_id == tenant_id,
+                    PlaybookDefinitionModel.id == definition_id,
+                )
             )
             if definition is None:
                 raise PlaybookAdministrationNotFound("PLAYBOOK_NOT_FOUND")
             version = await session.scalar(
                 select(PlaybookVersionModel)
                 .where(
+                    PlaybookVersionModel.tenant_id == tenant_id,
                     PlaybookVersionModel.definition_id == definition.id,
                     PlaybookVersionModel.status == "APPROVED",
                 )
@@ -1071,6 +1132,7 @@ class PlaybookAdministrationService:
 
             binding = await session.scalar(
                 select(AutomationEngineBindingModel).where(
+                    AutomationEngineBindingModel.tenant_id == tenant_id,
                     AutomationEngineBindingModel.playbook_version_id == version.id,
                     AutomationEngineBindingModel.engine_type == target_engine,
                 )
@@ -1085,7 +1147,7 @@ class PlaybookAdministrationService:
             if binding is None:
                 if target_engine == "NATIVE":
                     synchronized = await self._native_actions_ready(
-                        session, self._artifact(version)
+                        session, tenant_id, self._artifact(version)
                     )
                     binding = AutomationEngineBindingModel(
                         tenant_id=tenant_id,
@@ -1111,6 +1173,7 @@ class PlaybookAdministrationService:
                     (
                         await session.scalars(
                             select(AutomationEngineBindingModel).where(
+                                AutomationEngineBindingModel.tenant_id == tenant_id,
                                 AutomationEngineBindingModel.playbook_version_id == version.id,
                                 AutomationEngineBindingModel.id != binding.id,
                             )

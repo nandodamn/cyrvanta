@@ -311,7 +311,10 @@ class PlaybookAdministrationService:
                 ).all()
             )
             for existing in existing_items:
-                if existing.approval_mode != desired_approval_mode:
+                if not self._approval_satisfies_minimum(
+                    existing.approval_mode or "AUTOMATIC",
+                    desired_approval_mode,
+                ):
                     existing.approval_mode = desired_approval_mode
 
         for pb in ESSENTIAL_NATIVE_PLAYBOOKS:
@@ -955,17 +958,9 @@ class PlaybookAdministrationService:
         )
         artifact = self._artifact(version) if version.portable_artifact is not None else None
         required = version.input_schema.get("required", [])
-        target_types = PLAYBOOK_INCIDENT_TYPES.get(item.code, ["all-incidents"])
-        mitre = PLAYBOOK_MITRE_CODES.get(item.code, ["T1078"])
-        rollback_info = PLAYBOOK_ROLLBACK_MAP.get(
-            item.code,
-            {
-                "code": f"rollback-{item.code}",
-                "es": f"Reversión segura del playbook {item.code}.",
-                "en": f"Safe rollback for playbook {item.code}.",
-            },
-        )
-        rollback_guidance = LocalizedDescription(es=rollback_info["es"], en=rollback_info["en"])
+        target_types = PLAYBOOK_INCIDENT_TYPES.get(item.code, [])
+        mitre = PLAYBOOK_MITRE_CODES.get(item.code, [])
+        rollback_guidance = None
         policy_info = PLAYBOOK_AUTOMATION_POLICY_MAP.get(
             item.code,
             {
@@ -986,8 +981,8 @@ class PlaybookAdministrationService:
                     "PUBLISHED" if version.status == "APPROVED" else version.status
                 ),
                 "engine_type": resolved_engine_type,
-                "binding_status": binding.sync_status if binding is not None else "SYNCHRONIZED",
-                "binding_active": binding.active if binding is not None else True,
+                "binding_status": binding.sync_status if binding is not None else "PENDING",
+                "binding_active": binding.active if binding is not None else False,
                 "execution_mode": (
                     "SIMULATED" if version.classification == "SYNTHETIC" else "LIVE"
                 ),
@@ -1000,8 +995,8 @@ class PlaybookAdministrationService:
                 ),
                 "target_incident_types": target_types,
                 "mitre_codes": mitre,
-                "rollback_supported": True,
-                "rollback_target_code": rollback_info["code"],
+                "rollback_supported": False,
+                "rollback_target_code": None,
                 "rollback_guidance_i18n": rollback_guidance,
                 "automation_policy_i18n": policy_guidance,
                 "approval_mode": getattr(item, "approval_mode", "AUTOMATIC") or "AUTOMATIC",
@@ -1026,6 +1021,9 @@ class PlaybookAdministrationService:
             if definition is None:
                 raise PlaybookAdministrationNotFound("PLAYBOOK_NOT_FOUND")
 
+            minimum_mode = PLAYBOOK_GOVERNANCE_TAXONOMY.get(definition.code, "AUTOMATIC")
+            if not self._approval_satisfies_minimum(payload.approval_mode, minimum_mode):
+                raise PlaybookAdministrationConflict("PLAYBOOK_REVIEW_SEPARATION_REQUIRED")
             definition.approval_mode = payload.approval_mode
             await session.flush()
             self._audit(
@@ -1155,6 +1153,14 @@ class PlaybookAdministrationService:
                 item.approval_mode or "AUTOMATIC",
             ),
         )
+
+    @staticmethod
+    def _approval_satisfies_minimum(requested: str, minimum: str) -> bool:
+        rank = {"AUTOMATIC": 0, "SINGLE": 1, "FOUR_EYES": 2}
+        try:
+            return rank[requested] >= rank[minimum]
+        except KeyError:
+            return False
 
     @staticmethod
     def _version_response(item: PlaybookVersionModel) -> VersionResponse:

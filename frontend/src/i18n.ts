@@ -333,6 +333,7 @@ const resources = {
       noParameters: "Sin parámetros obligatorios",
       credentialsPending: "Credenciales pendientes",
       noCredentialsPending: "Sin credenciales pendientes",
+      noMitreMappings: "Sin mappings sustentados",
       playbookCredentialBoundary:
         "Los playbooks contienen aliases de credenciales, nunca valores secretos. LIVE permanece deshabilitado.",
       mitigatedIncidentTypes: "Tipos de incidentes mitigados",
@@ -743,6 +744,7 @@ const resources = {
       noParameters: "No required parameters",
       credentialsPending: "Pending credentials",
       noCredentialsPending: "No pending credentials",
+      noMitreMappings: "No supported mappings",
       playbookCredentialBoundary:
         "Playbooks contain credential aliases, never secret values. LIVE remains disabled.",
       mitigatedIncidentTypes: "Mitigated Incident Types",

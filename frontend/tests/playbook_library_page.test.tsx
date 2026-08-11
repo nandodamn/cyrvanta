@@ -61,5 +61,8 @@ describe("native playbook library", () => {
     expect(screen.getByText("SYNCHRONIZED")).toBeVisible();
     expect(screen.getByText("SUCCEEDED")).toBeVisible();
     expect(screen.getAllByText(/n8n opcional|optional n8n/i).length).toBeGreaterThan(0);
+    expect(screen.getByText(/Sin mappings sustentados|No supported mappings/i)).toBeVisible();
+    expect(screen.queryByText("T1078")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Rollback habilitado|Rollback enabled/i)).not.toBeInTheDocument();
   });
 });

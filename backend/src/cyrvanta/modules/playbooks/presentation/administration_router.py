@@ -186,6 +186,8 @@ async def get_connection_dependencies(
         )
     except PlaybookAdministrationNotFound as exc:
         raise _translate(exc) from exc
+    except PlaybookAdministrationConflict as exc:
+        raise _translate(exc) from exc
 
 
 @router.post("/playbook-versions/{version_id}/publish", response_model=VersionResponse)

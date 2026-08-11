@@ -565,8 +565,8 @@ class PlaybookAdministrationService:
                                 "verification_supported": res.verification_supported,
                             }
                         )
-            except Exception:
-                pass
+            except (ValueError, ActionUnavailableError) as exc:
+                raise PlaybookAdministrationConflict("PLAYBOOK_INVALID") from exc
         return results
 
     async def publish_version(

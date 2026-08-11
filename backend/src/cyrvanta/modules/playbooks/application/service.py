@@ -4,11 +4,21 @@ from uuid import UUID
 from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from cyrvanta.modules.decision.domain.models import (
+    ActionImpact,
+    EvaluationOutcome,
+    ResponseMode,
+    evaluate_policy,
+)
 from cyrvanta.modules.decision.infrastructure.models import (
     ActionAuthorizationModel,
     ActionProposalModel,
+    ApprovalDecisionModel,
+    ApprovalRequestModel,
+    ResponsePolicyVersionModel,
 )
 from cyrvanta.modules.identity.infrastructure.models import AuditEventModel
+from cyrvanta.modules.incident.infrastructure.models import IncidentModel
 from cyrvanta.modules.playbooks.application.schemas import (
     ExecutionClaim,
     ExecutionUpdate,
@@ -73,6 +83,7 @@ class PlaybookExecutionService:
         correlation_id: UUID,
     ) -> PlaybookExecutionResponse:
         now = datetime.now(UTC)
+        settings = get_settings()
         async with tenant_session(tenant_id) as session:
             existing = await session.scalar(
                 select(PlaybookExecutionModel).where(
@@ -94,10 +105,6 @@ class PlaybookExecutionService:
             )
             if authorization is None:
                 raise PlaybookNotFound("Authorization was not found")
-            if authorization.status != "ACTIVE":
-                raise PlaybookConflict("Authorization is not active")
-            if authorization.expires_at <= now:
-                raise PlaybookConflict("Authorization has expired")
             proposal = await session.scalar(
                 select(ActionProposalModel).where(
                     ActionProposalModel.tenant_id == tenant_id,
@@ -106,10 +113,47 @@ class PlaybookExecutionService:
             )
             if proposal is None:
                 raise PlaybookNotFound("Authorized proposal was not found")
-            if proposal.status != "AUTHORIZED":
-                raise PlaybookConflict("Proposal is not authorized")
-            if proposal.fingerprint != authorization.proposal_fingerprint:
-                raise PlaybookConflict("Authorization fingerprint no longer matches")
+            policy = await session.scalar(
+                select(ResponsePolicyVersionModel).where(
+                    ResponsePolicyVersionModel.tenant_id == tenant_id,
+                    ResponsePolicyVersionModel.id == proposal.policy_version_id,
+                )
+            )
+            incident = await session.scalar(
+                select(IncidentModel).where(
+                    IncidentModel.tenant_id == tenant_id,
+                    IncidentModel.id == proposal.incident_id,
+                )
+            )
+            approval_request = await session.scalar(
+                select(ApprovalRequestModel).where(
+                    ApprovalRequestModel.tenant_id == tenant_id,
+                    ApprovalRequestModel.id == authorization.approval_request_id,
+                    ApprovalRequestModel.proposal_id == proposal.id,
+                )
+            )
+            if policy is None or incident is None or approval_request is None:
+                raise PlaybookNotFound("Authorized decision material was not found")
+            approval_count = int(
+                await session.scalar(
+                    select(func.count(ApprovalDecisionModel.id)).where(
+                        ApprovalDecisionModel.tenant_id == tenant_id,
+                        ApprovalDecisionModel.approval_request_id == approval_request.id,
+                        ApprovalDecisionModel.decision == "APPROVE",
+                    )
+                )
+                or 0
+            )
+            self._validate_authorized_state(
+                authorization=authorization,
+                proposal=proposal,
+                policy=policy,
+                incident=incident,
+                approval_request=approval_request,
+                approval_count=approval_count,
+                global_kill_switch=settings.automation_kill_switch,
+                now=now,
+            )
             definition = await session.scalar(
                 select(PlaybookDefinitionModel).where(
                     PlaybookDefinitionModel.tenant_id == tenant_id,
@@ -132,21 +176,43 @@ class PlaybookExecutionService:
                 raise PlaybookConflict("Authorized workflow does not match the released artifact")
             if version.classification != "SYNTHETIC":
                 raise PlaybookConflict("LIVE playbook execution requires an operational approval")
-            binding = await session.scalar(
-                select(AutomationEngineBindingModel)
-                .where(
-                    AutomationEngineBindingModel.tenant_id == tenant_id,
-                    AutomationEngineBindingModel.playbook_version_id == version.id,
-                    AutomationEngineBindingModel.active.is_(True),
-                    AutomationEngineBindingModel.sync_status == "SYNCHRONIZED",
-                )
-                .order_by(
-                    (AutomationEngineBindingModel.engine_type == "NATIVE").desc(),
-                    AutomationEngineBindingModel.created_at.desc(),
-                )
+            bindings = list(
+                (
+                    await session.scalars(
+                        select(AutomationEngineBindingModel)
+                        .where(
+                            AutomationEngineBindingModel.tenant_id == tenant_id,
+                            AutomationEngineBindingModel.playbook_version_id == version.id,
+                            AutomationEngineBindingModel.active.is_(True),
+                            AutomationEngineBindingModel.sync_status == "SYNCHRONIZED",
+                        )
+                        .order_by(
+                            (AutomationEngineBindingModel.engine_type == "NATIVE").desc(),
+                            AutomationEngineBindingModel.created_at.desc(),
+                        )
+                        .limit(2)
+                    )
+                ).all()
             )
-            if binding is None or binding.observed_digest != version.artifact_sha256:
+            if len(bindings) != 1:
+                raise PlaybookConflict("Automation binding is unavailable or ambiguous")
+            binding = bindings[0]
+            if (
+                binding.observed_digest != version.artifact_sha256
+                or binding.desired_digest != version.artifact_sha256
+            ):
                 raise PlaybookConflict("Automation binding is unavailable or drifted")
+            if binding.engine_type == "NATIVE":
+                allowed_tenants = settings.native_enabled_tenant_ids
+                if not settings.playbook_native_engine_enabled or (
+                    allowed_tenants and str(tenant_id) not in allowed_tenants
+                ):
+                    raise PlaybookConflict("Native playbook engine is disabled")
+            elif binding.engine_type == "N8N":
+                if not settings.n8n_enabled:
+                    raise PlaybookConflict("n8n automation engine is disabled")
+            else:
+                raise PlaybookConflict("Automation engine is unavailable")
             execution = PlaybookExecutionModel(
                 tenant_id=tenant_id,
                 authorization_id=authorization.id,
@@ -201,6 +267,55 @@ class PlaybookExecutionService:
                 },
             )
             return self._response(execution)
+
+    @staticmethod
+    def _validate_authorized_state(
+        *,
+        authorization: ActionAuthorizationModel,
+        proposal: ActionProposalModel,
+        policy: ResponsePolicyVersionModel,
+        incident: IncidentModel,
+        approval_request: ApprovalRequestModel,
+        approval_count: int,
+        global_kill_switch: bool,
+        now: datetime,
+    ) -> None:
+        if authorization.status != "ACTIVE" or authorization.consumed_at is not None:
+            raise PlaybookConflict("Authorization is not active")
+        if authorization.revoked_at is not None:
+            raise PlaybookConflict("Authorization was revoked")
+        if authorization.expires_at <= now:
+            raise PlaybookConflict("Authorization has expired")
+        if proposal.status != "AUTHORIZED":
+            raise PlaybookConflict("Proposal is not authorized")
+        if proposal.fingerprint != authorization.proposal_fingerprint:
+            raise PlaybookConflict("Authorization fingerprint no longer matches")
+        if policy.status != "ACTIVE" or policy.kill_switch or global_kill_switch:
+            raise PlaybookConflict("Response policy or kill switch blocks execution")
+        if (
+            incident.version != proposal.incident_version
+            or incident.is_simulated != proposal.is_simulated
+        ):
+            raise PlaybookConflict("Incident material changed after authorization")
+        if approval_request.status != "APPROVED" or approval_request.expires_at <= now:
+            raise PlaybookConflict("Approval request is no longer valid")
+        try:
+            current_policy = evaluate_policy(
+                impact=ActionImpact(proposal.impact),
+                requested_mode=ResponseMode(proposal.requested_mode),
+                global_kill_switch=global_kill_switch,
+                tenant_kill_switch=policy.kill_switch,
+                is_simulated=incident.is_simulated,
+            )
+        except ValueError as exc:
+            raise PlaybookConflict("Authorized policy material is invalid") from exc
+        if current_policy.outcome is EvaluationOutcome.DENIED:
+            raise PlaybookConflict("Current response policy denies execution")
+        if (
+            approval_request.required_approvals != current_policy.required_approvals
+            or approval_count < current_policy.required_approvals
+        ):
+            raise PlaybookConflict("Approval quorum no longer satisfies current policy")
 
     async def list(
         self,
@@ -365,12 +480,8 @@ class PlaybookExecutionService:
     ) -> PlaybookExecutionResponse:
         async with tenant_session(tenant_id) as session:
             execution = await self._locked_execution(session, tenant_id, execution_id)
-            binding = await self._binding(
-                session, tenant_id, execution.binding_id, key_id
-            )
-            replay_digest = await self._nonce_digest(
-                session, tenant_id, "DISPATCH", key_id, nonce
-            )
+            binding = await self._binding(session, tenant_id, execution.binding_id, key_id)
+            replay_digest = await self._nonce_digest(session, tenant_id, "DISPATCH", key_id, nonce)
             if replay_digest is not None:
                 if (
                     replay_digest == body_digest
@@ -439,9 +550,7 @@ class PlaybookExecutionService:
     ) -> PlaybookExecutionResponse:
         async with tenant_session(tenant_id) as session:
             execution = await self._locked_execution(session, tenant_id, execution_id)
-            binding = await self._binding(
-                session, tenant_id, execution.binding_id, key_id
-            )
+            binding = await self._binding(session, tenant_id, execution.binding_id, key_id)
             duplicate = await session.scalar(
                 select(PlaybookExecutionUpdateModel).where(
                     PlaybookExecutionUpdateModel.tenant_id == tenant_id,

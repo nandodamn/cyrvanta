@@ -159,14 +159,21 @@ class PlaybookExecutionService:
                 global_kill_switch=settings.automation_kill_switch,
                 now=now,
             )
-            definition = await session.scalar(
-                select(PlaybookDefinitionModel).where(
-                    PlaybookDefinitionModel.tenant_id == tenant_id,
-                    PlaybookDefinitionModel.action_type == proposal.action_type,
-                )
+            definitions = list(
+                (
+                    await session.scalars(
+                        select(PlaybookDefinitionModel)
+                        .where(
+                            PlaybookDefinitionModel.tenant_id == tenant_id,
+                            PlaybookDefinitionModel.action_type == proposal.action_type,
+                        )
+                        .limit(2)
+                    )
+                ).all()
             )
-            if definition is None:
-                raise PlaybookConflict("No released playbook matches the authorized action")
+            if len(definitions) != 1:
+                raise PlaybookConflict("Released playbook definition is unavailable or ambiguous")
+            definition = definitions[0]
             version = await session.scalar(
                 select(PlaybookVersionModel).where(
                     PlaybookVersionModel.tenant_id == tenant_id,
@@ -179,6 +186,13 @@ class PlaybookExecutionService:
                 raise PlaybookConflict("Authorized playbook version is not released")
             if version.workflow_code != proposal.workflow_id:
                 raise PlaybookConflict("Authorized workflow does not match the released artifact")
+            self._validate_definition_governance(
+                definition_approval_mode=definition.approval_mode,
+                version_impact=version.impact,
+                proposal=proposal,
+                approval_request=approval_request,
+                approval_count=approval_count,
+            )
             if (
                 version.classification != "LIVE"
                 or not settings.playbook_live_enabled
@@ -330,6 +344,40 @@ class PlaybookExecutionService:
             or approval_count < current_policy.required_approvals
         ):
             raise PlaybookConflict("Approval quorum no longer satisfies current policy")
+
+    @staticmethod
+    def _validate_definition_governance(
+        *,
+        definition_approval_mode: str | None,
+        version_impact: str,
+        proposal: ActionProposalModel,
+        approval_request: ApprovalRequestModel,
+        approval_count: int,
+    ) -> None:
+        response_modes = {
+            "AUTOMATIC": ResponseMode.AUTOMATIC,
+            "SINGLE": ResponseMode.HUMAN_APPROVAL,
+            "FOUR_EYES": ResponseMode.DUAL_APPROVAL,
+        }
+        try:
+            impact = ActionImpact(version_impact)
+            response_mode = response_modes[definition_approval_mode]
+        except (KeyError, ValueError) as exc:
+            raise PlaybookConflict("Released playbook governance is invalid") from exc
+        if proposal.impact != impact.value or proposal.requested_mode != response_mode.value:
+            raise PlaybookConflict("Playbook governance changed after authorization")
+        expected_approvals = (
+            2
+            if impact is ActionImpact.HIGH or response_mode is ResponseMode.DUAL_APPROVAL
+            else 1
+            if response_mode is ResponseMode.HUMAN_APPROVAL
+            else 0
+        )
+        if (
+            approval_request.required_approvals != expected_approvals
+            or approval_count < expected_approvals
+        ):
+            raise PlaybookConflict("Approval quorum does not satisfy playbook governance")
 
     async def list(
         self,

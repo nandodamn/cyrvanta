@@ -30,6 +30,10 @@ Estado: implementación preparada; validación funcional manual pendiente del op
 - Biblioteca completa visible; playbooks no implementados o incompletos permanecen bloqueados.
 - La dependencia de aprobación se proyecta desde el modo tenant-scoped del playbook, no desde
   una inferencia por impacto del conector; un modo ausente o desconocido falla cerrado.
+- La creación de propuestas resuelve impacto y modo de aprobación desde la versión LIVE aprobada
+  del tenant; rechaza cualquier downgrade enviado por el cliente. Antes de encolar, el motor
+  revalida esa gobernanza y el quórum real, por lo que un cambio a `FOUR_EYES` invalida material
+  de aprobación anterior.
 - Menús bilingües para reemplazar, habilitar, deshabilitar y verificar conexiones sin volver a mostrar secretos, además de configurar bindings, validar/publicar y activar.
 - Login, investigación, decisiones, auditoría y cabecera administrativa usan claves i18n ES/EN; los ejemplos de acceso son neutrales y no sugieren cuentas demo.
 - Administración LDAP/AD completa: bind y CA write-only, transporte seguro, timeout, atributos y grupos, JIT condicionado a mappings no privilegiados, activación posterior a una prueba vigente y vínculo explícito de identidades locales.

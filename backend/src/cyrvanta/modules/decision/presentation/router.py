@@ -14,6 +14,9 @@ from cyrvanta.modules.decision.application.service import (
     DecisionNotFound,
     DecisionService,
 )
+from cyrvanta.modules.playbooks.infrastructure.decision_governance import (
+    PlaybookActionGovernanceAdapter,
+)
 from cyrvanta.shared.dependencies import SecurityContext, require_permission
 
 router = APIRouter(tags=["response-decisions"])
@@ -45,7 +48,7 @@ async def create_proposal(
     idempotency_key: Annotated[str, Header(alias="Idempotency-Key", min_length=8, max_length=200)],
 ) -> ActionProposalResponse:
     try:
-        return await DecisionService().create_proposal(
+        return await DecisionService(PlaybookActionGovernanceAdapter()).create_proposal(
             tenant_id=context.tenant_id,
             requester_user_id=context.user_id,
             payload=payload,

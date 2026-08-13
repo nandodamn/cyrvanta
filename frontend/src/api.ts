@@ -1052,7 +1052,7 @@ export async function getResponseDecisions(incidentId: string): Promise<Response
 
 export async function createResponseProposal(
   incidentId: string,
-  playbook: Pick<PlaybookDefinition, "code" | "latest_version" | "impact">,
+  playbook: Pick<PlaybookDefinition, "code" | "latest_version" | "impact" | "approval_mode">,
 ): Promise<ResponseDecision> {
   if (!playbook.latest_version) throw new Error("PLAYBOOK_NOT_PUBLISHED");
   return responseDecisionSchema.parse(
@@ -1067,7 +1067,12 @@ export async function createResponseProposal(
           incident_id: incidentId,
           action_type: playbook.code,
           impact: playbook.impact === "MEDIUM" ? "MODERATE" : (playbook.impact ?? "MODERATE"),
-          requested_mode: "HUMAN_APPROVAL",
+          requested_mode:
+            playbook.approval_mode === "FOUR_EYES"
+              ? "DUAL_APPROVAL"
+              : playbook.approval_mode === "SINGLE"
+                ? "HUMAN_APPROVAL"
+                : "AUTOMATIC",
           workflow_id: playbook.code,
           workflow_version: playbook.latest_version,
           targets: [incidentId],

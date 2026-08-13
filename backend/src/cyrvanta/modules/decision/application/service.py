@@ -7,6 +7,10 @@ from uuid import UUID, uuid4
 from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from cyrvanta.modules.decision.application.governance import (
+    ActionGovernance,
+    ActionGovernancePort,
+)
 from cyrvanta.modules.decision.application.schemas import (
     ActionProposalCreate,
     ActionProposalList,
@@ -65,6 +69,9 @@ class DecisionNotFound(LookupError):
 
 
 class DecisionService:
+    def __init__(self, governance: ActionGovernancePort | None = None) -> None:
+        self._governance = governance
+
     async def expire_due(self, batch_size: int = 100) -> tuple[int, int]:
         if batch_size < 1 or batch_size > 500:
             raise ValueError("Decision expiration batch size must be between 1 and 500")
@@ -213,6 +220,15 @@ class DecisionService:
         correlation_id: UUID,
         idempotency_key: str,
     ) -> ActionProposalResponse:
+        if self._governance is None:
+            raise DecisionConflict("Authoritative action governance is unavailable")
+        governance = await self._governance.resolve(
+            tenant_id=tenant_id,
+            action_type=payload.action_type,
+            workflow_id=payload.workflow_id,
+            workflow_version=payload.workflow_version,
+        )
+        self._validate_requested_governance(payload, governance)
         validate_target_limit(payload.impact, len(payload.targets))
         if len(json.dumps(payload.parameters, ensure_ascii=False).encode()) > 32 * 1024:
             raise DecisionConflict("Parameters exceed the approved size limit")
@@ -383,6 +399,20 @@ class DecisionService:
                     },
                 )
             return await self._response(session, proposal)
+
+    @staticmethod
+    def _validate_requested_governance(
+        payload: ActionProposalCreate,
+        governance: ActionGovernance | None,
+    ) -> None:
+        if governance is None:
+            raise DecisionConflict("Released playbook governance was not found")
+        if payload.impact is not governance.impact:
+            raise DecisionConflict("Requested impact does not match released playbook governance")
+        if payload.requested_mode is not governance.response_mode:
+            raise DecisionConflict(
+                "Requested approval mode does not match tenant playbook governance"
+            )
 
     async def list_proposals(
         self, tenant_id: UUID, *, incident_id: UUID | None, limit: int, offset: int

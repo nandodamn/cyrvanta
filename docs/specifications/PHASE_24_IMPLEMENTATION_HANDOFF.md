@@ -34,6 +34,9 @@ Estado: implementación preparada; validación funcional manual pendiente del op
 - `create-security-ticket`: POST HTTPS real, allowlisted e idempotente.
 - `incident-report-email`: informe real minimizado y entrega SMTP.
 
+El operador autorizó explícitamente el 2026-08-13 que estos tres playbooks de egreso puedan habilitarse: 
+otify-critical-incident, create-security-ticket e incident-report-email. La autorización no activa bindings, conexiones, aprobaciones ni switches LIVE, y no provoca ejecuciones automáticas.
+
 Cada capacidad externa permanece bloqueada hasta que su conexión tenant-scoped esté activa y
 verificada, el binding de acción sea válido, la versión sea publicada y los switches LIVE estén
 habilitados. El egreso excluye evidencia raw, secretos y parámetros libres de la propuesta.

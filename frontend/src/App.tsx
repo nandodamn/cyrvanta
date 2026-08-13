@@ -498,7 +498,6 @@ function ListControls({
 
 function Overview() {
   const { t } = useTranslation();
-  const queryClient = useQueryClient();
   const incidents = useQuery({
     queryKey: ["incidents", "overview"],
     queryFn: () => getIncidents({ pageSize: 100 }),
@@ -509,10 +508,10 @@ function Overview() {
   });
   const open = incidents.data?.filter((item) => item.status !== "closed") ?? [];
   const cards = [
-    [t("openIncidents"), String(open.length)],
-    [t("critical"), String(open.filter((item) => item.severity === "critical").length)],
-    [t("pendingReview"), String(open.filter((item) => item.status === "new").length)],
-    [t("alerts"), String(alerts.data?.length ?? 0)],
+    [t("listedOpenIncidents"), incidents.data ? String(open.length) : "—"],
+    [t("listedCriticalIncidents"), incidents.data ? String(open.filter((item) => item.severity === "critical").length) : "—"],
+    [t("listedPendingReview"), incidents.data ? String(open.filter((item) => item.status === "new").length) : "—"],
+    [t("listedAlerts"), alerts.data ? String(alerts.data.length) : "—"],
   ];
   return (
     <>
@@ -527,7 +526,6 @@ function Overview() {
           <article key={label}>
             <p>{label}</p>
             <strong>{value}</strong>
-            <span className="spark">╱╲╱╲╱</span>
           </article>
         ))}
       </section>

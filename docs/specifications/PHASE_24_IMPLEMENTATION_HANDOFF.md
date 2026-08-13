@@ -18,6 +18,7 @@ Estado: implementación preparada; validación funcional manual pendiente del op
 - Administración LDAP/AD completa: bind y CA write-only, transporte seguro, timeout, atributos y grupos, JIT condicionado a mappings no privilegiados, activación posterior a una prueba vigente y vínculo explícito de identidades locales.
 - Generadores de escenarios y propuesta sintética retirados de API/UI.
 - Listas, detalles, mutaciones, métricas, memoria, correlaciones, decisiones y ejecuciones operativas excluyen registros sintéticos históricos; el dispatcher rechaza cualquier versión que no sea `LIVE`.
+- Los contadores del resumen indican explícitamente su límite de 100 registros recientes, muestran estado indeterminado durante carga y no incluyen tendencias decorativas presentadas como telemetría.
 - El detalle de incidente permite editar sus datos, asignar o desasignar usuarios activos del tenant y agregar comentarios operativos a la línea temporal usando control optimista de versión y auditoría backend.
 - Las transiciones muestran todos los destinos válidos del estado actual; cierre y reapertura exigen justificación, y el cierre exige seleccionar explícitamente uno de los motivos aprobados.
 - La vista de conocimiento permite crear claims humanos con evidencia tenant-scoped e invariantes por tipo, además de evaluar claims ajenos o retractar claims propios mediante registros append-only.

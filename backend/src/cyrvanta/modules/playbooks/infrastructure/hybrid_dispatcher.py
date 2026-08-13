@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Iterator
 from uuid import UUID, uuid4
 
 from sqlalchemy import select
@@ -41,37 +42,108 @@ class HybridPlaybookDispatcher:
             raise RuntimeError("playbook dispatch failed")
 
     async def dispatch_pending(self, limit: int = 25) -> int:
+        if limit < 1 or limit > 500:
+            raise ValueError("Dispatch batch size must be between 1 and 500")
         async with SessionFactory() as session:
             tenant_ids = list(
                 (
                     await session.scalars(
-                        select(TenantModel.id).order_by(TenantModel.created_at).limit(limit)
+                        select(TenantModel.id)
+                        .where(TenantModel.status == "active")
+                        .order_by(TenantModel.created_at)
                     )
                 ).all()
             )
-        dispatched = 0
+        pending_batches: list[tuple[UUID, list[UUID]]] = []
         for tenant_id in tenant_ids:
+            enabled_engines = self._enabled_engines(tenant_id)
+            if not enabled_engines:
+                continue
             async with tenant_session(tenant_id) as session:
                 execution_ids = list(
                     (
                         await session.scalars(
                             select(PlaybookExecutionModel.id)
+                            .join(
+                                AutomationEngineBindingModel,
+                                (
+                                    PlaybookExecutionModel.binding_id
+                                    == AutomationEngineBindingModel.id
+                                )
+                                & (
+                                    PlaybookExecutionModel.tenant_id
+                                    == AutomationEngineBindingModel.tenant_id
+                                ),
+                            )
                             .where(
                                 PlaybookExecutionModel.tenant_id == tenant_id,
-                                PlaybookExecutionModel.status == ExecutionStatus.QUEUED.value,
+                                PlaybookExecutionModel.status
+                                == ExecutionStatus.QUEUED.value,
+                                PlaybookExecutionModel.execution_mode == "LIVE",
+                                AutomationEngineBindingModel.tenant_id == tenant_id,
+                                AutomationEngineBindingModel.active.is_(True),
+                                AutomationEngineBindingModel.sync_status == "SYNCHRONIZED",
+                                AutomationEngineBindingModel.engine_type.in_(
+                                    enabled_engines
+                                ),
                             )
                             .order_by(PlaybookExecutionModel.created_at)
-                            .limit(limit - dispatched)
+                            .limit(limit)
                         )
                     ).all()
                 )
-            for execution_id in execution_ids:
-                outcome = await self.dispatch(tenant_id, execution_id, uuid4())
-                if outcome is not None:
-                    dispatched += 1
-                if dispatched >= limit:
-                    return dispatched
+            if execution_ids:
+                pending_batches.append((tenant_id, execution_ids))
+
+        dispatched = 0
+        for attempted, (tenant_id, execution_id) in enumerate(
+            self._round_robin(pending_batches)
+        ):
+            if attempted >= limit:
+                break
+            outcome = await self.dispatch(tenant_id, execution_id, uuid4())
+            if outcome is not None:
+                dispatched += 1
         return dispatched
+
+    @staticmethod
+    def _round_robin(
+        batches: list[tuple[UUID, list[UUID]]],
+    ) -> Iterator[tuple[UUID, UUID]]:
+        positions = [0] * len(batches)
+        remaining = True
+        while remaining:
+            remaining = False
+            for index, (tenant_id, execution_ids) in enumerate(batches):
+                position = positions[index]
+                if position >= len(execution_ids):
+                    continue
+                remaining = True
+                positions[index] += 1
+                yield tenant_id, execution_ids[position]
+
+    def _enabled_engines(self, tenant_id: UUID) -> tuple[str, ...]:
+        engines: list[str] = []
+        allowed_tenants = self.settings.native_enabled_tenant_ids
+        if (
+            self.settings.playbook_native_engine_enabled
+            and self.settings.playbook_live_enabled
+            and self.settings.playbook_dispatch_enabled
+            and not self.settings.automation_kill_switch
+            and (not allowed_tenants or str(tenant_id) in allowed_tenants)
+        ):
+            engines.append("NATIVE")
+        if self._n8n_dispatch_enabled():
+            engines.append("N8N")
+        return tuple(engines)
+
+    def _n8n_dispatch_enabled(self) -> bool:
+        return bool(
+            self.settings.n8n_enabled
+            and self.settings.playbook_live_enabled
+            and self.settings.playbook_dispatch_enabled
+            and not self.settings.automation_kill_switch
+        )
 
     async def dispatch(
         self,
@@ -94,7 +166,13 @@ class HybridPlaybookDispatcher:
                         == AutomationEngineBindingModel.tenant_id
                     ),
                 )
+                .join(
+                    TenantModel,
+                    TenantModel.id == PlaybookExecutionModel.tenant_id,
+                )
                 .where(
+                    TenantModel.id == tenant_id,
+                    TenantModel.status == "active",
                     PlaybookExecutionModel.tenant_id == tenant_id,
                     AutomationEngineBindingModel.tenant_id == tenant_id,
                     PlaybookExecutionModel.id == execution_id,
@@ -118,7 +196,7 @@ class HybridPlaybookDispatcher:
         if engine_type == "NATIVE":
             return await self.native.dispatch(tenant_id, execution_id, correlation_id, causation_id)
         if engine_type == "N8N":
-            if not self.settings.n8n_enabled:
+            if not self._n8n_dispatch_enabled():
                 return None
             return await self.n8n.dispatch(tenant_id, execution_id, correlation_id)
         return None

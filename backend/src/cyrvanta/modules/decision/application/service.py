@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import json
 from datetime import UTC, datetime, timedelta
-from uuid import UUID
+from uuid import UUID, uuid4
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from cyrvanta.modules.decision.application.schemas import (
@@ -65,6 +65,145 @@ class DecisionNotFound(LookupError):
 
 
 class DecisionService:
+    async def expire_due(self, batch_size: int = 100) -> tuple[int, int]:
+        if batch_size < 1 or batch_size > 500:
+            raise ValueError("Decision expiration batch size must be between 1 and 500")
+        async with SessionFactory() as discovery_session, discovery_session.begin():
+            request_rows = (
+                (
+                    await discovery_session.execute(
+                        text(
+                            "SELECT * FROM public."
+                            "list_due_approval_request_expirations(:batch_size)"
+                        ),
+                        {"batch_size": batch_size},
+                    )
+                )
+                .mappings()
+                .all()
+            )
+            authorization_rows = (
+                (
+                    await discovery_session.execute(
+                        text(
+                            "SELECT * FROM public.list_due_authorization_expirations(:batch_size)"
+                        ),
+                        {"batch_size": batch_size},
+                    )
+                )
+                .mappings()
+                .all()
+            )
+
+        expired_requests = 0
+        for row in request_rows:
+            tenant_id = UUID(str(row["tenant_id"]))
+            request_id = UUID(str(row["approval_request_id"]))
+            correlation_id = uuid4()
+            async with tenant_session(tenant_id) as session:
+                request = await session.scalar(
+                    select(ApprovalRequestModel)
+                    .where(
+                        ApprovalRequestModel.tenant_id == tenant_id,
+                        ApprovalRequestModel.id == request_id,
+                    )
+                    .with_for_update()
+                )
+                if (
+                    request is None
+                    or request.status != "PENDING"
+                    or request.expires_at > datetime.now(UTC)
+                ):
+                    continue
+                proposal = await session.scalar(
+                    select(ActionProposalModel)
+                    .where(
+                        ActionProposalModel.tenant_id == tenant_id,
+                        ActionProposalModel.is_simulated.is_(False),
+                        ActionProposalModel.id == request.proposal_id,
+                    )
+                    .with_for_update()
+                )
+                if proposal is None:
+                    continue
+                request.status = "EXPIRED"
+                proposal.status = "EXPIRED"
+                await self._record(
+                    session,
+                    tenant_id,
+                    None,
+                    correlation_id,
+                    "response.approval.expired",
+                    request.id,
+                    {
+                        "proposal_id": str(proposal.id),
+                        "expiration_instant": request.expires_at.isoformat(),
+                    },
+                )
+                expired_requests += 1
+
+        expired_authorizations = 0
+        for row in authorization_rows:
+            tenant_id = UUID(str(row["tenant_id"]))
+            authorization_id = UUID(str(row["authorization_id"]))
+            correlation_id = uuid4()
+            async with tenant_session(tenant_id) as session:
+                authorization = await session.scalar(
+                    select(ActionAuthorizationModel)
+                    .where(
+                        ActionAuthorizationModel.tenant_id == tenant_id,
+                        ActionAuthorizationModel.id == authorization_id,
+                    )
+                    .with_for_update()
+                )
+                if (
+                    authorization is None
+                    or authorization.status != "ACTIVE"
+                    or authorization.expires_at > datetime.now(UTC)
+                ):
+                    continue
+                proposal = await session.scalar(
+                    select(ActionProposalModel)
+                    .where(
+                        ActionProposalModel.tenant_id == tenant_id,
+                        ActionProposalModel.is_simulated.is_(False),
+                        ActionProposalModel.id == authorization.proposal_id,
+                    )
+                    .with_for_update()
+                )
+                if proposal is None:
+                    continue
+                authorization.status = "EXPIRED"
+                proposal.status = "EXPIRED"
+                await self._record(
+                    session,
+                    tenant_id,
+                    None,
+                    correlation_id,
+                    "response.authorization.expired",
+                    authorization.id,
+                    {
+                        "proposal_id": str(proposal.id),
+                        "fingerprint": authorization.proposal_fingerprint,
+                        "expiration_instant": authorization.expires_at.isoformat(),
+                    },
+                )
+                await self._event(
+                    session,
+                    tenant_id,
+                    correlation_id,
+                    EVENT_AUTHORIZATION_EXPIRED,
+                    authorization.id,
+                    {
+                        "authorization_id": str(authorization.id),
+                        "proposal_id": str(proposal.id),
+                        "fingerprint": authorization.proposal_fingerprint,
+                        "expired_at": authorization.expires_at.isoformat(),
+                    },
+                )
+                expired_authorizations += 1
+        return expired_requests, expired_authorizations
+
     async def create_proposal(
         self,
         *,
@@ -604,7 +743,7 @@ class DecisionService:
     async def _record(
         session: AsyncSession,
         tenant_id: UUID,
-        actor_user_id: UUID,
+        actor_user_id: UUID | None,
         correlation_id: UUID,
         action: str,
         resource_id: UUID,

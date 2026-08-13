@@ -242,14 +242,14 @@ function LoginPage() {
         </div>
         <label>
           {t("tenant")}
-          <input autoComplete="organization" placeholder="demo" {...register("tenantSlug")} />
+          <input autoComplete="organization" placeholder={t("tenantSlugPlaceholder")} {...register("tenantSlug")} />
         </label>
         <label>
           {authMode === "local" ? t("email") : t("directoryUsername")}
           <input
             type={authMode === "local" ? "email" : "text"}
             autoComplete="username"
-            placeholder={authMode === "local" ? "demo@cyrvanta.uy" : "ldap-demo"}
+            placeholder={authMode === "local" ? t("emailPlaceholder") : t("directoryUserPlaceholder")}
             {...register("email")}
           />
         </label>
@@ -1481,7 +1481,7 @@ function IncidentDetailPage() {
                 cursor: "pointer",
               }}
               aria-expanded={showMoreMenu}
-              aria-label="Más opciones"
+              aria-label={t("moreOptions")}
               onClick={() => setShowMoreMenu(!showMoreMenu)}
             >
               ⋮
@@ -1843,7 +1843,7 @@ function IncidentDetailPage() {
                           </div>
                         ) : (
                           <p style={{ margin: 0, fontSize: "0.85rem", color: "var(--text-soft)", background: "var(--panel-raised)", padding: "8px 12px", borderRadius: "6px" }}>
-                            🔒 {t("awaitingSecondAnalystNotice", { defaultValue: "Esperando aprobación de un 2º analista (Principio 4-Ojos)" })}
+                            🔒 {t("awaitingSecondAnalystNotice")}
                           </p>
                         ))}
                       {decision.authorization?.status === "ACTIVE" && (
@@ -1931,10 +1931,10 @@ function IncidentDetailPage() {
             >
               <div style={{ marginBottom: "0.75rem" }}>
                 <strong style={{ fontSize: "0.9rem", color: "var(--text)" }}>
-                  📝 Registro de Investigación & Cambio de Estado
+                  📝 {t("investigationWorkflowTitle")}
                 </strong>
                 <p style={{ margin: "4px 0 0", fontSize: "0.8rem", color: "var(--muted)" }}>
-                  Registra hallazgos, evidencias verificadas o la justificación para avanzar la investigación. Las notas quedan guardadas inmutablemente en la línea temporal del SOC.
+                  {t("investigationWorkflowIntro")}
                 </p>
               </div>
 
@@ -2625,7 +2625,7 @@ function IncidentDetailPage() {
                         {decision.action_type}
                       </strong>
                       <div style={{ background: "var(--panel-raised)", padding: "6px 10px", borderRadius: "4px", margin: "6px 0", fontSize: "0.825rem" }}>
-                        🎯 <span style={{ color: "var(--muted)" }}>Target:</span>{" "}
+                        🎯 <span style={{ color: "var(--muted)" }}>{t("target")}:</span>{" "}
                         <strong style={{ fontFamily: "var(--font-mono, monospace)" }}>
                           {decision.targets && decision.targets.length > 0 ? decision.targets.join(", ") : t("notAvailable")}
                         </strong>
@@ -2634,7 +2634,7 @@ function IncidentDetailPage() {
                         📅 {new Date(decision.created_at).toLocaleString(i18n.language)}
                       </small>
                       <small style={{ color: "var(--muted)", display: "block", marginTop: "2px" }}>
-                        Aprobaciones: {countApproved}/{totalApprovals} {hasRequiredApprovals && <span style={{ color: "var(--accent)", marginLeft: "4px" }}>✓ Aprobado por 4-Ojos</span>} · Evaluación: {decision.evaluation_outcome}
+                        {t("approvalSummary", { approved: countApproved, total: totalApprovals, evaluation: decision.evaluation_outcome })} {hasRequiredApprovals && <span style={{ color: "var(--accent)", marginLeft: "4px" }}>✓ {t("fourEyesApproved")}</span>}
                       </small>
                       <div style={{ fontSize: "0.8rem", color: "var(--muted)", marginTop: "6px", display: "flex", flexDirection: "column", gap: "2px", background: "var(--panel-raised)", padding: "6px 10px", borderRadius: "4px" }}>
                         <span>
@@ -2687,7 +2687,7 @@ function IncidentDetailPage() {
                           </div>
                         ) : (
                           <p style={{ margin: "8px 0 0", fontSize: "0.8rem", color: "var(--text-soft)", background: "var(--panel-raised)", padding: "6px 10px", borderRadius: "4px" }}>
-                            🔒 {t("awaitingSecondAnalystNotice", { defaultValue: "Esperando aprobación de un 2º analista (Principio 4-Ojos)" })}
+                            🔒 {t("awaitingSecondAnalystNotice")}
                           </p>
                         )
                       )}
@@ -2704,7 +2704,7 @@ function IncidentDetailPage() {
 
             <div style={{ marginTop: "1.5rem" }}>
               <h3 style={{ fontSize: "1rem", marginBottom: "0.75rem" }}>
-                📋 Registro Cronológico e Inmutable de la Bitácora (Audit Log)
+                📋 {t("immutableAuditTimeline")}
               </h3>
               <div className="timeline" style={{ marginTop: "0.5rem" }}>
                 {timeline.data?.map((entry) => (
@@ -3119,7 +3119,7 @@ function Administration() {
         <div>
           <p className="eyebrow">{t("controlPlane")}</p>
           <h1>{t("administration")}</h1>
-          <p className="muted">Control de Identidades, Permisos RBAC, Integración LDAP/AD y Llaves de API</p>
+          <p className="muted">{t("administrationIntro")}</p>
         </div>
       </div>
 

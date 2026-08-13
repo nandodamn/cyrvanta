@@ -15,6 +15,9 @@ Estado: implementación preparada; validación funcional manual pendiente del op
 - Acción `incident.status.transition@1.0.0` mediante `IncidentService`, control optimista,
   auditoría y recibo.
 - Acciones SMTP y HTTP allowlisted con idempotency key, TLS y recibos sin secretos.
+- Destinos SMTP/HTTPS y credenciales validados por conector: mailbox único, origen sin
+  credenciales/query/fragment, autenticación no ambigua y path POST relativo sin traversal;
+  configuración, publicación o habilitación no producen egreso automático.
 - n8n sin éxito prefabricado: el workflow debe enviar el resultado real firmado por HMAC.
 - Biblioteca completa visible; playbooks no implementados o incompletos permanecen bloqueados.
 - Menús bilingües para reemplazar, habilitar, deshabilitar y verificar conexiones sin volver a mostrar secretos, además de configurar bindings, validar/publicar y activar.

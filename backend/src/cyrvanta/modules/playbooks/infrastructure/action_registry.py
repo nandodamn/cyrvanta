@@ -5,32 +5,41 @@ import hashlib
 import smtplib
 import ssl
 from email.message import EmailMessage
-from urllib.parse import urljoin, urlsplit
+from urllib.parse import unquote, urljoin, urlsplit
 from uuid import UUID
 
 import httpx
 from sqlalchemy import select
 
 from cyrvanta.modules.identity.infrastructure.models import AuditEventModel
-
 from cyrvanta.modules.incident.application.schemas import IncidentTransition
-from cyrvanta.modules.incident.infrastructure.models import IncidentModel
 from cyrvanta.modules.incident.application.service import (
     IncidentConflict,
     IncidentNotFound,
     IncidentService,
     InvalidTransition,
 )
-
-from cyrvanta.modules.integrations.application.connection_service import StoredIntegrationCredential
+from cyrvanta.modules.incident.infrastructure.models import IncidentModel
+from cyrvanta.modules.integrations.application.connection_service import (
+    StoredIntegrationCredential,
+)
 from cyrvanta.modules.operations.application.reporting import (
     IncidentReportService,
     IncidentReportStateConflict,
 )
-from cyrvanta.shared.database import tenant_session
 from cyrvanta.modules.playbooks.application.engine_ports import (
-    ActionConnectorPort, ActionDescriptor, ActionResult, CredentialHandle,
-    EngineContext, ProbeResult, ValidationResult,
+    ActionConnectorPort,
+    ActionDescriptor,
+    ActionResult,
+    CredentialHandle,
+    EngineContext,
+    ProbeResult,
+    ValidationResult,
+)
+from cyrvanta.shared.database import tenant_session
+from cyrvanta.shared.target_validation import (
+    contains_control_characters,
+    is_safe_single_mailbox,
 )
 
 REAL_ACTIONS = (
@@ -56,16 +65,24 @@ class RealActionConnector:
         is_http = self._code in {"ticket.create", "webhook.invoke_allowlisted"}
         is_internal = self._code == "incident.status.transition"
         return ActionDescriptor(
-            code=self._code, version="1.0.0", modes=("LIVE",), impact="MEDIUM",
-            timeout_seconds=30, retry_safe=is_internal, cancellable=False,
+            code=self._code,
+            version="1.0.0",
+            modes=("LIVE",),
+            impact="MEDIUM",
+            timeout_seconds=30,
+            retry_safe=is_internal,
+            cancellable=False,
             egress="NONE" if is_internal else "HTTPS" if is_http else "SMTP",
         )
 
     def validate_configuration(self, configuration: dict[str, object]) -> ValidationResult:
+        invalid = ValidationResult(False, ("PLAYBOOK_ACTION_CONFIG_INVALID",))
         if self._code == "incident.status.transition":
-            if configuration != {"target_status": "contained"}:
-                return ValidationResult(False, ("PLAYBOOK_ACTION_CONFIG_INVALID",))
-            return ValidationResult(True)
+            return (
+                ValidationResult(True)
+                if configuration == {"target_status": "contained"}
+                else invalid
+            )
         if self._code in {"notification.send", "incident.report.generate"}:
             required, allowed = {"to"}, {"to", "subject_prefix"}
         else:
@@ -73,22 +90,56 @@ class RealActionConnector:
         if set(configuration) - allowed or any(
             key not in configuration or configuration[key] in ("", None) for key in required
         ):
-            return ValidationResult(False, ("PLAYBOOK_ACTION_CONFIG_INVALID",))
-        if self._code in {"ticket.create", "webhook.invoke_allowlisted"}:
-            path = str(configuration["path"])
+            return invalid
+        if self._code in {"notification.send", "incident.report.generate"}:
+            prefix = configuration.get("subject_prefix", "[Cyrvanta]")
             if (
-                not path.startswith("/")
-                or urlsplit(path).scheme
-                or ".." in path.split("/")
-                or str(configuration.get("method", "POST")).upper() != "POST"
+                not is_safe_single_mailbox(configuration["to"])
+                or not isinstance(prefix, str)
+                or len(prefix) > 80
+                or contains_control_characters(prefix)
             ):
-                return ValidationResult(False, ("PLAYBOOK_ACTION_CONFIG_INVALID",))
+                return invalid
+            return ValidationResult(True)
+        path = configuration["path"]
+        method = configuration.get("method", "POST")
+        if not isinstance(path, str) or not isinstance(method, str):
+            return invalid
+        try:
+            parsed = urlsplit(path)
+        except ValueError:
+            return invalid
+        decoded_path = parsed.path
+        for _ in range(5):
+            candidate = unquote(decoded_path)
+            if candidate == decoded_path:
+                break
+            decoded_path = candidate
+        else:
+            return invalid
+        if (
+            path != path.strip()
+            or not 1 <= len(path) <= 512
+            or contains_control_characters(path)
+            or not path.startswith("/")
+            or parsed.scheme
+            or parsed.netloc
+            or parsed.query
+            or parsed.fragment
+            or contains_control_characters(decoded_path)
+            or "\\" in decoded_path
+            or any(segment in {".", ".."} for segment in decoded_path.split("/"))
+            or method.upper() != "POST"
+        ):
+            return invalid
         return ValidationResult(True)
 
     async def probe(self, context: EngineContext, configuration: dict[str, object]) -> ProbeResult:
         del context
         validation = self.validate_configuration(configuration)
-        return ProbeResult(validation.valid, None if validation.valid else validation.error_codes[0])
+        return ProbeResult(
+            validation.valid, None if validation.valid else validation.error_codes[0]
+        )
 
     async def execute(
         self,
@@ -175,7 +226,10 @@ class RealActionConnector:
                 status = "DELIVERED"
             else:
                 receipt = await self._post_http(
-                    context, safe_payload, configuration, idempotency_key,
+                    context,
+                    safe_payload,
+                    configuration,
+                    idempotency_key,
                     credential_handle.values,
                 )
                 status = "CREATED" if self._code == "ticket.create" else "ACCEPTED"
@@ -227,8 +281,13 @@ class RealActionConnector:
         }
 
     async def _send_email(
-        self, action_input: dict[str, object], configuration: dict[str, object],
-        idempotency_key: str, credential: dict[str, object], *, attach_report: bool,
+        self,
+        action_input: dict[str, object],
+        configuration: dict[str, object],
+        idempotency_key: str,
+        credential: dict[str, object],
+        *,
+        attach_report: bool,
     ) -> str:
         message = EmailMessage()
         prefix = str(configuration.get("subject_prefix", "[Cyrvanta]"))
@@ -250,12 +309,16 @@ class RealActionConnector:
                 IncidentReportService.render_html(action_input)[:200000], subtype="html"
             )
         await asyncio.to_thread(self._smtp_send, credential, message)
-        return hashlib.sha256(f"{idempotency_key}:{message['Message-ID']}".encode()).hexdigest()[:24]
+        return hashlib.sha256(f"{idempotency_key}:{message['Message-ID']}".encode()).hexdigest()[
+            :24
+        ]
 
     @staticmethod
     def _smtp_send(credential: dict[str, object], message: EmailMessage) -> None:
         timeout = min(30, max(1, int(credential.get("timeout_seconds", 10))))
-        with smtplib.SMTP(str(credential["host"]), int(credential["port"]), timeout=timeout) as client:
+        with smtplib.SMTP(
+            str(credential["host"]), int(credential["port"]), timeout=timeout
+        ) as client:
             client.ehlo()
             if bool(credential.get("use_starttls", True)):
                 client.starttls(context=ssl.create_default_context())
@@ -265,8 +328,11 @@ class RealActionConnector:
             client.send_message(message)
 
     async def _post_http(
-        self, context: EngineContext, action_input: dict[str, object],
-        configuration: dict[str, object], idempotency_key: str,
+        self,
+        context: EngineContext,
+        action_input: dict[str, object],
+        configuration: dict[str, object],
+        idempotency_key: str,
         credential: dict[str, object],
     ) -> str:
         base_url = str(credential["base_url"]).rstrip("/") + "/"

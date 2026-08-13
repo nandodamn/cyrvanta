@@ -24,6 +24,10 @@ from cyrvanta.modules.integrations.infrastructure.models import (
 )
 from cyrvanta.shared.config import Settings, get_settings
 from cyrvanta.shared.database import tenant_session
+from cyrvanta.shared.target_validation import (
+    contains_control_characters,
+    is_safe_single_mailbox,
+)
 
 ConnectorType = Literal["SMTP", "HTTP_ALLOWLISTED", "N8N", "OPENSEARCH", "OLLAMA", "WAZUH"]
 
@@ -35,10 +39,26 @@ _REQUIRED: dict[str, frozenset[str]] = {
     "OLLAMA": frozenset({"base_url"}),
     "WAZUH": frozenset({"base_url", "username", "password"}),
 }
-_ALLOWED = frozenset({
-    "host", "port", "username", "password", "from_address", "use_starttls",
-    "base_url", "api_key", "bearer_token", "timeout_seconds",
-})
+_ALLOWED_BY_CONNECTOR: dict[str, frozenset[str]] = {
+    "SMTP": frozenset(
+        {
+            "host",
+            "port",
+            "username",
+            "password",
+            "from_address",
+            "use_starttls",
+            "timeout_seconds",
+        }
+    ),
+    "HTTP_ALLOWLISTED": frozenset({"base_url", "api_key", "bearer_token", "timeout_seconds"}),
+    "N8N": frozenset({"base_url", "api_key", "timeout_seconds"}),
+    "OPENSEARCH": frozenset(
+        {"base_url", "username", "password", "bearer_token", "timeout_seconds"}
+    ),
+    "OLLAMA": frozenset({"base_url", "bearer_token", "timeout_seconds"}),
+    "WAZUH": frozenset({"base_url", "username", "password", "timeout_seconds"}),
+}
 
 
 class IntegrationConfigurationWrite(BaseModel):
@@ -84,11 +104,15 @@ class IntegrationConnectionService:
 
     async def list(self, tenant_id: UUID) -> list[IntegrationConnectionResponse]:
         async with tenant_session(tenant_id) as session:
-            rows = list((await session.scalars(
-                select(IntegrationModel)
-                .where(IntegrationModel.tenant_id == tenant_id)
-                .order_by(IntegrationModel.name)
-            )).all())
+            rows = list(
+                (
+                    await session.scalars(
+                        select(IntegrationModel)
+                        .where(IntegrationModel.tenant_id == tenant_id)
+                        .order_by(IntegrationModel.name)
+                    )
+                ).all()
+            )
             return [self._response(row) for row in rows]
 
     async def configure(
@@ -108,10 +132,12 @@ class IntegrationConnectionService:
                     parsed_id = UUID(connection_id)
                 except ValueError as exc:
                     raise IntegrationConfigurationError("INTEGRATION_ID_INVALID") from exc
-                row = await session.scalar(select(IntegrationModel).where(
-                    IntegrationModel.tenant_id == tenant_id,
-                    IntegrationModel.id == parsed_id,
-                ))
+                row = await session.scalar(
+                    select(IntegrationModel).where(
+                        IntegrationModel.tenant_id == tenant_id,
+                        IntegrationModel.id == parsed_id,
+                    )
+                )
                 if row is None:
                     raise IntegrationConfigurationError("INTEGRATION_NOT_FOUND")
             preserve_secret = row is not None and not values
@@ -133,7 +159,9 @@ class IntegrationConnectionService:
                     status="pending_verification" if payload.enabled else "disabled",
                     configuration_schema_version="1.0",
                     configuration_encrypted=encrypted.encode(),
-                    capabilities_snapshot={"capabilities": self._capabilities(payload.connector_type)},
+                    capabilities_snapshot={
+                        "capabilities": self._capabilities(payload.connector_type)
+                    },
                 )
                 session.add(row)
             else:
@@ -150,33 +178,41 @@ class IntegrationConnectionService:
                     row.last_error_code = None
                 row.updated_at = datetime.now(UTC)
             await session.flush()
-            session.add(AuditEventModel(
-                tenant_id=tenant_id,
-                actor_user_id=actor_user_id,
-                action=(
-                    "integration.configuration.enabled"
-                    if preserve_secret and payload.enabled
-                    else "integration.configuration.disabled"
-                    if preserve_secret
-                    else "integration.configuration.replaced"
-                ),
-                resource_type="integration",
-                resource_id=row.id,
-                outcome="success",
-                correlation_id=correlation_id,
-                details={"connector_type": row.connector_type, "secret_fields_redacted": True},
-            ))
+            session.add(
+                AuditEventModel(
+                    tenant_id=tenant_id,
+                    actor_user_id=actor_user_id,
+                    action=(
+                        "integration.configuration.enabled"
+                        if preserve_secret and payload.enabled
+                        else "integration.configuration.disabled"
+                        if preserve_secret
+                        else "integration.configuration.replaced"
+                    ),
+                    resource_type="integration",
+                    resource_id=row.id,
+                    outcome="success",
+                    correlation_id=correlation_id,
+                    details={"connector_type": row.connector_type, "secret_fields_redacted": True},
+                )
+            )
             return self._response(row)
 
     async def probe(
-        self, *, tenant_id: UUID, actor_user_id: UUID, connection_id: UUID,
+        self,
+        *,
+        tenant_id: UUID,
+        actor_user_id: UUID,
+        connection_id: UUID,
         correlation_id: UUID,
     ) -> IntegrationProbeResponse:
         async with tenant_session(tenant_id) as session:
-            row = await session.scalar(select(IntegrationModel).where(
-                IntegrationModel.tenant_id == tenant_id,
-                IntegrationModel.id == connection_id,
-            ))
+            row = await session.scalar(
+                select(IntegrationModel).where(
+                    IntegrationModel.tenant_id == tenant_id,
+                    IntegrationModel.id == connection_id,
+                )
+            )
             if row is None:
                 raise IntegrationConfigurationError("INTEGRATION_NOT_FOUND")
             if row.status == "disabled":
@@ -190,24 +226,28 @@ class IntegrationConnectionService:
             row.status = "active" if healthy else "unhealthy"
             if healthy:
                 row.last_successful_sync_at = row.last_health_check_at
-            session.add(IntegrationHealthHistoryModel(
-                tenant_id=tenant_id,
-                integration_id=row.id,
-                status="healthy" if healthy else "unhealthy",
-                latency_ms=latency_ms,
-                error_code=error_code,
-                error_message_redacted=None,
-            ))
-            session.add(AuditEventModel(
-                tenant_id=tenant_id,
-                actor_user_id=actor_user_id,
-                action="integration.connection.probed",
-                resource_type="integration",
-                resource_id=row.id,
-                outcome="success" if healthy else "failure",
-                correlation_id=correlation_id,
-                details={"connector_type": row.connector_type, "error_code": error_code},
-            ))
+            session.add(
+                IntegrationHealthHistoryModel(
+                    tenant_id=tenant_id,
+                    integration_id=row.id,
+                    status="healthy" if healthy else "unhealthy",
+                    latency_ms=latency_ms,
+                    error_code=error_code,
+                    error_message_redacted=None,
+                )
+            )
+            session.add(
+                AuditEventModel(
+                    tenant_id=tenant_id,
+                    actor_user_id=actor_user_id,
+                    action="integration.connection.probed",
+                    resource_type="integration",
+                    resource_id=row.id,
+                    outcome="success" if healthy else "failure",
+                    correlation_id=correlation_id,
+                    details={"connector_type": row.connector_type, "error_code": error_code},
+                )
+            )
             return IntegrationProbeResponse(
                 id=row.id, healthy=healthy, latency_ms=latency_ms, error_code=error_code
             )
@@ -220,13 +260,15 @@ class IntegrationConnectionService:
         except ValueError as exc:
             raise IntegrationConfigurationError("PLAYBOOK_CREDENTIAL_UNAVAILABLE") from exc
         async with tenant_session(tenant_id) as session:
-            row = await session.scalar(select(IntegrationModel).where(
-                IntegrationModel.tenant_id == tenant_id,
-                IntegrationModel.id == connection_id,
-                IntegrationModel.status == "active",
-                IntegrationModel.last_health_check_at.is_not(None),
-                IntegrationModel.last_error_code.is_(None),
-            ))
+            row = await session.scalar(
+                select(IntegrationModel).where(
+                    IntegrationModel.tenant_id == tenant_id,
+                    IntegrationModel.id == connection_id,
+                    IntegrationModel.status == "active",
+                    IntegrationModel.last_health_check_at.is_not(None),
+                    IntegrationModel.last_error_code.is_(None),
+                )
+            )
             if row is None:
                 raise IntegrationConfigurationError("PLAYBOOK_CREDENTIAL_UNAVAILABLE")
             return StoredIntegrationCredential(str(row.id), self._decrypt(row))
@@ -270,33 +312,95 @@ class IntegrationConnectionService:
         return value
 
     def _validate(self, connector_type: str, values: dict[str, object]) -> None:
-        unknown = set(values) - _ALLOWED
+        allowed = _ALLOWED_BY_CONNECTOR.get(connector_type)
+        if allowed is None:
+            raise IntegrationConfigurationError("INTEGRATION_CONFIGURATION_INVALID")
+        unknown = set(values) - allowed
         missing = _REQUIRED[connector_type] - {
             key for key, value in values.items() if value not in ("", None)
         }
         if unknown or missing:
             raise IntegrationConfigurationError("INTEGRATION_CONFIGURATION_INVALID")
-        if connector_type != "SMTP":
-            url = str(values.get("base_url", ""))
-            parsed = urlsplit(url)
-            if parsed.scheme not in {"https", "http"} or not parsed.hostname:
-                raise IntegrationConfigurationError("INTEGRATION_CONFIGURATION_INVALID")
+        timeout = values.get("timeout_seconds", 10)
+        if not isinstance(timeout, int) or isinstance(timeout, bool) or not 1 <= timeout <= 30:
+            raise IntegrationConfigurationError("INTEGRATION_CONFIGURATION_INVALID")
+        for key in ("username", "password", "api_key", "bearer_token"):
+            if key not in values:
+                continue
+            value = values[key]
             if (
-                self.settings.environment.casefold() == "production"
-                and parsed.scheme != "https"
-                and not self._is_loopback(parsed.hostname)
+                not isinstance(value, str)
+                or not 1 <= len(value) <= 4096
+                or contains_control_characters(value)
             ):
-                raise IntegrationConfigurationError("INTEGRATION_TLS_REQUIRED")
-        else:
+                raise IntegrationConfigurationError("INTEGRATION_CONFIGURATION_INVALID")
+        username_present = "username" in values
+        password_present = "password" in values
+        if username_present != password_present:
+            raise IntegrationConfigurationError("INTEGRATION_CONFIGURATION_INVALID")
+
+        if connector_type == "SMTP":
+            host = values.get("host")
             port = values.get("port")
-            if not isinstance(port, int) or isinstance(port, bool) or not 1 <= port <= 65535:
+            starttls = values.get("use_starttls", True)
+            if (
+                not isinstance(host, str)
+                or host != host.strip()
+                or not 1 <= len(host) <= 253
+                or contains_control_characters(host)
+                or any(character.isspace() for character in host)
+                or "://" in host
+                or "/" in host
+                or not isinstance(port, int)
+                or isinstance(port, bool)
+                or not 1 <= port <= 65535
+                or not isinstance(starttls, bool)
+                or not is_safe_single_mailbox(values.get("from_address"))
+            ):
                 raise IntegrationConfigurationError("INTEGRATION_CONFIGURATION_INVALID")
             if (
                 self.settings.environment.casefold() == "production"
-                and not bool(values.get("use_starttls", True))
-                and not self._is_loopback(str(values.get("host", "")))
+                and not starttls
+                and not self._is_loopback(host)
             ):
                 raise IntegrationConfigurationError("INTEGRATION_TLS_REQUIRED")
+            return
+
+        url = values.get("base_url")
+        if (
+            not isinstance(url, str)
+            or url != url.strip()
+            or not 1 <= len(url) <= 2048
+            or contains_control_characters(url)
+        ):
+            raise IntegrationConfigurationError("INTEGRATION_CONFIGURATION_INVALID")
+        try:
+            parsed = urlsplit(url)
+            parsed_port = parsed.port
+        except ValueError as exc:
+            raise IntegrationConfigurationError("INTEGRATION_CONFIGURATION_INVALID") from exc
+        if (
+            parsed.scheme not in {"https", "http"}
+            or not parsed.hostname
+            or parsed.username is not None
+            or parsed.password is not None
+            or parsed.query
+            or parsed.fragment
+            or (parsed_port is not None and not 1 <= parsed_port <= 65535)
+        ):
+            raise IntegrationConfigurationError("INTEGRATION_CONFIGURATION_INVALID")
+        if (
+            self.settings.environment.casefold() == "production"
+            and parsed.scheme != "https"
+            and not self._is_loopback(parsed.hostname)
+        ):
+            raise IntegrationConfigurationError("INTEGRATION_TLS_REQUIRED")
+        if connector_type == "HTTP_ALLOWLISTED" and (
+            "api_key" in values and "bearer_token" in values
+        ):
+            raise IntegrationConfigurationError("INTEGRATION_CONFIGURATION_INVALID")
+        if connector_type == "OPENSEARCH" and username_present and "bearer_token" in values:
+            raise IntegrationConfigurationError("INTEGRATION_CONFIGURATION_INVALID")
 
     @staticmethod
     def _is_loopback(hostname: str) -> bool:
@@ -327,12 +431,12 @@ class IntegrationConnectionService:
             if connector_type == "N8N":
                 path = "/api/v1/workflows?limit=1"
                 headers["X-N8N-API-KEY"] = str(values["api_key"])
-            elif token := values.get("bearer_token"):
+            elif token := values.get("bearer_token") or (
+                values.get("api_key") if connector_type == "HTTP_ALLOWLISTED" else None
+            ):
                 headers["Authorization"] = f"Bearer {token}"
             if connector_type in {"WAZUH", "OPENSEARCH"} and values.get("username"):
-                auth = httpx.BasicAuth(
-                    str(values["username"]), str(values.get("password", ""))
-                )
+                auth = httpx.BasicAuth(str(values["username"]), str(values.get("password", "")))
             timeout = min(30, max(1, int(values.get("timeout_seconds", 10))))
             async with httpx.AsyncClient(timeout=timeout, follow_redirects=False) as client:
                 if connector_type == "WAZUH":
@@ -349,9 +453,7 @@ class IntegrationConnectionService:
                         headers={"Authorization": f"Bearer {wazuh_token}"},
                     )
                 else:
-                    response = await client.get(
-                        f"{base_url}{path}", headers=headers, auth=auth
-                    )
+                    response = await client.get(f"{base_url}{path}", headers=headers, auth=auth)
                 response.raise_for_status()
             return True, None
         except (httpx.HTTPError, OSError, smtplib.SMTPException, ValueError, KeyError):
@@ -393,6 +495,7 @@ class IntegrationConnectionService:
             configured=bool(row.configuration_encrypted),
             last_health_check_at=row.last_health_check_at,
             last_error_code=row.last_error_code,
-            capabilities=[str(item) for item in capabilities] if isinstance(capabilities, list) else [],
+            capabilities=[str(item) for item in capabilities]
+            if isinstance(capabilities, list)
+            else [],
         )
-

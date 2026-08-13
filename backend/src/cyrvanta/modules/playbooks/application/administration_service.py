@@ -584,35 +584,64 @@ class PlaybookAdministrationService:
         tenant_id: UUID,
         version_id: UUID,
     ) -> list[dict[str, object]]:
-        from cyrvanta.modules.integrations.application.resolver import ConnectionResolver
-
-        resolver = ConnectionResolver()
         results: list[dict[str, object]] = []
         async with tenant_session(tenant_id) as session:
             version = await self._locked_version(session, tenant_id, version_id)
             try:
                 artifact = self._artifact(version)
                 for step in artifact.steps:
-                    if isinstance(step, ActionStep):
-                        capability = f"action.{step.action}"
-                        res = await resolver.resolve(tenant_id, capability)
-                        results.append(
-                            {
-                                "step_id": step.id,
-                                "action": step.action,
-                                "required_capability": capability,
-                                "resolution_status": res.resolution_status,
-                                "connection_id": res.connection_id,
-                                "connector_type": res.connector_type,
-                                "requires_approval": res.requires_approval,
-                                "simulation_supported": res.simulation_supported,
-                                "verification_supported": res.verification_supported,
-                            }
+                    if not isinstance(step, ActionStep):
+                        continue
+                    connector = self.registry.get(step.action, step.action_version)
+                    descriptor = connector.describe()
+                    binding = await session.scalar(
+                        select(NativeActionBindingModel).where(
+                            NativeActionBindingModel.tenant_id == tenant_id,
+                            NativeActionBindingModel.action_code == step.action,
+                            NativeActionBindingModel.action_version == step.action_version,
+                            NativeActionBindingModel.active.is_(True),
+                            NativeActionBindingModel.last_verified_at.is_not(None),
                         )
+                    )
+                    binding_ready = (
+                        binding is not None
+                        and binding.configuration_sha256 == self._digest(binding.configuration)
+                    )
+                    credential_id: UUID | None = None
+                    credential_ready = descriptor.egress == "NONE"
+                    if binding_ready and descriptor.egress != "NONE":
+                        try:
+                            credential_id = UUID(binding.credential_key_id or "")
+                        except ValueError:
+                            credential_ready = False
+                        else:
+                            credential_ready = await session.scalar(
+                                select(IntegrationModel.id).where(
+                                    IntegrationModel.tenant_id == tenant_id,
+                                    IntegrationModel.id == credential_id,
+                                    IntegrationModel.status == "active",
+                                    IntegrationModel.last_health_check_at.is_not(None),
+                                    IntegrationModel.last_error_code.is_(None),
+                                )
+                            ) is not None
+                    ready = binding_ready and credential_ready
+                    results.append(
+                        {
+                            "step_id": step.id,
+                            "action": step.action,
+                            "required_capability": step.action,
+                            "resolution_status": "resolved" if ready else "not_resolved",
+                            "connection_id": str(credential_id) if credential_ready and credential_id else None,
+                            "connector_type": binding.connector_type if binding is not None else None,
+                            "requires_approval": descriptor.impact in {"HIGH", "CRITICAL"},
+                            "simulation_supported": False,
+                            "verification_supported": True,
+                            "blocking": not ready,
+                        }
+                    )
             except (ValueError, ActionUnavailableError) as exc:
                 raise PlaybookAdministrationConflict("PLAYBOOK_INVALID") from exc
         return results
-
     async def publish_version(
         self,
         *,

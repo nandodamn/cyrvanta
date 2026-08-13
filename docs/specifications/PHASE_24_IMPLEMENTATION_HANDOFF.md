@@ -13,7 +13,7 @@ Estado: implementación preparada; validación funcional manual pendiente del op
 - Acciones SMTP y HTTP allowlisted con idempotency key, TLS y recibos sin secretos.
 - n8n sin éxito prefabricado: el workflow debe enviar el resultado real firmado por HMAC.
 - Biblioteca completa visible; playbooks no implementados o incompletos permanecen bloqueados.
-- Menús para configurar conexiones, configurar bindings, validar/publicar y activar.
+- Menús bilingües para reemplazar, habilitar, deshabilitar y verificar conexiones sin volver a mostrar secretos, además de configurar bindings, validar/publicar y activar.
 - Generadores de escenarios y propuesta sintética retirados de API/UI.
 
 ## Playbooks habilitables actualmente
@@ -27,16 +27,17 @@ publicarse ni activarse.
 
 ## Secuencia de validación manual
 
-1. Abrir Integraciones, guardar una conexión y ejecutar **Probar conexión real**.
-2. Abrir Playbooks, elegir **Configurar** y guardar/verificar cada binding requerido.
-3. Ejecutar **Validar y publicar**.
-4. Activar el binding NATIVE.
-5. Activar de forma consciente `PLAYBOOK_LIVE_ENABLED=true` y
+1. Abrir Integraciones, guardar una conexión y ejecutar **Probar conexión real**. Una conexión deshabilitada no puede probarse ni resolverse hasta volver a habilitarla.
+2. Para LDAP/AD: guardar, ejecutar la prueba real y activar la configuración desde Administración; la activación queda bloqueada si la última prueba no fue exitosa.
+3. Abrir Playbooks, elegir **Configurar** y guardar/verificar cada binding requerido.
+4. Ejecutar **Validar y publicar**.
+5. Activar el binding NATIVE.
+6. Activar de forma consciente `PLAYBOOK_LIVE_ENABLED=true` y
    `PLAYBOOK_DISPATCH_ENABLED=true`; mantener `AUTOMATION_KILL_SWITCH=false`.
-6. Crear o seleccionar un incidente real del tenant. Para el playbook de contención, el estado
+7. Crear o seleccionar un incidente real del tenant. Para el playbook de contención, el estado
    debe admitir la transición a `contained`.
-7. Crear la propuesta, completar las aprobaciones y ejecutar la autorización.
-8. Verificar estado del incidente o entrega externa, ejecución persistida y auditoría.
+8. Crear la propuesta, completar las aprobaciones y ejecutar la autorización.
+9. Verificar estado del incidente o entrega externa, ejecución persistida y auditoría.
 
 ## Verificación no ejecutada
 

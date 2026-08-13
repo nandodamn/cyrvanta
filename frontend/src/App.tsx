@@ -8,12 +8,14 @@ import { z } from "zod";
 
 import {
   Alert,
+  activateDirectoryConfiguration,
   createRole,
   createUser,
   createResponseProposal,
   decideResponse,
   analyzeIncident,
   directoryLogin,
+  disableDirectoryConfiguration,
   downloadIncidentReport,
   executeAuthorizedResponse,
   generateIncidentExplanation,
@@ -49,9 +51,7 @@ import { OperationalPulse } from "./OperationalPulse";
 import { SecurityTopologyPanel } from "./SecurityTopologyPanel";
 import { useAuth } from "./AuthContext";
 
-const ApiKeysPage = lazy(() =>
-  import("./ApiKeysPage").then((module) => ({ default: module.ApiKeysPage })),
-);
+
 const GovernedMemoryPage = lazy(() =>
   import("./GovernedMemoryPage").then((module) => ({ default: module.GovernedMemoryPage })),
 );
@@ -132,17 +132,7 @@ const NAV_ITEMS: ReadonlyArray<{ to: string; icon: React.ReactNode; key: string;
       </svg>
     ),
   },
-  {
-    to: "/api-keys",
-    key: "apiKeys.navigation",
-    icon: (
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <circle cx="7.5" cy="15.5" r="5.5" />
-        <path d="M21 2l-9.6 9.6" />
-        <path d="M15.5 7.5l3 3" />
-      </svg>
-    ),
-  },
+
   {
     to: "/audit",
     key: "audit",
@@ -2238,6 +2228,18 @@ function Administration() {
     },
     onError: () => setFormError(t("directoryTestFailed")),
   });
+  const directoryActivationMutation = useMutation({
+    mutationFn: (enabled: boolean) =>
+      enabled ? activateDirectoryConfiguration() : disableDirectoryConfiguration(),
+    onSuccess: async () => {
+      setFormError("");
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["directory-configuration"] }),
+        queryClient.invalidateQueries({ queryKey: ["audit-events"] }),
+      ]);
+    },
+    onError: () => setFormError(t("adminMutationError")),
+  });
   const failed = tenant.isError || users.isError || roles.isError || audit.isError;
   const submitUser = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -2301,7 +2303,7 @@ function Administration() {
       timeout_seconds: 5,
     });
   };
-  const [activeSubTab, setActiveSubTab] = useState<"overview" | "users" | "rbac" | "directory" | "api-keys">("overview");
+  const [activeSubTab, setActiveSubTab] = useState<"overview" | "users" | "rbac" | "directory">("overview");
 
   return (
     <>
@@ -2352,13 +2354,7 @@ function Administration() {
               {directory.data ? "CONFIGURADO" : "PENDIENTE"}
             </span>
           </button>
-          <button
-            type="button"
-            className={`admin-sub-tab-button ${activeSubTab === "api-keys" ? "active" : ""}`}
-            onClick={() => setActiveSubTab("api-keys")}
-          >
-            <span>Claves API & Tokens</span>
-          </button>
+
         </aside>
 
         {/* Dynamic Content Panel */}
@@ -2677,14 +2673,31 @@ function Administration() {
                 >
                   {t("testConnection")}
                 </button>
+                {directory.data?.status === "active" ? (
+                  <button
+                    className="ghost"
+                    type="button"
+                    disabled={directoryActivationMutation.isPending}
+                    onClick={() => directoryActivationMutation.mutate(false)}
+                  >
+                    {t("disable")}
+                  </button>
+                ) : (
+                  <button
+                    className="ghost"
+                    type="button"
+                    disabled={
+                      !directory.data?.last_test_success || directoryActivationMutation.isPending
+                    }
+                    onClick={() => directoryActivationMutation.mutate(true)}
+                  >
+                    {t("activate")}
+                  </button>
+                )}
               </div>
             </form>
           )}
 
-          {/* SUB-TAB 5: API KEYS & TOKENS */}
-          {activeSubTab === "api-keys" && (
-            <ApiKeysPage />
-          )}
         </main>
       </div>
     </>
@@ -2725,7 +2738,7 @@ export default function App() {
             <Route path="playbooks" element={<PlaybooksPage />} />
             <Route path="integrations" element={<VerifiedIntegrationsPage />} />
             <Route path="memory" element={<GovernedMemoryPage />} />
-            <Route path="api-keys" element={<ApiKeysPage />} />
+
             <Route path="audit" element={<AuditPage />} />
             <Route path="administration" element={<Administration />} />
           </Route>

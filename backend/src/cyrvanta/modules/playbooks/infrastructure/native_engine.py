@@ -399,6 +399,7 @@ class NativePlaybookDispatcher:
         self, context: EngineContext, execution_id: UUID, step: ActionStep
     ) -> dict[str, object]:
         now = datetime.now(UTC)
+        connector = self.registry.get(step.action, step.action_version)
         step_input: dict[str, object]
         async with tenant_session(context.tenant_id) as session:
             execution = await self._active_execution(
@@ -442,6 +443,20 @@ class NativePlaybookDispatcher:
                     outcome_exists=outcome_exists,
                     input_digest=input_digest,
                 )
+                if not connector.describe().retry_safe:
+                    step_row.status = "UNKNOWN"
+                    step_row.error_code = "PLAYBOOK_ACTION_OUTCOME_UNKNOWN"
+                    step_row.completed_at = now
+                    await self._record_step_completion(
+                        session,
+                        context,
+                        execution_id,
+                        step_row.id,
+                        step.id,
+                        "UNKNOWN",
+                        "PLAYBOOK_ACTION_OUTCOME_UNKNOWN",
+                    )
+                    raise NativeEngineRejected("PLAYBOOK_ACTION_OUTCOME_UNKNOWN")
             else:
                 attempt = PlaybookStepAttemptModel(
                     tenant_id=context.tenant_id,
@@ -491,7 +506,6 @@ class NativePlaybookDispatcher:
             attempt_id = attempt.id
             idempotency_key = attempt.idempotency_key
 
-        connector = self.registry.get(step.action, step.action_version)
         credential = None
         if connector.describe().egress != "NONE":
             try:

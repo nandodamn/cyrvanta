@@ -55,7 +55,7 @@ async def integration_health(context: IntegrationReader) -> list[IntegrationHeal
 async def resolve_connection(
     context: IntegrationReader,
     capability: Annotated[str, Query(max_length=120)],
-    environment: Annotated[str, Query(max_length=40)] = "laboratory",
+    environment: Annotated[str, Query(max_length=40)] = "live",
 ) -> dict[str, object]:
     from cyrvanta.modules.integrations.application.resolver import ConnectionResolver
 

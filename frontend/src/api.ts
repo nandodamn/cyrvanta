@@ -709,6 +709,18 @@ export async function testDirectoryConfiguration(): Promise<{
     .parse(await authorizedMutation("/api/v1/directory/configuration/test", "POST", {}));
 }
 
+export async function activateDirectoryConfiguration(): Promise<DirectoryConfiguration> {
+  return directoryConfigurationSchema.parse(
+    await authorizedMutation("/api/v1/directory/configuration/activate", "POST", {}),
+  );
+}
+
+export async function disableDirectoryConfiguration(): Promise<DirectoryConfiguration> {
+  return directoryConfigurationSchema.parse(
+    await authorizedMutation("/api/v1/directory/configuration/disable", "POST", {}),
+  );
+}
+
 export async function getAlerts(options?: ListQuery): Promise<Alert[]> {
   return z.array(alertSchema).parse(await authorized(listPath("/api/v1/alerts", options)));
 }

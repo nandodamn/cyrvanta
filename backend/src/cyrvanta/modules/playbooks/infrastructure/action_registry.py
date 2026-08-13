@@ -10,8 +10,12 @@ from urllib.parse import urljoin, urlsplit
 from uuid import UUID
 
 import httpx
+from sqlalchemy import select
+
+from cyrvanta.modules.identity.infrastructure.models import AuditEventModel
 
 from cyrvanta.modules.incident.application.schemas import IncidentTransition
+from cyrvanta.modules.incident.infrastructure.models import IncidentModel
 from cyrvanta.modules.incident.application.service import (
     IncidentConflict,
     IncidentNotFound,
@@ -20,6 +24,7 @@ from cyrvanta.modules.incident.application.service import (
 )
 
 from cyrvanta.modules.integrations.application.connection_service import StoredIntegrationCredential
+from cyrvanta.shared.database import tenant_session
 from cyrvanta.modules.playbooks.application.engine_ports import (
     ActionConnectorPort, ActionDescriptor, ActionResult, CredentialHandle,
     EngineContext, ProbeResult, ValidationResult,
@@ -49,7 +54,7 @@ class RealActionConnector:
         is_internal = self._code == "incident.status.transition"
         return ActionDescriptor(
             code=self._code, version="1.0.0", modes=("LIVE",), impact="MEDIUM",
-            timeout_seconds=30, retry_safe=False, cancellable=False,
+            timeout_seconds=30, retry_safe=is_internal, cancellable=False,
             egress="NONE" if is_internal else "HTTPS" if is_http else "SMTP",
         )
 
@@ -101,17 +106,40 @@ class RealActionConnector:
                 incident_id = UUID(str(inputs["incident_id"]))
                 actor_user_id = UUID(str(inputs["actor_user_id"]))
                 expected_version = int(inputs["incident_version"])
-                incident = await IncidentService().transition(
-                    context.tenant_id,
-                    actor_user_id,
-                    incident_id,
-                    IncidentTransition(
-                        expected_version=expected_version,
-                        target_status="contained",
-                        reason="Authorized Cyrvanta NATIVE playbook",
-                    ),
-                    context.correlation_id,
-                )
+                async with tenant_session(context.tenant_id) as session:
+                    prior_effect = await session.scalar(
+                        select(AuditEventModel.id).where(
+                            AuditEventModel.tenant_id == context.tenant_id,
+                            AuditEventModel.resource_type == "incident",
+                            AuditEventModel.resource_id == incident_id,
+                            AuditEventModel.action == "incident.status.changed",
+                            AuditEventModel.correlation_id == context.correlation_id,
+                        )
+                    )
+                    incident = await session.scalar(
+                        select(IncidentModel).where(
+                            IncidentModel.tenant_id == context.tenant_id,
+                            IncidentModel.id == incident_id,
+                        )
+                    )
+                if prior_effect is None:
+                    incident = await IncidentService().transition(
+                        context.tenant_id,
+                        actor_user_id,
+                        incident_id,
+                        IncidentTransition(
+                            expected_version=expected_version,
+                            target_status="contained",
+                            reason="Authorized Cyrvanta NATIVE playbook",
+                        ),
+                        context.correlation_id,
+                    )
+                elif (
+                    incident is None
+                    or incident.status != "contained"
+                    or incident.version != expected_version + 1
+                ):
+                    return ActionResult(False, {}, "PLAYBOOK_STATE_CONFLICT")
             except (KeyError, ValueError, IncidentConflict, IncidentNotFound, InvalidTransition):
                 return ActionResult(False, {}, "PLAYBOOK_ACTION_FAILED")
             receipt = hashlib.sha256(

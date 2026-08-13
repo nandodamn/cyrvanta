@@ -12,7 +12,6 @@ FUTURE_CAPABILITIES = (
     "endpoint.release",
     "network.ip.block",
     "network.ip.unblock",
-    "ticket.create",
     "threatintel.indicator.search",
 )
 

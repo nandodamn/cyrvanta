@@ -24,6 +24,7 @@ export function VerifiedIntegrationsPage() {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [connectorType, setConnectorType] = useState<ConnectorType>("SMTP");
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [fields, setFields] = useState<Record<string, string>>({});
 
@@ -32,15 +33,22 @@ export function VerifiedIntegrationsPage() {
     queryFn: getIntegrationConnections,
   });
   const configure = useMutation({
-    mutationFn: (payload: {
-      connector_type: ConnectorType;
-      name: string;
-      configuration: Record<string, string | number | boolean>;
-      enabled: boolean;
-    }) => configureIntegrationConnection("new", payload),
+    mutationFn: ({
+      connectionId,
+      payload,
+    }: {
+      connectionId: string;
+      payload: {
+        connector_type: ConnectorType;
+        name: string;
+        configuration: Record<string, string | number | boolean>;
+        enabled: boolean;
+      };
+    }) => configureIntegrationConnection(connectionId, payload),
     onSuccess: () => {
       setName("");
       setFields({});
+      setEditingId(null);
       queryClient.invalidateQueries({ queryKey: ["integration-connections"] });
       queryClient.invalidateQueries({ queryKey: ["playbook-definitions"] });
     },
@@ -77,10 +85,13 @@ export function VerifiedIntegrationsPage() {
     }
     if (connectorType === "SMTP") configuration.use_starttls = true;
     configure.mutate({
-      connector_type: connectorType,
-      name: name.trim(),
-      configuration,
-      enabled: true,
+      connectionId: editingId ?? "new",
+      payload: {
+        connector_type: connectorType,
+        name: name.trim(),
+        configuration,
+        enabled: true,
+      },
     });
   }
 
@@ -93,16 +104,16 @@ export function VerifiedIntegrationsPage() {
           <p className="eyebrow">{t("securityDataSources")}</p>
           <h1>{t("integrations")}</h1>
           <p className="muted">
-            Las credenciales son write-only: después de guardar solo pueden reemplazarse.
+            {t("integrationConnections.writeOnlyHelp")}
           </p>
         </div>
       </div>
 
       <section className="panel" style={{ marginBottom: "1rem" }}>
-        <h2>Configurar conexión real</h2>
+        <h2>{t("integrationConnections.configureReal")}</h2>
         <form onSubmit={submit} className="form-grid">
           <label>
-            Tipo
+            {t("integrationConnections.type")}
             <select
               value={connectorType}
               onChange={(event) => {
@@ -114,7 +125,7 @@ export function VerifiedIntegrationsPage() {
             </select>
           </label>
           <label>
-            Nombre
+            {t("integrationConnections.name")}
             <input
               required
               maxLength={200}
@@ -142,17 +153,30 @@ export function VerifiedIntegrationsPage() {
           })}
           <div>
             <button type="submit" disabled={configure.isPending || !name.trim()}>
-              Guardar sin mostrar secretos
+              {editingId ? t("integrationConnections.replaceSave") : t("integrationConnections.saveWriteOnly")}
             </button>
+            {editingId && (
+              <button
+                type="button"
+                className="ghost"
+                onClick={() => {
+                  setEditingId(null);
+                  setName("");
+                  setFields({});
+                }}
+              >
+                {t("integrationConnections.cancelReplace")}
+              </button>
+            )}
           </div>
         </form>
-        {configure.isError && <p className="error" role="alert">No se pudo guardar la conexión.</p>}
+        {configure.isError && <p className="error" role="alert">{t("integrationConnections.saveError")}</p>}
       </section>
 
       {connections.isLoading && <p className="muted" role="status">{t("loading")}</p>}
       {connections.isError && <p className="error" role="alert">{t("loadError")}</p>}
       {!connections.isLoading && !connections.isError && items.length === 0 && (
-        <p className="muted">No hay conexiones configuradas.</p>
+        <p className="muted">{t("integrationConnections.none")}</p>
       )}
 
       <section
@@ -171,22 +195,53 @@ export function VerifiedIntegrationsPage() {
               </span>
             </div>
             <dl>
-              <dt className="muted">Tipo</dt>
+              <dt className="muted">{t("integrationConnections.type")}</dt>
               <dd>{item.connector_type}</dd>
-              <dt className="muted">Credenciales</dt>
-              <dd>{item.configured ? "Guardadas (write-only)" : "Pendientes"}</dd>
-              <dt className="muted">Última verificación</dt>
+              <dt className="muted">{t("integrationConnections.credentials")}</dt>
+              <dd>{item.configured ? t("integrationConnections.stored") : t("integrationConnections.pending")}</dd>
+              <dt className="muted">{t("integrationConnections.lastVerification")}</dt>
               <dd>{item.last_health_check_at
                 ? new Date(item.last_health_check_at).toLocaleString()
-                : "Nunca"}</dd>
+                : t("integrationConnections.never")}</dd>
             </dl>
             <button
               type="button"
               className="ghost"
-              disabled={probe.isPending}
+              disabled={probe.isPending || item.status === "disabled"}
               onClick={() => probe.mutate(item.id)}
             >
-              Probar conexión real
+              {t("integrationConnections.testReal")}
+            </button>
+            <button
+              type="button"
+              className="ghost"
+              onClick={() => {
+                setEditingId(item.id);
+                setConnectorType(item.connector_type);
+                setName(item.name);
+                setFields({});
+                globalThis.scrollTo({ top: 0, behavior: "smooth" });
+              }}
+            >
+              {t("integrationConnections.replaceConfiguration")}
+            </button>
+            <button
+              type="button"
+              className="ghost"
+              disabled={configure.isPending}
+              onClick={() => configure.mutate({
+                connectionId: item.id,
+                payload: {
+                  connector_type: item.connector_type,
+                  name: item.name,
+                  configuration: {},
+                  enabled: item.status === "disabled",
+                },
+              })}
+            >
+              {item.status === "disabled"
+                ? t("integrationConnections.enableConnection")
+                : t("integrationConnections.disableConnection")}
             </button>
             {item.last_error_code && <p className="error">{item.last_error_code}</p>}
           </article>

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import ipaddress
 import json
 import smtplib
 import ssl
@@ -100,8 +101,6 @@ class IntegrationConnectionService:
         correlation_id: UUID,
     ) -> IntegrationConnectionResponse:
         values = dict(payload.configuration)
-        self._validate(payload.connector_type, values)
-        encrypted = self.cipher.encrypt(json.dumps(values, separators=(",", ":"), sort_keys=True))
         async with tenant_session(tenant_id) as session:
             row = None
             if connection_id != "new":
@@ -115,6 +114,16 @@ class IntegrationConnectionService:
                 ))
                 if row is None:
                     raise IntegrationConfigurationError("INTEGRATION_NOT_FOUND")
+            preserve_secret = row is not None and not values
+            if preserve_secret:
+                if row.connector_type != payload.connector_type:
+                    raise IntegrationConfigurationError("INTEGRATION_CONFIGURATION_INVALID")
+                encrypted = row.configuration_encrypted.decode()
+            else:
+                self._validate(payload.connector_type, values)
+                encrypted = self.cipher.encrypt(
+                    json.dumps(values, separators=(",", ":"), sort_keys=True)
+                )
             if row is None:
                 row = IntegrationModel(
                     id=uuid4(),
@@ -136,14 +145,21 @@ class IntegrationConnectionService:
                 row.capabilities_snapshot = {
                     "capabilities": self._capabilities(payload.connector_type)
                 }
-                row.last_health_check_at = None
-                row.last_error_code = None
+                if not preserve_secret:
+                    row.last_health_check_at = None
+                    row.last_error_code = None
                 row.updated_at = datetime.now(UTC)
             await session.flush()
             session.add(AuditEventModel(
                 tenant_id=tenant_id,
                 actor_user_id=actor_user_id,
-                action="integration.configuration.replaced",
+                action=(
+                    "integration.configuration.enabled"
+                    if preserve_secret and payload.enabled
+                    else "integration.configuration.disabled"
+                    if preserve_secret
+                    else "integration.configuration.replaced"
+                ),
                 resource_type="integration",
                 resource_id=row.id,
                 outcome="success",
@@ -163,6 +179,8 @@ class IntegrationConnectionService:
             ))
             if row is None:
                 raise IntegrationConfigurationError("INTEGRATION_NOT_FOUND")
+            if row.status == "disabled":
+                raise IntegrationConfigurationError("INTEGRATION_DISABLED")
             values = self._decrypt(row)
             started = perf_counter()
             healthy, error_code = await self._probe(row.connector_type, values)
@@ -234,12 +252,31 @@ class IntegrationConnectionService:
             parsed = urlsplit(url)
             if parsed.scheme not in {"https", "http"} or not parsed.hostname:
                 raise IntegrationConfigurationError("INTEGRATION_CONFIGURATION_INVALID")
-            if self.settings.environment.casefold() == "production" and parsed.scheme != "https":
+            if (
+                self.settings.environment.casefold() == "production"
+                and parsed.scheme != "https"
+                and not self._is_loopback(parsed.hostname)
+            ):
                 raise IntegrationConfigurationError("INTEGRATION_TLS_REQUIRED")
         else:
             port = values.get("port")
             if not isinstance(port, int) or isinstance(port, bool) or not 1 <= port <= 65535:
                 raise IntegrationConfigurationError("INTEGRATION_CONFIGURATION_INVALID")
+            if (
+                self.settings.environment.casefold() == "production"
+                and not bool(values.get("use_starttls", True))
+                and not self._is_loopback(str(values.get("host", "")))
+            ):
+                raise IntegrationConfigurationError("INTEGRATION_TLS_REQUIRED")
+
+    @staticmethod
+    def _is_loopback(hostname: str) -> bool:
+        if hostname.casefold() == "localhost":
+            return True
+        try:
+            return ipaddress.ip_address(hostname).is_loopback
+        except ValueError:
+            return False
 
     async def _probe(
         self, connector_type: str, values: dict[str, object]
@@ -257,12 +294,35 @@ class IntegrationConnectionService:
                 "HTTP_ALLOWLISTED": "",
             }[connector_type]
             headers: dict[str, str] = {}
-            token = values.get("api_key") or values.get("bearer_token")
-            if token:
+            auth: httpx.BasicAuth | None = None
+            if connector_type == "N8N":
+                path = "/api/v1/workflows?limit=1"
+                headers["X-N8N-API-KEY"] = str(values["api_key"])
+            elif token := values.get("bearer_token"):
                 headers["Authorization"] = f"Bearer {token}"
+            if connector_type in {"WAZUH", "OPENSEARCH"} and values.get("username"):
+                auth = httpx.BasicAuth(
+                    str(values["username"]), str(values.get("password", ""))
+                )
             timeout = min(30, max(1, int(values.get("timeout_seconds", 10))))
             async with httpx.AsyncClient(timeout=timeout, follow_redirects=False) as client:
-                response = await client.get(f"{base_url}{path}", headers=headers)
+                if connector_type == "WAZUH":
+                    token_response = await client.get(
+                        f"{base_url}/security/user/authenticate?raw=true",
+                        auth=auth,
+                    )
+                    token_response.raise_for_status()
+                    wazuh_token = token_response.text.strip().strip('"')
+                    if not wazuh_token:
+                        raise ValueError("empty Wazuh token")
+                    response = await client.get(
+                        f"{base_url}/",
+                        headers={"Authorization": f"Bearer {wazuh_token}"},
+                    )
+                else:
+                    response = await client.get(
+                        f"{base_url}{path}", headers=headers, auth=auth
+                    )
                 response.raise_for_status()
             return True, None
         except (httpx.HTTPError, OSError, smtplib.SMTPException, ValueError, KeyError):

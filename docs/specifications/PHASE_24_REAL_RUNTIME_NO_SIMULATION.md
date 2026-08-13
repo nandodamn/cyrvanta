@@ -79,7 +79,8 @@ Las respuestas de catálogo incorporarán readiness y razones bloqueantes sin re
 
 - Se elimina toda acción `Generar demo`, etiqueta `Simulado` y contador de fuentes simuladas.
 - Integraciones muestra `Deshabilitada`, `Sin configurar`, `No saludable` o `Conectada`.
-- Playbooks muestra `Real`, efecto, conexión, credenciales pendientes, aprobación y readiness.`n- Todos los playbooks conservan su menú de configuración aunque estén deshabilitados.
+- Playbooks muestra `Real`, efecto, conexión, credenciales pendientes, aprobación y readiness.
+- Todos los playbooks conservan su menú de configuración aunque estén deshabilitados.
 - Los controles no ejecutables explican exactamente qué configuración real falta.
 - Ninguna cifra estática se presenta como dato operativo.
 

@@ -7,8 +7,18 @@ from cyrvanta.shared.config import Settings
 
 
 class OllamaAIProvider:
-    def __init__(self, settings: Settings) -> None:
+    def __init__(
+        self,
+        settings: Settings,
+        *,
+        base_url: str | None = None,
+        bearer_token: str | None = None,
+    ) -> None:
         self._settings = settings
+        self._base_url = (base_url or settings.ollama_base_url).rstrip("/")
+        self._headers = (
+            {"Authorization": f"Bearer {bearer_token}"} if bearer_token else {}
+        )
 
     async def redact_explanation(
         self, deterministic_es: str, deterministic_en: str
@@ -38,7 +48,8 @@ class OllamaAIProvider:
                 timeout=self._settings.ai_request_timeout_seconds
             ) as client:
                 response = await client.post(
-                    f"{self._settings.ollama_base_url}/api/generate",
+                    f"{self._base_url}/api/generate",
+                    headers=self._headers,
                     json={
                         "model": self._settings.ollama_model,
                         "prompt": prompt,

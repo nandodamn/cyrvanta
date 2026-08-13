@@ -5,6 +5,10 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy import func, or_, select
 
 from cyrvanta.modules.ai_analysis.infrastructure.ollama import OllamaAIProvider
+from cyrvanta.modules.integrations.application.connection_service import (
+    IntegrationConfigurationError,
+    IntegrationConnectionService,
+)
 from cyrvanta.modules.threat_knowledge.application.schemas import (
     AttackTechniqueResponse,
     EnrichmentResponse,
@@ -160,7 +164,22 @@ async def generate_explanation(
         for item in current.explanations
         if item.locale == "en" and item.mode == "DETERMINISTIC"
     )
-    draft = await OllamaAIProvider(settings).redact_explanation(deterministic_es, deterministic_en)
+    try:
+        connection = await IntegrationConnectionService(settings).resolve_single_connector(
+            context.tenant_id, "OLLAMA"
+        )
+    except IntegrationConfigurationError:
+        draft = None
+    else:
+        draft = await OllamaAIProvider(
+            settings,
+            base_url=str(connection.values["base_url"]),
+            bearer_token=(
+                str(connection.values["bearer_token"])
+                if connection.values.get("bearer_token")
+                else None
+            ),
+        ).redact_explanation(deterministic_es, deterministic_en)
     async with tenant_session(context.tenant_id) as session:
         events = SqlEventStore(
             session_factory=None,  # type: ignore[arg-type]

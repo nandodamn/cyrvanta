@@ -7,6 +7,7 @@ Estado: implementación preparada; validación funcional manual pendiente del op
 - Modos de infraestructura restringidos a `disabled` o `live`.
 - Configuración tenant-scoped de conexiones con cifrado Fernet y respuestas write-only.
 - Probes reales manuales para SMTP, HTTP allowlisted, n8n, OpenSearch, Ollama y Wazuh.
+- La redacción Ollama y la ingesta Wazuh/OpenSearch resuelven exclusivamente conexiones activas y verificadas del tenant; una configuración ausente o ambigua falla cerrado.
 - Motor NATIVE exclusivamente LIVE, con kill switch y doble activación operativa.
 - Acción `incident.status.transition@1.0.0` mediante `IncidentService`, control optimista,
   auditoría y recibo.

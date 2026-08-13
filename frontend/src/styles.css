@@ -1576,7 +1576,7 @@ nav a.active {
   display: grid;
   grid-template-columns: auto 1fr;
   gap: 6px 12px;
-  margin: 0 0 1rem 0;
+  margin: 0 0 0.75rem 0;
   font-size: 0.85rem;
 }
 
@@ -1590,6 +1590,107 @@ nav a.active {
   color: var(--text);
   font-weight: 600;
   overflow-wrap: anywhere;
+}
+
+.integration-params-box {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 8px 12px;
+  margin: 0.5rem 0 0.75rem 0;
+  font-size: 0.82rem;
+}
+
+.integration-param-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 0;
+  border-bottom: 1px dashed rgba(255, 255, 255, 0.05);
+}
+
+.integration-param-row:last-child {
+  border-bottom: none;
+}
+
+.integration-param-key {
+  color: var(--text-soft);
+  font-weight: 600;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+}
+
+.integration-param-val {
+  font-family: "Space Mono", monospace;
+  font-size: 0.78rem;
+  color: var(--cyan);
+  overflow-wrap: anywhere;
+  text-align: right;
+}
+
+.integration-caps-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 0.5rem 0;
+}
+
+.integration-cap-badge {
+  background: rgba(96, 201, 255, 0.1);
+  color: var(--cyan);
+  border: 1px solid rgba(96, 201, 255, 0.25);
+  font-size: 0.72rem;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-family: "Space Mono", monospace;
+}
+
+.integration-empty-box {
+  background: radial-gradient(circle at 50% 50%, rgba(85, 230, 193, 0.03) 0, transparent 70%), var(--panel);
+  border: 1px dashed var(--line-strong);
+  border-radius: 8px;
+  padding: 2rem;
+  text-align: center;
+  margin-bottom: 1.5rem;
+}
+
+.integration-editing-banner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  background: rgba(85, 230, 193, 0.08);
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  padding: 10px 14px;
+  margin-bottom: 1rem;
+  animation: fadeIn 0.2s ease;
+}
+
+.integration-templates-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 1rem;
+  justify-content: center;
+}
+
+.integration-template-btn {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  color: var(--text);
+  padding: 6px 12px;
+  font-size: 0.8rem;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.integration-template-btn:hover {
+  background: var(--panel-raised);
+  border-color: var(--accent);
+  color: var(--accent);
 }
 
 .integration-actions-row {

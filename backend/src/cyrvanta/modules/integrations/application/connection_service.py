@@ -79,6 +79,7 @@ class IntegrationConnectionResponse(BaseModel):
     last_health_check_at: datetime | None
     last_error_code: str | None
     capabilities: list[str]
+    sanitized_parameters: dict[str, str] = Field(default_factory=dict)
 
 
 class IntegrationProbeResponse(BaseModel):
@@ -506,9 +507,19 @@ class IntegrationConnectionService:
             "WAZUH": ["findings.ingest"],
         }[connector_type]
 
-    @classmethod
-    def _response(cls, row: IntegrationModel) -> IntegrationConnectionResponse:
+    def _response(self, row: IntegrationModel) -> IntegrationConnectionResponse:
         capabilities = row.capabilities_snapshot.get("capabilities", [])
+        sanitized: dict[str, str] = {}
+        if row.configuration_encrypted:
+            try:
+                decrypted = self._decrypt(row)
+                for k, v in decrypted.items():
+                    if k in {"password", "api_key", "bearer_token"}:
+                        sanitized[k] = "••••••••"
+                    elif v is not None:
+                        sanitized[k] = str(v)
+            except Exception:
+                sanitized = {}
         return IntegrationConnectionResponse(
             id=row.id,
             connector_type=row.connector_type,
@@ -520,4 +531,5 @@ class IntegrationConnectionService:
             capabilities=[str(item) for item in capabilities]
             if isinstance(capabilities, list)
             else [],
+            sanitized_parameters=sanitized,
         )

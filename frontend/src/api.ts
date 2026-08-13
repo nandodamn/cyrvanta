@@ -152,6 +152,7 @@ const integrationHealthSchema = z.object({
   last_health_check_at: z.string().nullable(),
   last_error_code: z.string().nullable(),
   capabilities: z.array(z.string()),
+  sanitized_parameters: z.record(z.string()).optional().default({}),
 });
 const integrationProbeSchema = z.object({
   id: z.string().uuid(),

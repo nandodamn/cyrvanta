@@ -8,7 +8,9 @@ import { z } from "zod";
 
 import {
   Alert,
+  addIncidentTimelineEntry,
   activateDirectoryConfiguration,
+  assignIncident,
   createRole,
   createIncident,
   createUser,
@@ -53,6 +55,7 @@ import {
   transitionIncident,
   unlinkUserDirectoryIdentity,
   updateAlertTriage,
+  updateIncident,
   updateUser,
 } from "./api";
 import { OperationalPulse } from "./OperationalPulse";
@@ -996,9 +999,23 @@ function IncidentDetailPage() {
   const [expandedAlertId, setExpandedAlertId] = useState<string | null>(null);
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [selectedPlaybookCode, setSelectedPlaybookCode] = useState("");
+  const [incidentDraft, setIncidentDraft] = useState({
+    title: "",
+    description: "",
+    severity: "medium" as "informational" | "low" | "medium" | "high" | "critical",
+    priority: 3,
+    classification: "",
+  });
+  const [assigneeUserId, setAssigneeUserId] = useState("");
+  const [timelineComment, setTimelineComment] = useState("");
 
   const incident = useQuery({ queryKey: ["incident", id], queryFn: () => getIncident(id) });
   const currentUser = useQuery({ queryKey: ["me"], queryFn: getMe, retry: false });
+  const tenantUsers = useQuery({
+    queryKey: ["users", "incident-assignment"],
+    queryFn: () => getUsers({ pageSize: 100 }),
+    retry: false,
+  });
   const timeline = useQuery({ queryKey: ["timeline", id], queryFn: () => getTimeline(id) });
   const claims = useQuery({ queryKey: ["claims", id], queryFn: () => getClaims(id) });
   const correlations = useQuery({
@@ -1038,6 +1055,41 @@ function IncidentDetailPage() {
     queryKey: ["playbook-executions", id],
     queryFn: () => getPlaybookExecutions(id),
     retry: false,
+  });
+
+  useEffect(() => {
+    if (!incident.data) return;
+    setIncidentDraft({
+      title: incident.data.title,
+      description: incident.data.description ?? "",
+      severity: incident.data.severity as typeof incidentDraft.severity,
+      priority: incident.data.priority ?? 3,
+      classification: incident.data.classification ?? "",
+    });
+    setAssigneeUserId(incident.data.assignee_user_id ?? "");
+  }, [incident.data?.version]);
+
+  const refreshIncident = async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["incident", id] }),
+      queryClient.invalidateQueries({ queryKey: ["incidents"] }),
+      queryClient.invalidateQueries({ queryKey: ["timeline", id] }),
+    ]);
+  };
+  const updateDetails = useMutation({
+    mutationFn: () => updateIncident(id, incident.data!.version, incidentDraft),
+    onSuccess: refreshIncident,
+  });
+  const assign = useMutation({
+    mutationFn: () => assignIncident(id, incident.data!.version, assigneeUserId || null),
+    onSuccess: refreshIncident,
+  });
+  const addTimelineComment = useMutation({
+    mutationFn: () => addIncidentTimelineEntry(id, incident.data!.version, timelineComment.trim()),
+    onSuccess: async () => {
+      setTimelineComment("");
+      await refreshIncident();
+    },
   });
 
   const [transitionNote, setTransitionNote] = useState("");
@@ -1345,6 +1397,121 @@ function IncidentDetailPage() {
 
       {activeTab === "overview" && (
         <>
+          <section className="panel" style={{ marginBottom: "1.25rem" }}>
+            <p className="eyebrow">{t("incidentOperations")}</p>
+            <h2>{t("incidentDetails")}</h2>
+            <form
+              className="form-grid"
+              onSubmit={(event) => {
+                event.preventDefault();
+                updateDetails.mutate();
+              }}
+            >
+              <label>
+                {t("title")}
+                <input
+                  required
+                  minLength={3}
+                  maxLength={300}
+                  value={incidentDraft.title}
+                  onChange={(event) => setIncidentDraft({ ...incidentDraft, title: event.target.value })}
+                />
+              </label>
+              <label>
+                {t("classification")}
+                <input
+                  required
+                  minLength={2}
+                  maxLength={120}
+                  value={incidentDraft.classification}
+                  onChange={(event) => setIncidentDraft({ ...incidentDraft, classification: event.target.value })}
+                />
+              </label>
+              <label>
+                {t("severity")}
+                <select
+                  value={incidentDraft.severity}
+                  onChange={(event) => setIncidentDraft({
+                    ...incidentDraft,
+                    severity: event.target.value as typeof incidentDraft.severity,
+                  })}
+                >
+                  {(["informational", "low", "medium", "high", "critical"] as const).map((value) => (
+                    <option key={value} value={value}>
+                      {t(`severityCodes.${value}`, { defaultValue: value })}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                {t("priority")}
+                <select
+                  value={incidentDraft.priority}
+                  onChange={(event) => setIncidentDraft({ ...incidentDraft, priority: Number(event.target.value) })}
+                >
+                  {[1, 2, 3, 4, 5].map((value) => <option key={value} value={value}>{value}</option>)}
+                </select>
+              </label>
+              <label style={{ gridColumn: "1 / -1" }}>
+                {t("description")}
+                <textarea
+                  required
+                  minLength={3}
+                  maxLength={5000}
+                  rows={4}
+                  value={incidentDraft.description}
+                  onChange={(event) => setIncidentDraft({ ...incidentDraft, description: event.target.value })}
+                />
+              </label>
+              <button type="submit" disabled={updateDetails.isPending}>{t("saveIncident")}</button>
+            </form>
+
+            <div className="form-grid" style={{ marginTop: "1.25rem" }}>
+              <label>
+                {t("assignee")}
+                <select
+                  value={assigneeUserId}
+                  disabled={tenantUsers.isLoading || tenantUsers.isError}
+                  onChange={(event) => setAssigneeUserId(event.target.value)}
+                >
+                  <option value="">{t("unassigned")}</option>
+                  {tenantUsers.data?.filter((user) => user.is_active).map((user) => (
+                    <option key={user.id} value={user.id}>{user.display_name} · {user.email}</option>
+                  ))}
+                </select>
+              </label>
+              <div style={{ alignSelf: "end" }}>
+                <button
+                  type="button"
+                  disabled={assign.isPending || tenantUsers.isLoading || tenantUsers.isError}
+                  onClick={() => assign.mutate()}
+                >
+                  {t("saveAssignment")}
+                </button>
+              </div>
+              <label style={{ gridColumn: "1 / -1" }}>
+                {t("timelineComment")}
+                <textarea
+                  rows={3}
+                  minLength={1}
+                  maxLength={5000}
+                  value={timelineComment}
+                  onChange={(event) => setTimelineComment(event.target.value)}
+                />
+              </label>
+              <button
+                type="button"
+                disabled={addTimelineComment.isPending || timelineComment.trim().length === 0}
+                onClick={() => addTimelineComment.mutate()}
+              >
+                {t("addTimelineComment")}
+              </button>
+            </div>
+            {(updateDetails.isError || assign.isError || addTimelineComment.isError) && (
+              <p className="status-message status-error" role="alert">{t("actionError")}</p>
+            )}
+          </section>
+
           {/* Recommended Playbooks & Approval Section */}
           <section className="panel" style={{ marginBottom: "1.25rem" }}>
             <div

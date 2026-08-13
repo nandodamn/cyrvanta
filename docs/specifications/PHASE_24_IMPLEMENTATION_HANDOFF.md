@@ -18,6 +18,7 @@ Estado: implementación preparada; validación funcional manual pendiente del op
 - Administración LDAP/AD completa: bind y CA write-only, transporte seguro, timeout, atributos y grupos, JIT condicionado a mappings no privilegiados, activación posterior a una prueba vigente y vínculo explícito de identidades locales.
 - Generadores de escenarios y propuesta sintética retirados de API/UI.
 - Listas, detalles, mutaciones, métricas, memoria, correlaciones, decisiones y ejecuciones operativas excluyen registros sintéticos históricos; el dispatcher rechaza cualquier versión que no sea `LIVE`.
+- El detalle de incidente permite editar sus datos, asignar o desasignar usuarios activos del tenant y agregar comentarios operativos a la línea temporal usando control optimista de versión y auditoría backend.
 
 ## Playbooks habilitables actualmente
 
@@ -45,7 +46,7 @@ publicarse ni activarse.
 5. Activar el binding NATIVE.
 6. Activar de forma consciente `PLAYBOOK_LIVE_ENABLED=true` y
    `PLAYBOOK_DISPATCH_ENABLED=true`; mantener `AUTOMATION_KILL_SWITCH=false`.
-7. Crear manualmente un incidente real desde la pantalla **Incidentes** o seleccionar uno producido por ingesta/correlación real. Para el playbook de contención, el estado
+7. Crear manualmente un incidente real desde la pantalla **Incidentes** o seleccionar uno producido por ingesta/correlación real. Editar sus datos, asignarlo y registrar un comentario operativo desde el detalle antes de continuar. Para el playbook de contención, el estado
    debe admitir la transición a `contained`.
 8. Crear la propuesta, completar las aprobaciones y ejecutar la autorización.
 9. Verificar estado del incidente o entrega externa, ejecución persistida y auditoría.

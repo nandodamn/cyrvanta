@@ -800,6 +800,48 @@ export async function getIncidentAlerts(id: string): Promise<Alert[]> {
 export async function getTimeline(id: string): Promise<TimelineEntry[]> {
   return z.array(timelineSchema).parse(await authorized(`/api/v1/incidents/${id}/timeline`));
 }
+export async function updateIncident(
+  id: string,
+  expectedVersion: number,
+  input: {
+    title: string;
+    description: string;
+    severity: "informational" | "low" | "medium" | "high" | "critical";
+    priority: number;
+    classification: string;
+  },
+): Promise<Incident> {
+  return incidentSchema.parse(
+    await authorizedMutation(`/api/v1/incidents/${id}`, "PATCH", {
+      expected_version: expectedVersion,
+      ...input,
+    }),
+  );
+}
+export async function assignIncident(
+  id: string,
+  expectedVersion: number,
+  assigneeUserId: string | null,
+): Promise<Incident> {
+  return incidentSchema.parse(
+    await authorizedMutation(`/api/v1/incidents/${id}/assign`, "POST", {
+      expected_version: expectedVersion,
+      assignee_user_id: assigneeUserId,
+    }),
+  );
+}
+export async function addIncidentTimelineEntry(
+  id: string,
+  expectedVersion: number,
+  summary: string,
+): Promise<TimelineEntry> {
+  return timelineSchema.parse(
+    await authorizedMutation(`/api/v1/incidents/${id}/timeline`, "POST", {
+      expected_version: expectedVersion,
+      summary,
+    }),
+  );
+}
 export async function getClaims(id: string): Promise<Claim[]> {
   return z.array(claimSchema).parse(await authorized(`/api/v1/incidents/${id}/claims?limit=25`));
 }

@@ -991,6 +991,16 @@ function IncidentsPage() {
   );
 }
 
+const INCIDENT_TRANSITIONS: Record<string, string[]> = {
+  new: ["triaged", "closed"],
+  triaged: ["investigating", "closed"],
+  investigating: ["contained", "resolved", "closed"],
+  contained: ["investigating", "resolved"],
+  resolved: ["closed", "reopened"],
+  closed: ["reopened"],
+  reopened: ["triaged", "investigating"],
+};
+
 function IncidentDetailPage() {
   const { id = "" } = useParams();
   const { t, i18n } = useTranslation();
@@ -1008,6 +1018,10 @@ function IncidentDetailPage() {
   });
   const [assigneeUserId, setAssigneeUserId] = useState("");
   const [timelineComment, setTimelineComment] = useState("");
+  const [transitionTarget, setTransitionTarget] = useState("");
+  const [closeReason, setCloseReason] = useState<
+    "false_positive" | "duplicate" | "accepted_risk" | "resolved" | "other"
+  >("resolved");
 
   const incident = useQuery({ queryKey: ["incident", id], queryFn: () => getIncident(id) });
   const currentUser = useQuery({ queryKey: ["me"], queryFn: getMe, retry: false });
@@ -1067,6 +1081,7 @@ function IncidentDetailPage() {
       classification: incident.data.classification ?? "",
     });
     setAssigneeUserId(incident.data.assignee_user_id ?? "");
+    setTransitionTarget(INCIDENT_TRANSITIONS[incident.data.status]?.[0] ?? "");
   }, [incident.data?.version]);
 
   const refreshIncident = async () => {
@@ -1095,8 +1110,15 @@ function IncidentDetailPage() {
   const [transitionNote, setTransitionNote] = useState("");
 
   const transition = useMutation({
-    mutationFn: ({ target, reason }: { target: string; reason?: string }) =>
-      transitionIncident(id, incident.data!.version, target, reason),
+    mutationFn: ({
+      target,
+      reason,
+      closingReason,
+    }: {
+      target: string;
+      reason?: string;
+      closingReason?: "false_positive" | "duplicate" | "accepted_risk" | "resolved" | "other";
+    }) => transitionIncident(id, incident.data!.version, target, reason, closingReason),
     onSuccess: async () => {
       setTransitionNote("");
       await Promise.all([
@@ -1157,15 +1179,7 @@ function IncidentDetailPage() {
     },
   });
 
-  const next: Record<string, string> = {
-    new: "triaged",
-    triaged: "investigating",
-    investigating: "contained",
-    contained: "resolved",
-    resolved: "closed",
-    closed: "reopened",
-    reopened: "investigating",
-  };
+  const transitionTargets = incident.data ? INCIDENT_TRANSITIONS[incident.data.status] ?? [] : [];
 
   if (incident.isLoading) return <PageState loading error={false} empty={false} />;
   if (incident.isError || !incident.data) {
@@ -1799,45 +1813,58 @@ function IncidentDetailPage() {
               </div>
 
               <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-                <textarea
-                  rows={2}
-                  maxLength={500}
-                  value={transitionNote}
-                  placeholder="Escribe la justificación o hallazgos para esta etapa (ej: Se verificaron registros de autenticación del usuario admin...)"
-                  onChange={(e) => setTransitionNote(e.target.value)}
-                  style={{
-                    width: "100%",
-                    padding: "8px 12px",
-                    fontSize: "0.85rem",
-                    borderRadius: "6px",
-                    border: "1px solid var(--line)",
-                    background: "var(--panel)",
-                    color: "var(--text)",
-                    resize: "vertical",
-                  }}
-                />
+                <label>
+                  {t("targetStatus")}
+                  <select value={transitionTarget} onChange={(event) => setTransitionTarget(event.target.value)}>
+                    {transitionTargets.map((target) => (
+                      <option key={target} value={target}>
+                        {t(`statusCodes.${target}`, { defaultValue: target })}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                {transitionTarget === "closed" && (
+                  <label>
+                    {t("closeReason")}
+                    <select value={closeReason} onChange={(event) => setCloseReason(
+                      event.target.value as typeof closeReason,
+                    )}>
+                      {(["resolved", "false_positive", "duplicate", "accepted_risk", "other"] as const).map(
+                        (reason) => <option key={reason} value={reason}>{t(`closeReasons.${reason}`)}</option>,
+                      )}
+                    </select>
+                  </label>
+                )}
+                <label>
+                  {t("transitionReason")}
+                  <textarea
+                    rows={2}
+                    minLength={transitionTarget === "closed" || transitionTarget === "reopened" ? 3 : undefined}
+                    maxLength={1000}
+                    required={transitionTarget === "closed" || transitionTarget === "reopened"}
+                    value={transitionNote}
+                    onChange={(event) => setTransitionNote(event.target.value)}
+                  />
+                </label>
 
                 <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: "10px" }}>
                   <button
                     type="button"
                     className="primary"
-                    disabled={transition.isPending}
-                    style={{
-                      padding: "6px 16px",
-                      fontSize: "0.825rem",
-                      fontWeight: 600,
-                      width: "auto",
-                      minWidth: "unset",
-                      height: "auto",
-                    }}
-                    onClick={() =>
-                      transition.mutate({
-                        target: next[incident.data.status],
-                        reason: transitionNote,
-                      })
+                    disabled={
+                      transition.isPending
+                      || !transitionTarget
+                      || (["closed", "reopened"].includes(transitionTarget) && transitionNote.trim().length < 3)
                     }
+                    onClick={() => transition.mutate({
+                      target: transitionTarget,
+                      reason: transitionNote,
+                      closingReason: transitionTarget === "closed" ? closeReason : undefined,
+                    })}
                   >
-                    {transition.isPending ? t("loading") : `➜ ${t("advanceTo")} ${t(`statusCodes.${next[incident.data.status]}`, { defaultValue: next[incident.data.status] })}`}
+                    {transition.isPending
+                      ? t("loading")
+                      : `➜ ${t("changeStatusTo")} ${t(`statusCodes.${transitionTarget}`, { defaultValue: transitionTarget })}`}
                   </button>
                 </div>
               </div>

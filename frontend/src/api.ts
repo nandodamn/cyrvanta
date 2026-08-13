@@ -868,14 +868,14 @@ export async function transitionIncident(
   expectedVersion: number,
   targetStatus: string,
   reason?: string,
+  closeReason?: "false_positive" | "duplicate" | "accepted_risk" | "resolved" | "other",
 ) {
-  const closing = ["resolved", "closed", "reopened"].includes(targetStatus);
   return incidentSchema.parse(
     await authorizedMutation(`/api/v1/incidents/${id}/transition`, "POST", {
       expected_version: expectedVersion,
       target_status: targetStatus,
-      reason: reason?.trim() || (closing ? "Acción de ciclo de vida del incidente" : "Transición de estado registrada"),
-      close_reason: targetStatus === "closed" ? "resolved" : undefined,
+      reason: reason?.trim() || undefined,
+      close_reason: targetStatus === "closed" ? closeReason : undefined,
     }),
   );
 }

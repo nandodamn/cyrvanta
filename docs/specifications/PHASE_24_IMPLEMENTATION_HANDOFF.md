@@ -19,6 +19,7 @@ Estado: implementación preparada; validación funcional manual pendiente del op
 - Generadores de escenarios y propuesta sintética retirados de API/UI.
 - Listas, detalles, mutaciones, métricas, memoria, correlaciones, decisiones y ejecuciones operativas excluyen registros sintéticos históricos; el dispatcher rechaza cualquier versión que no sea `LIVE`.
 - El detalle de incidente permite editar sus datos, asignar o desasignar usuarios activos del tenant y agregar comentarios operativos a la línea temporal usando control optimista de versión y auditoría backend.
+- Las transiciones muestran todos los destinos válidos del estado actual; cierre y reapertura exigen justificación, y el cierre exige seleccionar explícitamente uno de los motivos aprobados.
 
 ## Playbooks habilitables actualmente
 

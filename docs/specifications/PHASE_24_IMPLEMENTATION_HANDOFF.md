@@ -20,8 +20,14 @@ Estado: implementación preparada; validación funcional manual pendiente del op
 
 ## Playbooks habilitables actualmente
 
-- `contain-and-document-incident`: acción interna real.
-- `escalation-notification`: entrega SMTP real.
+- `contain-and-document-incident`: transición interna real y auditable.
+- `notify-critical-incident`: entrega SMTP real de un snapshot minimizado.
+- `create-security-ticket`: POST HTTPS real, allowlisted e idempotente.
+- `incident-report-email`: informe real minimizado y entrega SMTP.
+
+Cada capacidad externa permanece bloqueada hasta que su conexión tenant-scoped esté activa y
+verificada, el binding de acción sea válido, la versión sea publicada y los switches LIVE estén
+habilitados. El egreso excluye evidencia raw, secretos y parámetros libres de la propuesta.
 
 Los demás playbooks del catálogo se muestran con
 `PLAYBOOK_ACTION_UNAVAILABLE` hasta incorporar su adaptador real específico. No pueden

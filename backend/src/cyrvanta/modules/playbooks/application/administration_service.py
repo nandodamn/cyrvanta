@@ -223,6 +223,27 @@ ESSENTIAL_NATIVE_PLAYBOOKS: list[dict[str, object]] = [
             "with optimistic locking and approval."
         ),
     },
+    {
+        "code": "notify-critical-incident",
+        "title_es": "Notificar incidente crítico",
+        "title_en": "Notify Critical Incident",
+        "description_es": "Entrega SMTP real de una notificación tipada del incidente.",
+        "description_en": "Real SMTP delivery of a typed incident notification.",
+    },
+    {
+        "code": "create-security-ticket",
+        "title_es": "Crear ticket de seguridad",
+        "title_en": "Create Security Ticket",
+        "description_es": "Creación real e idempotente de un ticket mediante HTTPS allowlisted.",
+        "description_en": "Real idempotent ticket creation through allowlisted HTTPS.",
+    },
+    {
+        "code": "incident-report-email",
+        "title_es": "Enviar informe de incidente",
+        "title_en": "Send Incident Report",
+        "description_es": "Generación de un informe minimizado real y entrega por SMTP.",
+        "description_en": "Generation of a real minimized incident report and SMTP delivery.",
+    },
 ]
 
 ESSENTIAL_NATIVE_ACTIONS: dict[str, str] = {
@@ -239,12 +260,17 @@ ESSENTIAL_NATIVE_ACTIONS: dict[str, str] = {
     "escalation-notification": "notification.send",
     "evidence-preservation": "incident.report.generate",
     "closure-controlled-learning": "incident.report.generate",
+    "notify-critical-incident": "notification.send",
+    "create-security-ticket": "ticket.create",
+    "incident-report-email": "incident.report.generate",
 }
 
 
 IMPLEMENTED_REAL_PLAYBOOKS = {
     "contain-and-document-incident",
-    "escalation-notification",
+    "notify-critical-incident",
+    "create-security-ticket",
+    "incident-report-email",
 }
 
 SENSITIVE_KEY = re.compile(
@@ -276,6 +302,9 @@ PLAYBOOK_GOVERNANCE_TAXONOMY: dict[str, str] = {
     # 👤 SINGLE: Notificaciones de incidentes críticos, tickets SecOps/ITSM y filtrado de IoCs
     "simulate-critical-incident-notification": "SINGLE",
     "escalation-notification": "SINGLE",
+    "notify-critical-incident": "SINGLE",
+    "create-security-ticket": "SINGLE",
+    "incident-report-email": "SINGLE",
     "simulate-itsm-ticket-creation": "SINGLE",
     "phishing-malicious-email": "SINGLE",
     "malicious-indicator": "SINGLE",
@@ -344,10 +373,15 @@ class PlaybookAdministrationService:
                 )
                 session.add(definition)
                 await session.flush()
-            elif not self._approval_satisfies_minimum(
-                definition.approval_mode or "AUTOMATIC", desired_approval_mode
-            ):
-                definition.approval_mode = desired_approval_mode
+            else:
+                if not definition.description_es:
+                    definition.description_es = cast(str, pb["description_es"])
+                if not definition.description_en:
+                    definition.description_en = cast(str, pb["description_en"])
+                if not self._approval_satisfies_minimum(
+                    definition.approval_mode or "AUTOMATIC", desired_approval_mode
+                ):
+                    definition.approval_mode = desired_approval_mode
 
             live_version = await session.scalar(
                 select(PlaybookVersionModel).where(

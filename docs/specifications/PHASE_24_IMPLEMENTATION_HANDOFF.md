@@ -36,6 +36,7 @@ publicarse ni activarse.
 ## Secuencia de validación manual
 
 1. Abrir Integraciones, guardar una conexión y ejecutar **Probar conexión real**. Una conexión deshabilitada no puede probarse ni resolverse hasta volver a habilitarla.
+   Para ingesta Wazuh se requieren exactamente una conexión `WAZUH` y una `OPENSEARCH` activas y verificadas dentro del mismo tenant; el comando acotado usa ambas y falla cerrado si falta una o existe ambigüedad.
 2. Para LDAP/AD: guardar, ejecutar la prueba real y activar la configuración desde Administración; la activación queda bloqueada si la última prueba no fue exitosa.
 3. Abrir Playbooks, elegir **Configurar** y guardar/verificar cada binding requerido.
 4. Ejecutar **Validar y publicar**.

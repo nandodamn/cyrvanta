@@ -18,8 +18,19 @@ from cyrvanta.modules.integrations.infrastructure.wazuh.schemas import (
 
 
 class WazuhIndexerClient:
-    def __init__(self, configuration: WazuhConnectorConfigV1) -> None:
+    def __init__(
+        self,
+        configuration: WazuhConnectorConfigV1,
+        *,
+        username: str | None = None,
+        password: str | None = None,
+        bearer_token: str | None = None,
+    ) -> None:
         self.configuration = configuration
+        self.auth = httpx.BasicAuth(username, password or "") if username else None
+        self.headers = (
+            {"Authorization": f"Bearer {bearer_token}"} if bearer_token else {}
+        )
 
     async def search_alerts(
         self,
@@ -78,7 +89,9 @@ class WazuhIndexerClient:
                 verify=self.configuration.verify_tls,
                 follow_redirects=False,
             ) as client:
-                response = await client.post(url, json=body)
+                response = await client.post(
+                    url, json=body, auth=self.auth, headers=self.headers
+                )
             if len(response.content) > self.configuration.max_response_bytes:
                 raise ConnectorError(
                     ConnectorErrorCode.SOURCE_SCHEMA_CHANGED,

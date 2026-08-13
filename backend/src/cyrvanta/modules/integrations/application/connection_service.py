@@ -231,6 +231,35 @@ class IntegrationConnectionService:
                 raise IntegrationConfigurationError("PLAYBOOK_CREDENTIAL_UNAVAILABLE")
             return StoredIntegrationCredential(str(row.id), self._decrypt(row))
 
+    async def resolve_single_connector(
+        self, tenant_id: UUID, connector_type: ConnectorType
+    ) -> StoredIntegrationCredential:
+        async with tenant_session(tenant_id) as session:
+            rows = list(
+                (
+                    await session.scalars(
+                        select(IntegrationModel)
+                        .where(
+                            IntegrationModel.tenant_id == tenant_id,
+                            IntegrationModel.connector_type == connector_type,
+                            IntegrationModel.status == "active",
+                            IntegrationModel.last_health_check_at.is_not(None),
+                            IntegrationModel.last_error_code.is_(None),
+                        )
+                        .order_by(IntegrationModel.id)
+                        .limit(2)
+                    )
+                ).all()
+            )
+            if len(rows) != 1:
+                raise IntegrationConfigurationError(
+                    "INTEGRATION_CONNECTION_AMBIGUOUS"
+                    if rows
+                    else "INTEGRATION_CONNECTION_UNAVAILABLE"
+                )
+            row = rows[0]
+            return StoredIntegrationCredential(str(row.id), self._decrypt(row))
+
     def _decrypt(self, row: IntegrationModel) -> dict[str, object]:
         try:
             value = json.loads(self.cipher.decrypt(row.configuration_encrypted.decode()))

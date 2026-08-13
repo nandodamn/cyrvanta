@@ -32,10 +32,23 @@ from cyrvanta.modules.integrations.infrastructure.wazuh.normalizer import WazuhN
 class WazuhSIEMAdapter(SIEMConnectorPort):
     ADAPTER_VERSION = "1.0"
 
-    def __init__(self, configuration: WazuhConnectorConfigV1, source_instance_id: UUID) -> None:
+    def __init__(
+        self,
+        configuration: WazuhConnectorConfigV1,
+        source_instance_id: UUID,
+        *,
+        indexer_username: str | None = None,
+        indexer_password: str | None = None,
+        indexer_bearer_token: str | None = None,
+    ) -> None:
         self.configuration = configuration
         self.source_instance_id = source_instance_id
-        self.client = WazuhIndexerClient(configuration)
+        self.client = WazuhIndexerClient(
+            configuration,
+            username=indexer_username,
+            password=indexer_password,
+            bearer_token=indexer_bearer_token,
+        )
         self.normalizer = WazuhNormalizer()
 
     async def health_check(self) -> ConnectorHealth:

@@ -11,8 +11,7 @@ from cyrvanta.modules.integrations.application.services.synchronization import (
 )
 from cyrvanta.modules.integrations.domain.findings import CanonicalFinding
 from cyrvanta.modules.integrations.infrastructure.composition import (
-    configured_wazuh_connector,
-    configured_wazuh_integration_id,
+    configured_wazuh_connection,
 )
 from cyrvanta.modules.integrations.infrastructure.finding_repository import (
     SqlFindingRepository,
@@ -24,8 +23,7 @@ from cyrvanta.shared.infrastructure.event_store import SqlEventStore
 
 async def synchronize(tenant_id: UUID, limit: int, cursor: str | None) -> None:
     settings = get_settings()
-    integration_id = configured_wazuh_integration_id(tenant_id)
-    connector = configured_wazuh_connector(tenant_id)
+    integration_id, connector = await configured_wazuh_connection(tenant_id)
     correlation_id = uuid4()
     event_store = SqlEventStore(SessionFactory, settings.event_max_payload_bytes)
     created = 0

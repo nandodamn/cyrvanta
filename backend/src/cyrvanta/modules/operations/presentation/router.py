@@ -47,7 +47,11 @@ def correlation_id(request: Request) -> UUID:
 
 @router.get("/integrations/health", response_model=list[IntegrationHealth])
 async def integration_health(context: IntegrationReader) -> list[IntegrationHealth]:
-    return await OperationsService(configured_wazuh_connector(context.tenant_id)).health()
+    try:
+        wazuh = await configured_wazuh_connector(context.tenant_id)
+    except IntegrationConfigurationError:
+        wazuh = None
+    return await OperationsService(wazuh).health()
 
 
 @router.get("/integrations/connections/resolve")

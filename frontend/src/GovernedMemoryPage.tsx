@@ -143,12 +143,6 @@ function MemoryCard({ item }: { item: MemoryCandidate }) {
           </div>
         </dl>
 
-        {item.is_synthetic && (
-          <div className="demo-badge" style={{ marginTop: "8px", display: "inline-block" }}>
-            {t("memory.syntheticBlocked")}
-          </div>
-        )}
-
         <div style={{ marginTop: "12px", display: "flex", flexDirection: "column", gap: "6px" }}>
           <details style={{ fontSize: "0.85rem", color: "var(--text-soft)" }}>
             <summary style={{ cursor: "pointer", fontWeight: 600, padding: "4px 0" }}>
@@ -295,7 +289,6 @@ export function GovernedMemoryPage() {
     resource_id: "",
     outcome: "TRUE_POSITIVE",
     reason: "",
-    is_synthetic: false,
   });
 
   const [candidate, setCandidate] = useState({
@@ -304,7 +297,6 @@ export function GovernedMemoryPage() {
     statement: "",
     evidence_refs: "",
     valid_until: isoDaysFromNow(30),
-    is_synthetic: false,
   });
 
   const feedbackMutation = useMutation({
@@ -326,7 +318,6 @@ export function GovernedMemoryPage() {
           .split(",")
           .map((value) => value.trim())
           .filter(Boolean),
-        is_synthetic: candidate.is_synthetic,
         valid_from: new Date().toISOString(),
         valid_until: new Date(candidate.valid_until).toISOString(),
       }),
@@ -624,14 +615,6 @@ export function GovernedMemoryPage() {
                 onChange={(e) => setFeedback({ ...feedback, reason: e.target.value })}
               />
             </label>
-            <label className="check-row" style={{ display: "flex", alignItems: "center", gap: "8px", margin: "12px 0" }}>
-              <input
-                type="checkbox"
-                checked={feedback.is_synthetic}
-                onChange={(e) => setFeedback({ ...feedback, is_synthetic: e.target.checked })}
-              />
-              <span>{t("memory.synthetic")}</span>
-            </label>
             <button type="submit" disabled={feedbackMutation.isPending} style={{ width: "100%", minHeight: "40px" }}>
               {t("memory.saveFeedback")}
             </button>
@@ -711,14 +694,6 @@ export function GovernedMemoryPage() {
                 value={candidate.valid_until}
                 onChange={(e) => setCandidate({ ...candidate, valid_until: e.target.value })}
               />
-            </label>
-            <label className="check-row" style={{ display: "flex", alignItems: "center", gap: "8px", margin: "12px 0" }}>
-              <input
-                type="checkbox"
-                checked={candidate.is_synthetic}
-                onChange={(e) => setCandidate({ ...candidate, is_synthetic: e.target.checked })}
-              />
-              <span>{t("memory.synthetic")}</span>
             </label>
             <button type="submit" disabled={candidateMutation.isPending} style={{ width: "100%", minHeight: "40px" }}>
               {t("memory.propose")}

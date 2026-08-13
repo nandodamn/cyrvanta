@@ -1,5 +1,3 @@
-import json
-from pathlib import Path
 from types import SimpleNamespace
 from uuid import uuid4
 
@@ -12,29 +10,9 @@ from cyrvanta.modules.playbooks.infrastructure.dispatcher import (
 )
 from cyrvanta.shared.domain.events import DomainEvent
 
-ROOT = Path(__file__).parents[3]
-
-
-def test_released_simulation_is_not_the_legacy_artifact() -> None:
-    manifest = json.loads(
-        (ROOT / "infrastructure" / "n8n" / "manifest.json").read_text(encoding="utf-8")
-    )
-    entry = next(item for item in manifest["workflows"] if item["code"] == "simulate-user-block")
-    assert entry["version"] == "1.0.0"
-    assert entry["file"] == "workflows/simulate-user-block.json"
-    assert entry["result_schema"] == ("schemas/simulate-user-block-result.schema.json")
-
-
-def test_simulation_result_matches_the_approved_exact_contract() -> None:
-    assert N8nPlaybookDispatcher.synthetic_result("simulate-user-block") == {
-        "execution_mode": "demo",
-        "action": "block_user",
-        "result": "simulated_success",
-    }
-
 
 def test_dispatch_ack_rejects_false_success() -> None:
-    request = httpx.Request("POST", "http://n8n/webhook/simulate-user-block")
+    request = httpx.Request("POST", "http://n8n/webhook/cyrvanta-live")
     response = httpx.Response(
         202,
         request=request,

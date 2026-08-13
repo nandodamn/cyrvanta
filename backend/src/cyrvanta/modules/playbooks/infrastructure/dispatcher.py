@@ -73,6 +73,7 @@ class N8nPlaybookDispatcher:
                             .where(
                                 PlaybookExecutionModel.tenant_id == tenant_id,
                                 PlaybookExecutionModel.status == ExecutionStatus.QUEUED.value,
+                                PlaybookExecutionModel.execution_mode == "LIVE",
                             )
                             .order_by(PlaybookExecutionModel.created_at)
                             .limit(limit - dispatched)
@@ -111,6 +112,7 @@ class N8nPlaybookDispatcher:
                                 PlaybookExecutionModel.tenant_id == tenant_id,
                                 PlaybookExecutionModel.status.not_in(terminal),
                                 PlaybookExecutionModel.deadline_at <= now,
+                                PlaybookExecutionModel.execution_mode == "LIVE",
                             )
                             .order_by(PlaybookExecutionModel.deadline_at)
                             .with_for_update(skip_locked=True)
@@ -189,6 +191,7 @@ class N8nPlaybookDispatcher:
             if (
                 binding is None
                 or version is None
+                or version.classification != "LIVE"
                 or binding.observed_digest != version.artifact_sha256
             ):
                 return None

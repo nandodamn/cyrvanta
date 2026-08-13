@@ -28,13 +28,21 @@ class CorrelationQueryService:
         self, tenant_id: UUID, incident_id: UUID, *, limit: int, offset: int
     ) -> list[CorrelationResponse]:
         async with tenant_session(tenant_id) as session:
-            incident = await session.get(IncidentModel, incident_id)
+            incident = await session.scalar(
+                select(IncidentModel).where(
+                    IncidentModel.id == incident_id,
+                    IncidentModel.is_simulated.is_(False),
+                )
+            )
             if incident is None:
                 raise CorrelationNotFound
             matches = (
                 await session.scalars(
                     select(CorrelationRunModel)
-                    .where(CorrelationRunModel.incident_id == incident_id)
+                    .where(
+                        CorrelationRunModel.incident_id == incident_id,
+                        CorrelationRunModel.is_simulated.is_(False),
+                    )
                     .order_by(
                         CorrelationRunModel.created_at.desc(),
                         CorrelationRunModel.id.desc(),
@@ -47,7 +55,15 @@ class CorrelationQueryService:
 
     async def get(self, tenant_id: UUID, match_id: UUID) -> CorrelationResponse:
         async with tenant_session(tenant_id) as session:
-            match = await session.get(CorrelationRunModel, match_id)
+            match = await session.scalar(
+                select(CorrelationRunModel)
+                .join(IncidentModel, IncidentModel.id == CorrelationRunModel.incident_id)
+                .where(
+                    CorrelationRunModel.id == match_id,
+                    CorrelationRunModel.is_simulated.is_(False),
+                    IncidentModel.is_simulated.is_(False),
+                )
+            )
             if match is None or match.incident_id is None:
                 raise CorrelationNotFound
             return await self._view(session, match)

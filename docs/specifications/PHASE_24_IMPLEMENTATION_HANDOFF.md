@@ -15,6 +15,7 @@ Estado: implementación preparada; validación funcional manual pendiente del op
 - Biblioteca completa visible; playbooks no implementados o incompletos permanecen bloqueados.
 - Menús bilingües para reemplazar, habilitar, deshabilitar y verificar conexiones sin volver a mostrar secretos, además de configurar bindings, validar/publicar y activar.
 - Generadores de escenarios y propuesta sintética retirados de API/UI.
+- Listas, detalles, mutaciones, métricas, memoria, correlaciones, decisiones y ejecuciones operativas excluyen registros sintéticos históricos; el dispatcher rechaza cualquier versión que no sea `LIVE`.
 
 ## Playbooks habilitables actualmente
 

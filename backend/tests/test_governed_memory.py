@@ -70,6 +70,8 @@ def test_feedback_body_forbids_tenant_and_unbounded_reason() -> None:
         FeedbackCreate.model_validate({**material, "tenant_id": uuid4()})
     with pytest.raises(ValidationError):
         FeedbackCreate.model_validate({**material, "reason": "x" * 1001})
+    with pytest.raises(ValidationError):
+        FeedbackCreate.model_validate({**material, "is_synthetic": True})
 
 
 def test_candidate_body_forbids_tenant_and_invalid_window() -> None:
@@ -93,6 +95,8 @@ def test_candidate_body_forbids_tenant_and_invalid_window() -> None:
         MemoryCandidateCreate.model_validate(
             {**material, "valid_until": now - timedelta(seconds=1)}
         )
+    with pytest.raises(ValidationError):
+        MemoryCandidateCreate.model_validate({**material, "is_synthetic": True})
 
 
 def test_migration_declares_rls_append_only_and_separation() -> None:

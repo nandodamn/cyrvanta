@@ -57,7 +57,10 @@ class ThreatEnrichmentService:
         causation_id: UUID | None = None,
     ) -> EnrichmentResponse:
         incident = await self._session.scalar(
-            select(IncidentModel).where(IncidentModel.id == incident_id)
+            select(IncidentModel).where(
+                IncidentModel.id == incident_id,
+                IncidentModel.is_simulated.is_(False),
+            )
         )
         if incident is None:
             raise EnrichmentUnavailable("incident not found")
@@ -65,6 +68,7 @@ class ThreatEnrichmentService:
             select(CorrelationRunModel)
             .where(
                 CorrelationRunModel.incident_id == incident_id,
+                CorrelationRunModel.is_simulated.is_(False),
                 CorrelationRunModel.result_type == "MATCHED",
             )
             .order_by(CorrelationRunModel.created_at.desc())

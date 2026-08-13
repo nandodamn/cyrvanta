@@ -83,6 +83,7 @@ class DecisionService:
                 select(IncidentModel).where(
                     IncidentModel.tenant_id == tenant_id,
                     IncidentModel.id == payload.incident_id,
+                    IncidentModel.is_simulated.is_(False),
                 )
             )
             requester = await session.scalar(
@@ -123,6 +124,7 @@ class DecisionService:
             existing = await session.scalar(
                 select(ActionProposalModel).where(
                     ActionProposalModel.tenant_id == tenant_id,
+                    ActionProposalModel.is_simulated.is_(False),
                     ActionProposalModel.fingerprint == fingerprint,
                 )
             )
@@ -248,10 +250,12 @@ class DecisionService:
     ) -> ActionProposalList:
         async with tenant_session(tenant_id) as session:
             statement = select(ActionProposalModel).where(
-                ActionProposalModel.tenant_id == tenant_id
+                ActionProposalModel.tenant_id == tenant_id,
+                ActionProposalModel.is_simulated.is_(False),
             )
             count_statement = select(func.count(ActionProposalModel.id)).where(
-                ActionProposalModel.tenant_id == tenant_id
+                ActionProposalModel.tenant_id == tenant_id,
+                ActionProposalModel.is_simulated.is_(False),
             )
             if incident_id is not None:
                 statement = statement.where(ActionProposalModel.incident_id == incident_id)
@@ -278,6 +282,7 @@ class DecisionService:
             proposal = await session.scalar(
                 select(ActionProposalModel).where(
                     ActionProposalModel.tenant_id == tenant_id,
+                    ActionProposalModel.is_simulated.is_(False),
                     ActionProposalModel.id == proposal_id,
                 )
             )
@@ -309,6 +314,7 @@ class DecisionService:
             proposal = await session.scalar(
                 select(ActionProposalModel).where(
                     ActionProposalModel.tenant_id == tenant_id,
+                    ActionProposalModel.is_simulated.is_(False),
                     ActionProposalModel.id == request.proposal_id,
                 )
             )
@@ -453,6 +459,7 @@ class DecisionService:
             proposal = await session.scalar(
                 select(ActionProposalModel).where(
                     ActionProposalModel.tenant_id == tenant_id,
+                    ActionProposalModel.is_simulated.is_(False),
                     ActionProposalModel.id == authorization.proposal_id,
                 )
             )

@@ -27,10 +27,10 @@ def test_activity_uses_window_boundaries_and_never_invents_counts() -> None:
         now=now,
     )
 
-    assert result.source_mode == "MIXED"
-    assert result.totals.alerts == 2
+    assert result.source_mode == "LIVE"
+    assert result.totals.alerts == 1
     assert result.totals.incidents == 1
-    assert result.series[0].alerts == 1
+    assert result.series[0].alerts == 0
     assert result.series[-1].alerts == 1
     assert result.series[-1].incidents == 1
 
@@ -40,5 +40,6 @@ def test_activity_source_modes_are_derived_from_records() -> None:
     simulated = build_activity_24h(alert_rows=[(now, True)], incident_rows=[], now=now)
     live = build_activity_24h(alert_rows=[], incident_rows=[(now, False)], now=now)
 
-    assert simulated.source_mode == "SIMULATED"
+    assert simulated.source_mode == "EMPTY"
+    assert simulated.totals.alerts == 0
     assert live.source_mode == "LIVE"

@@ -125,7 +125,7 @@ const operationalActivity24hSchema = z.object({
   window_start: z.string(),
   window_end: z.string(),
   updated_at: z.string(),
-  source_mode: z.enum(["EMPTY", "SIMULATED", "LIVE", "MIXED"]),
+  source_mode: z.enum(["EMPTY", "LIVE"]),
   totals: z.object({
     alerts: z.number().int().nonnegative(),
     incidents: z.number().int().nonnegative(),
@@ -315,7 +315,7 @@ const playbookDefinitionSchema = z.object({
   engine_type: z.enum(["NATIVE", "N8N"]).nullable(),
   binding_status: z.string().nullable(),
   binding_active: z.boolean(),
-  execution_mode: z.enum(["SIMULATED", "LIVE"]).nullable(),
+  execution_mode: z.literal("LIVE").nullable(),
   impact: z.string().nullable(),
   required_parameters: z.array(z.string()),
   credential_aliases: z.array(z.string()),

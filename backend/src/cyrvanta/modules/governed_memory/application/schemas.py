@@ -22,7 +22,7 @@ class FeedbackCreate(StrictBody):
     resource_id: UUID
     outcome: FeedbackOutcome
     reason: str = Field(min_length=1, max_length=1000)
-    is_synthetic: bool = False
+    is_synthetic: Literal[False] = False
     occurred_at: datetime
 
     @field_validator("reason")
@@ -67,7 +67,7 @@ class MemoryCandidateCreate(StrictBody):
     statement_en: str = Field(min_length=1, max_length=2000)
     conditions: dict[str, object] = Field(default_factory=dict)
     evidence_refs: list[UUID] = Field(min_length=1, max_length=100)
-    is_synthetic: bool = False
+    is_synthetic: Literal[False] = False
     valid_from: datetime
     valid_until: datetime
 

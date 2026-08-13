@@ -94,6 +94,8 @@ class GovernedMemoryService:
             )
             if source_synthetic is None:
                 raise GovernedMemoryNotFound("Source resource was not found")
+            if source_synthetic:
+                raise GovernedMemoryConflict("Synthetic legacy sources are not operational")
             entry = FeedbackEntryModel(
                 tenant_id=tenant_id,
                 resource_type=payload.resource_type,
@@ -101,7 +103,7 @@ class GovernedMemoryService:
                 actor_user_id=actor_user_id,
                 outcome=payload.outcome.value,
                 reason=payload.reason,
-                is_synthetic=payload.is_synthetic or source_synthetic,
+                is_synthetic=False,
                 idempotency_key=idempotency_key,
                 correlation_id=correlation_id,
                 occurred_at=payload.occurred_at,
@@ -148,8 +150,12 @@ class GovernedMemoryService:
         offset: int,
     ) -> FeedbackList:
         async with tenant_session(tenant_id) as session:
-            query = select(FeedbackEntryModel)
-            count = select(func.count(FeedbackEntryModel.id))
+            query = select(FeedbackEntryModel).where(
+                FeedbackEntryModel.is_synthetic.is_(False)
+            )
+            count = select(func.count(FeedbackEntryModel.id)).where(
+                FeedbackEntryModel.is_synthetic.is_(False)
+            )
             if resource_type:
                 query = query.where(FeedbackEntryModel.resource_type == resource_type)
                 count = count.where(FeedbackEntryModel.resource_type == resource_type)
@@ -213,7 +219,8 @@ class GovernedMemoryService:
                 (
                     await session.scalars(
                         select(FeedbackEntryModel).where(
-                            FeedbackEntryModel.id.in_(payload.evidence_refs)
+                            FeedbackEntryModel.id.in_(payload.evidence_refs),
+                            FeedbackEntryModel.is_synthetic.is_(False),
                         )
                     )
                 ).all()
@@ -246,7 +253,7 @@ class GovernedMemoryService:
                 statement_en=payload.statement_en,
                 conditions=payload.conditions,
                 evidence_refs=[str(item) for item in payload.evidence_refs],
-                is_synthetic=payload.is_synthetic or any(item.is_synthetic for item in evidence),
+                is_synthetic=False,
                 valid_from=payload.valid_from,
                 valid_until=payload.valid_until,
             )
@@ -299,13 +306,29 @@ class GovernedMemoryService:
                 (
                     await session.scalars(
                         select(MemoryCandidateModel)
+                        .join(
+                            MemoryCandidateVersionModel,
+                            MemoryCandidateVersionModel.candidate_id == MemoryCandidateModel.id,
+                        )
+                        .where(MemoryCandidateVersionModel.is_synthetic.is_(False))
+                        .distinct()
                         .order_by(MemoryCandidateModel.created_at.desc())
                         .limit(limit)
                         .offset(offset)
                     )
                 ).all()
             )
-            total = int(await session.scalar(select(func.count(MemoryCandidateModel.id))) or 0)
+            total = int(
+                await session.scalar(
+                    select(func.count(func.distinct(MemoryCandidateModel.id)))
+                    .join(
+                        MemoryCandidateVersionModel,
+                        MemoryCandidateVersionModel.candidate_id == MemoryCandidateModel.id,
+                    )
+                    .where(MemoryCandidateVersionModel.is_synthetic.is_(False))
+                )
+                or 0
+            )
             return MemoryCandidateList(
                 items=[await self._candidate_response(session, item) for item in candidates],
                 total=total,
@@ -314,7 +337,15 @@ class GovernedMemoryService:
     async def get_candidate(self, tenant_id: UUID, candidate_id: UUID) -> MemoryCandidateResponse:
         async with tenant_session(tenant_id) as session:
             candidate = await session.scalar(
-                select(MemoryCandidateModel).where(MemoryCandidateModel.id == candidate_id)
+                select(MemoryCandidateModel)
+                .join(
+                    MemoryCandidateVersionModel,
+                    MemoryCandidateVersionModel.candidate_id == MemoryCandidateModel.id,
+                )
+                .where(
+                    MemoryCandidateModel.id == candidate_id,
+                    MemoryCandidateVersionModel.is_synthetic.is_(False),
+                )
             )
             if candidate is None:
                 raise GovernedMemoryNotFound("Memory candidate was not found")
@@ -712,7 +743,10 @@ class GovernedMemoryService:
             async with tenant_session(tenant_id) as session:
                 version = await session.scalar(
                     select(MemoryCandidateVersionModel)
-                    .where(MemoryCandidateVersionModel.id == version_id)
+                    .where(
+                        MemoryCandidateVersionModel.id == version_id,
+                        MemoryCandidateVersionModel.is_synthetic.is_(False),
+                    )
                     .with_for_update()
                 )
                 if version is None or version.valid_until > datetime.now(UTC):
@@ -825,12 +859,15 @@ class GovernedMemoryService:
     ) -> MemoryCandidateResponse:
         version = await session.scalar(
             select(MemoryCandidateVersionModel)
-            .where(MemoryCandidateVersionModel.candidate_id == candidate.id)
+            .where(
+                MemoryCandidateVersionModel.candidate_id == candidate.id,
+                MemoryCandidateVersionModel.is_synthetic.is_(False),
+            )
             .order_by(MemoryCandidateVersionModel.version.desc())
             .limit(1)
         )
         if version is None:
-            raise RuntimeError("Memory candidate version is missing")
+            raise GovernedMemoryNotFound("Memory candidate version was not found")
         reviews = list(
             (
                 await session.scalars(
@@ -897,7 +934,10 @@ class GovernedMemoryService:
     ) -> tuple[MemoryCandidateVersionModel, MemoryCandidateModel]:
         version = await session.scalar(
             select(MemoryCandidateVersionModel)
-            .where(MemoryCandidateVersionModel.id == version_id)
+            .where(
+                MemoryCandidateVersionModel.id == version_id,
+                MemoryCandidateVersionModel.is_synthetic.is_(False),
+            )
             .with_for_update()
         )
         if version is None:

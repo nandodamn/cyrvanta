@@ -33,7 +33,7 @@ class OperationalActivity24h(StrictResponse):
     window_start: datetime
     window_end: datetime
     updated_at: datetime
-    source_mode: Literal["EMPTY", "SIMULATED", "LIVE", "MIXED"]
+    source_mode: Literal["EMPTY", "LIVE"]
     totals: ActivityTotals
     series: list[ActivityBucket]
 
@@ -55,10 +55,13 @@ def build_activity_24h(
         )
         for index in range(BUCKET_COUNT)
     ]
-    source_flags: list[bool] = []
+    real_activity_count = 0
 
     def record(rows: list[tuple[datetime, bool]], field: Literal["alerts", "incidents"]) -> None:
+        nonlocal real_activity_count
         for occurred_at, is_simulated in rows:
+            if is_simulated:
+                continue
             normalized = occurred_at.astimezone(UTC)
             if normalized < window_start or normalized > window_end:
                 continue
@@ -68,18 +71,11 @@ def build_activity_24h(
             )
             current = buckets[index]
             buckets[index] = current.model_copy(update={field: getattr(current, field) + 1})
-            source_flags.append(is_simulated)
+            real_activity_count += 1
 
     record(alert_rows, "alerts")
     record(incident_rows, "incidents")
-    if not source_flags:
-        source_mode: Literal["EMPTY", "SIMULATED", "LIVE", "MIXED"] = "EMPTY"
-    elif all(source_flags):
-        source_mode = "SIMULATED"
-    elif any(source_flags):
-        source_mode = "MIXED"
-    else:
-        source_mode = "LIVE"
+    source_mode: Literal["EMPTY", "LIVE"] = "LIVE" if real_activity_count else "EMPTY"
     return OperationalActivity24h(
         window_start=window_start,
         window_end=window_end,

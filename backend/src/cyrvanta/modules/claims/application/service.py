@@ -95,7 +95,10 @@ class ClaimService:
     ) -> list[ClaimResponse]:
         async with tenant_session(tenant_id) as session:
             await self._incident(session, incident_id)
-            statement = select(ClaimModel).where(ClaimModel.incident_id == incident_id)
+            statement = select(ClaimModel).where(
+                ClaimModel.incident_id == incident_id,
+                ClaimModel.is_simulated.is_(False),
+            )
             if query and (normalized := query.strip()):
                 escaped = normalized.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
                 statement = statement.where(
@@ -465,7 +468,7 @@ class ClaimService:
                     explanation=item.explanation,
                     validation_criteria=None,
                     missing_evidence=(),
-                    is_simulated=incident.is_simulated or mode == "simulated",
+                    is_simulated=False,
                     correlation_id=correlation_id,
                     causation_id=None,
                     created_at=datetime.now(UTC),
@@ -859,14 +862,24 @@ class ClaimService:
 
     @staticmethod
     async def _incident(session: AsyncSession, incident_id: UUID) -> IncidentModel:
-        incident = await session.get(IncidentModel, incident_id)
+        incident = await session.scalar(
+            select(IncidentModel).where(
+                IncidentModel.id == incident_id,
+                IncidentModel.is_simulated.is_(False),
+            )
+        )
         if incident is None:
             raise ClaimNotFound
         return incident
 
     @staticmethod
     async def _claim(session: AsyncSession, claim_id: UUID) -> ClaimModel:
-        claim = await session.get(ClaimModel, claim_id)
+        claim = await session.scalar(
+            select(ClaimModel).where(
+                ClaimModel.id == claim_id,
+                ClaimModel.is_simulated.is_(False),
+            )
+        )
         if claim is None:
             raise ClaimNotFound
         return claim

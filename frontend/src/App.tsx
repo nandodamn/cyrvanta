@@ -652,11 +652,6 @@ function AlertsPage() {
                     {alert.source} · {alert.category}
                   </small>
                 </div>
-                {alert.is_simulated ? (
-                  <span className="demo-badge">{t("simulated")}</span>
-                ) : (
-                  <span />
-                )}
                 <div
                   style={{
                     display: "flex",
@@ -905,7 +900,6 @@ function IncidentsPage() {
                   </span>
                 )}
                 <span style={{ whiteSpace: "nowrap" }}>{t(`statusCodes.${incident.status}`, { defaultValue: incident.status })}</span>
-                {incident.is_simulated && <span className="demo-badge" style={{ whiteSpace: "nowrap" }}>{t("simulated")}</span>}
               </NavLink>
             );
           })}
@@ -1039,7 +1033,6 @@ function IncidentDetailPage() {
                 📅 {new Date(incident.data.detected_at).toLocaleString(i18n.language, { dateStyle: "medium", timeStyle: "medium" })}
               </span>
             )}
-            {incident.data.is_simulated && <span className="demo-badge">{t("simulated")}</span>}
           </div>
           <h1 style={{ margin: "4px 0 0" }}>{incident.data.title}</h1>
         </div>
@@ -1354,7 +1347,6 @@ function IncidentDetailPage() {
                       <div className="claim-badges" style={{ marginBottom: "10px" }}>
                         <span className="severity">{decision.status}</span>
                         <span>{decision.impact}</span>
-                        {decision.is_simulated && <span>{t("simulated")}</span>}
                       </div>
                       <strong style={{ fontSize: "1.15rem", display: "block", marginBottom: "6px" }}>
                         {decision.action_type}
@@ -1600,11 +1592,6 @@ function IncidentDetailPage() {
                         {alert.source} · {alert.category}
                       </small>
                     </div>
-                    {alert.is_simulated ? (
-                      <span className="demo-badge">{t("simulated")}</span>
-                    ) : (
-                      <span />
-                    )}
                     <div style={{ display: "flex", alignItems: "center", gap: "10px", justifyContent: "flex-end" }}>
                       <time dateTime={alert.observed_at}>
                         {new Date(alert.observed_at).toLocaleString(i18n.language)}
@@ -1689,7 +1676,6 @@ function IncidentDetailPage() {
                       {t("rule")}: {match.rule_code} v{match.rule_version}
                     </span>
                     <span>{match.result_type}</span>
-                    {match.is_simulated && <span>{t("simulated")}</span>}
                   </div>
                   <strong>
                     {t("correlationScore")}: {match.score}/100 · {t("threshold")}: {match.threshold}
@@ -1697,9 +1683,6 @@ function IncidentDetailPage() {
                   <p style={{ margin: "4px 0" }}>
                     {t("members")}: {match.members.length}
                   </p>
-                  {match.result_type === "LEGACY_SIMULATED_V0" && (
-                    <small style={{ color: "var(--muted)" }}>{t("legacyCorrelation")}</small>
-                  )}
                   <div className="correlation-factors" style={{ marginTop: "8px" }}>
                     {match.factors.map((factor) => (
                       <span key={factor.factor_code}>
@@ -1865,7 +1848,6 @@ function IncidentDetailPage() {
                       <span>
                         {t(`claimOrigins.${claim.origin_type}`, { defaultValue: claim.origin_type })}
                       </span>
-                      {claim.is_simulated && <span>{t("simulated")}</span>}
                     </div>
                     <p style={{ margin: "6px 0" }}>{statement}</p>
                     {claim.confidence !== null && (
@@ -1918,7 +1900,6 @@ function IncidentDetailPage() {
                       <div className="claim-badges" style={{ marginBottom: "8px" }}>
                         <span className="severity">{decision.status}</span>
                         <span>{decision.impact}</span>
-                        {decision.is_simulated && <span>{t("simulated")}</span>}
                       </div>
                       <strong style={{ fontSize: "1.05rem", display: "block", marginBottom: "4px" }}>
                         {decision.action_type}

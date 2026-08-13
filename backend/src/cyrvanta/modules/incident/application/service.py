@@ -54,7 +54,10 @@ class IncidentService:
         async with tenant_session(tenant_id) as session:
             statement = select(
                 AlertReferenceModel, UserModel.email, UserModel.display_name
-            ).outerjoin(UserModel, AlertReferenceModel.reviewed_by_user_id == UserModel.id)
+            ).outerjoin(
+                UserModel,
+                AlertReferenceModel.reviewed_by_user_id == UserModel.id,
+            ).where(AlertReferenceModel.is_simulated.is_(False))
             if pattern := self._search_pattern(search):
                 statement = statement.where(
                     or_(
@@ -87,7 +90,10 @@ class IncidentService:
                 await session.execute(
                     select(AlertReferenceModel, UserModel.email, UserModel.display_name)
                     .outerjoin(UserModel, AlertReferenceModel.reviewed_by_user_id == UserModel.id)
-                    .where(AlertReferenceModel.id == alert_id)
+                    .where(
+                        AlertReferenceModel.id == alert_id,
+                        AlertReferenceModel.is_simulated.is_(False),
+                    )
                 )
             ).first()
             if row is None:
@@ -107,7 +113,10 @@ class IncidentService:
                     AlertReferenceModel.id == IncidentAlertModel.alert_id,
                 )
                 .outerjoin(UserModel, AlertReferenceModel.reviewed_by_user_id == UserModel.id)
-                .where(IncidentAlertModel.incident_id == incident_id)
+                .where(
+                    IncidentAlertModel.incident_id == incident_id,
+                    AlertReferenceModel.is_simulated.is_(False),
+                )
                 .order_by(
                     AlertReferenceModel.observed_at.desc(),
                     AlertReferenceModel.id.desc(),
@@ -131,7 +140,12 @@ class IncidentService:
     ) -> AlertResponse:
         now = datetime.now(UTC)
         async with tenant_session(tenant_id) as session:
-            alert = await session.get(AlertReferenceModel, alert_id)
+            alert = await session.scalar(
+                select(AlertReferenceModel).where(
+                    AlertReferenceModel.id == alert_id,
+                    AlertReferenceModel.is_simulated.is_(False),
+                )
+            )
             if alert is None:
                 raise IncidentNotFound
 
@@ -158,7 +172,7 @@ class IncidentService:
         self, tenant_id: UUID, limit: int, offset: int = 0, search: str | None = None
     ) -> list[IncidentModel]:
         async with tenant_session(tenant_id) as session:
-            statement = select(IncidentModel)
+            statement = select(IncidentModel).where(IncidentModel.is_simulated.is_(False))
             if pattern := self._search_pattern(search):
                 statement = statement.where(
                     or_(
@@ -367,7 +381,12 @@ class IncidentService:
 
     @staticmethod
     async def _get(session: AsyncSession, incident_id: UUID) -> IncidentModel:
-        incident = await session.get(IncidentModel, incident_id)
+        incident = await session.scalar(
+            select(IncidentModel).where(
+                IncidentModel.id == incident_id,
+                IncidentModel.is_simulated.is_(False),
+            )
+        )
         if incident is None:
             raise IncidentNotFound
         return incident

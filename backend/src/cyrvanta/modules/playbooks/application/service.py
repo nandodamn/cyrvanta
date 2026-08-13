@@ -90,6 +90,7 @@ class PlaybookExecutionService:
                 select(PlaybookExecutionModel).where(
                     PlaybookExecutionModel.tenant_id == tenant_id,
                     PlaybookExecutionModel.idempotency_key == idempotency_key,
+                    PlaybookExecutionModel.execution_mode == "LIVE",
                 )
             )
             if existing is not None:
@@ -110,6 +111,7 @@ class PlaybookExecutionService:
                 select(ActionProposalModel).where(
                     ActionProposalModel.tenant_id == tenant_id,
                     ActionProposalModel.id == authorization.proposal_id,
+                    ActionProposalModel.is_simulated.is_(False),
                 )
             )
             if proposal is None:
@@ -124,6 +126,7 @@ class PlaybookExecutionService:
                 select(IncidentModel).where(
                     IncidentModel.tenant_id == tenant_id,
                     IncidentModel.id == proposal.incident_id,
+                    IncidentModel.is_simulated.is_(False),
                 )
             )
             approval_request = await session.scalar(
@@ -335,10 +338,12 @@ class PlaybookExecutionService:
     ) -> PlaybookExecutionList:
         async with tenant_session(tenant_id) as session:
             query = select(PlaybookExecutionModel).where(
-                PlaybookExecutionModel.tenant_id == tenant_id
+                PlaybookExecutionModel.tenant_id == tenant_id,
+                PlaybookExecutionModel.execution_mode == "LIVE",
             )
             count_query = select(func.count(PlaybookExecutionModel.id)).where(
-                PlaybookExecutionModel.tenant_id == tenant_id
+                PlaybookExecutionModel.tenant_id == tenant_id,
+                PlaybookExecutionModel.execution_mode == "LIVE",
             )
             if incident_id is not None:
                 query = query.where(PlaybookExecutionModel.incident_id == incident_id)
@@ -364,6 +369,7 @@ class PlaybookExecutionService:
                 select(PlaybookExecutionModel).where(
                     PlaybookExecutionModel.tenant_id == tenant_id,
                     PlaybookExecutionModel.id == execution_id,
+                    PlaybookExecutionModel.execution_mode == "LIVE",
                 )
             )
             if execution is None:
@@ -624,6 +630,7 @@ class PlaybookExecutionService:
             .where(
                 PlaybookExecutionModel.tenant_id == tenant_id,
                 PlaybookExecutionModel.id == execution_id,
+                PlaybookExecutionModel.execution_mode == "LIVE",
             )
             .with_for_update()
         )

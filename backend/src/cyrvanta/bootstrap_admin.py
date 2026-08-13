@@ -12,26 +12,25 @@ async def bootstrap(
     tenant_name: str, tenant_slug: str, email: str, password: str, display_name: str
 ) -> None:
     normalized_email = email.lower()
-    tenant_id = uuid4()
+    proposed_tenant_id = uuid4()
     user_id = uuid4()
     role_id = uuid4()
     password_hash = PasswordHash.recommended().hash(password)
     async with SessionFactory() as session, session.begin():
         await session.execute(text("SELECT set_config('app.auth_lookup', 'true', true)"))
-        existing = await session.scalar(
-            text("SELECT EXISTS (SELECT 1 FROM users WHERE email = :email)"),
-            {"email": normalized_email},
-        )
-        if existing:
-            print(f"Administrator already exists for {normalized_email}; no changes made")
-            return
         await session.execute(
             text(
                 "INSERT INTO tenants (id, name, slug) VALUES (:id, :name, :slug) "
-                "ON CONFLICT DO NOTHING"
+                "ON CONFLICT (slug) DO NOTHING"
             ),
-            {"id": tenant_id, "name": tenant_name, "slug": tenant_slug},
+            {"id": proposed_tenant_id, "name": tenant_name, "slug": tenant_slug},
         )
+        tenant_id = await session.scalar(
+            text("SELECT id FROM tenants WHERE slug = :slug"),
+            {"slug": tenant_slug},
+        )
+        if tenant_id is None:
+            raise RuntimeError("Tenant bootstrap failed")
         await session.execute(
             text("SELECT set_config('app.current_tenant_id', :tenant_id, true)"),
             {"tenant_id": str(tenant_id)},
@@ -40,7 +39,7 @@ async def bootstrap(
             text("""
                 INSERT INTO users (id, tenant_id, email, password_hash, display_name)
                 VALUES (:id, :tenant_id, :email, :password_hash, :display_name)
-                ON CONFLICT (email) DO NOTHING
+                ON CONFLICT (tenant_id, email) DO NOTHING
             """),
             {
                 "id": user_id,
@@ -66,6 +65,15 @@ async def bootstrap(
                 ON CONFLICT DO NOTHING
             """),
             {"tenant_id": tenant_id, "email": normalized_email},
+        )
+        await session.execute(
+            text("""
+                INSERT INTO role_permissions (tenant_id, role_id, permission_id)
+                SELECT :tenant_id, r.id, p.id FROM roles r CROSS JOIN permissions p
+                WHERE r.tenant_id = :tenant_id AND r.code = 'tenant-admin'
+                ON CONFLICT DO NOTHING
+            """),
+            {"tenant_id": tenant_id},
         )
     print(f"Bootstrap completed for {normalized_email} (tenant {tenant_id})")
 

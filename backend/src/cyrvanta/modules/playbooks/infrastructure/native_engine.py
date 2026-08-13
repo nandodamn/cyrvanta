@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from datetime import UTC, datetime, timedelta
 from typing import Any
 from uuid import UUID, uuid4
 
-from sqlalchemy import select
+from sqlalchemy import select, text
 
 from cyrvanta.modules.identity.infrastructure.models import AuditEventModel
 from cyrvanta.modules.playbooks.application.engine_ports import EngineContext
@@ -32,7 +34,7 @@ from cyrvanta.modules.playbooks.infrastructure.models import (
     PlaybookVersionModel,
 )
 from cyrvanta.shared.config import Settings
-from cyrvanta.shared.database import SessionFactory, tenant_session
+from cyrvanta.shared.database import SessionFactory, engine, tenant_session
 from cyrvanta.shared.domain.events import DomainEvent
 from cyrvanta.shared.infrastructure.event_store import SqlEventStore
 
@@ -57,6 +59,23 @@ class NativePlaybookDispatcher:
         execution_id: UUID,
         correlation_id: UUID,
         causation_id: UUID | None = None,
+    ) -> bool | None:
+        async with self._execution_lease(tenant_id, execution_id) as acquired:
+            if not acquired:
+                return None
+            return await self._dispatch_exclusively(
+                tenant_id,
+                execution_id,
+                correlation_id,
+                causation_id,
+            )
+
+    async def _dispatch_exclusively(
+        self,
+        tenant_id: UUID,
+        execution_id: UUID,
+        correlation_id: UUID,
+        causation_id: UUID | None,
     ) -> bool | None:
         try:
             artifact, deadline, workflow_code, execution_inputs = await self._claim_execution(
@@ -121,6 +140,25 @@ class NativePlaybookDispatcher:
             error_code="PLAYBOOK_ACTION_FAILED" if failed else None,
         )
         return not failed
+
+    @asynccontextmanager
+    async def _execution_lease(
+        self, tenant_id: UUID, execution_id: UUID
+    ) -> AsyncIterator[bool]:
+        lock_key = self._execution_lock_key(tenant_id, execution_id)
+        async with engine.connect() as connection, connection.begin():
+            acquired = bool(
+                await connection.scalar(
+                    text("SELECT pg_try_advisory_xact_lock(:lock_key)"),
+                    {"lock_key": lock_key},
+                )
+            )
+            yield acquired
+
+    @staticmethod
+    def _execution_lock_key(tenant_id: UUID, execution_id: UUID) -> int:
+        digest = hashlib.sha256(f"{tenant_id}:{execution_id}".encode()).digest()
+        return int.from_bytes(digest[:8], byteorder="big", signed=True)
 
     async def _load_progress(
         self, tenant_id: UUID, execution_id: UUID

@@ -1,7 +1,10 @@
+import asyncio
 import json
+from contextlib import asynccontextmanager
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import AsyncMock
 from uuid import uuid4
 
 import pytest
@@ -154,3 +157,66 @@ def test_recovery_reuses_only_attempt_without_outcome_and_same_input() -> None:
         NativePlaybookDispatcher._validate_recoverable_attempt(
             attempt, outcome_exists=None, input_digest="b" * 64
         )
+
+
+def test_native_execution_lock_key_is_stable_and_tenant_scoped() -> None:
+    tenant_id, execution_id = uuid4(), uuid4()
+
+    first = NativePlaybookDispatcher._execution_lock_key(tenant_id, execution_id)
+
+    assert first == NativePlaybookDispatcher._execution_lock_key(tenant_id, execution_id)
+    assert first != NativePlaybookDispatcher._execution_lock_key(uuid4(), execution_id)
+    assert -(2**63) <= first < 2**63
+
+
+async def test_native_redelivery_without_execution_lease_is_a_no_op() -> None:
+    dispatcher = object.__new__(NativePlaybookDispatcher)
+    dispatcher._dispatch_exclusively = AsyncMock(return_value=True)
+
+    @asynccontextmanager
+    async def lease_unavailable(*_args: object):
+        yield False
+
+    dispatcher._execution_lease = lease_unavailable
+
+    result = await dispatcher.dispatch(uuid4(), uuid4(), uuid4())
+
+    assert result is None
+    dispatcher._dispatch_exclusively.assert_not_awaited()
+
+
+async def test_two_simultaneous_native_deliveries_execute_only_once() -> None:
+    dispatcher = object.__new__(NativePlaybookDispatcher)
+    entered = asyncio.Event()
+    release = asyncio.Event()
+    lease_active = False
+
+    async def execute_once(*_args: object) -> bool:
+        entered.set()
+        await release.wait()
+        return True
+
+    @asynccontextmanager
+    async def exclusive_lease(*_args: object):
+        nonlocal lease_active
+        if lease_active:
+            yield False
+            return
+        lease_active = True
+        try:
+            yield True
+        finally:
+            lease_active = False
+
+    dispatcher._dispatch_exclusively = AsyncMock(side_effect=execute_once)
+    dispatcher._execution_lease = exclusive_lease
+    tenant_id, execution_id = uuid4(), uuid4()
+
+    first = asyncio.create_task(dispatcher.dispatch(tenant_id, execution_id, uuid4()))
+    await entered.wait()
+    second = asyncio.create_task(dispatcher.dispatch(tenant_id, execution_id, uuid4()))
+    assert await second is None
+    release.set()
+
+    assert await first is True
+    assert dispatcher._dispatch_exclusively.await_count == 1

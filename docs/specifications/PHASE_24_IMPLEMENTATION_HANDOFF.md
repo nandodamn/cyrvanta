@@ -45,7 +45,7 @@ publicarse ni activarse.
 5. Activar el binding NATIVE.
 6. Activar de forma consciente `PLAYBOOK_LIVE_ENABLED=true` y
    `PLAYBOOK_DISPATCH_ENABLED=true`; mantener `AUTOMATION_KILL_SWITCH=false`.
-7. Crear o seleccionar un incidente real del tenant. Para el playbook de contención, el estado
+7. Crear manualmente un incidente real desde la pantalla **Incidentes** o seleccionar uno producido por ingesta/correlación real. Para el playbook de contención, el estado
    debe admitir la transición a `contained`.
 8. Crear la propuesta, completar las aprobaciones y ejecutar la autorización.
 9. Verificar estado del incidente o entrega externa, ejecución persistida y auditoría.

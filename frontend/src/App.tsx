@@ -10,6 +10,7 @@ import {
   Alert,
   activateDirectoryConfiguration,
   createRole,
+  createIncident,
   createUser,
   createResponseProposal,
   decideResponse,
@@ -852,7 +853,14 @@ function AlertsPage() {
 
 function IncidentsPage() {
   const { t, i18n } = useTranslation();
+  const queryClient = useQueryClient();
   const controls = useListControls();
+  const createMutation = useMutation({
+    mutationFn: createIncident,
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["incidents"] });
+    },
+  });
   const incidents = useQuery({
     queryKey: ["incidents", controls.query, controls.page, controls.pageSize],
     queryFn: () =>
@@ -869,6 +877,70 @@ function IncidentsPage() {
       <div className="page-title">
         <h1>{t("incidents")}</h1>
       </div>
+      <details className="panel" style={{ marginBottom: "1rem" }}>
+        <summary>{t("createRealIncident")}</summary>
+        <form
+          className="form-grid"
+          style={{ marginTop: "1rem" }}
+          onSubmit={async (event) => {
+            event.preventDefault();
+            const form = event.currentTarget;
+            const data = new FormData(form);
+            try {
+              await createMutation.mutateAsync({
+                title: String(data.get("title")).trim(),
+                description: String(data.get("description")).trim(),
+                severity: String(data.get("severity")) as
+                  | "informational" | "low" | "medium" | "high" | "critical",
+                priority: Number(data.get("priority")),
+                classification: String(data.get("classification")).trim(),
+              });
+              form.reset();
+            } catch {
+              // The error state remains visible and submitted values are preserved.
+            }
+          }}
+        >
+          <label>
+            {t("title")}
+            <input name="title" required minLength={3} maxLength={300} />
+          </label>
+          <label>
+            {t("classification")}
+            <input name="classification" required minLength={2} maxLength={120} />
+          </label>
+          <label>
+            {t("severity")}
+            <select name="severity" defaultValue="medium">
+              {(["informational", "low", "medium", "high", "critical"] as const).map(
+                (value) => (
+                  <option key={value} value={value}>
+                    {t(`severityCodes.${value}`, { defaultValue: value })}
+                  </option>
+                ),
+              )}
+            </select>
+          </label>
+          <label>
+            {t("priority")}
+            <select name="priority" defaultValue="3">
+              {[1, 2, 3, 4, 5].map((value) => (
+                <option key={value} value={value}>{value}</option>
+              ))}
+            </select>
+          </label>
+          <label style={{ gridColumn: "1 / -1" }}>
+            {t("description")}
+            <textarea name="description" required minLength={3} maxLength={5000} rows={5} />
+          </label>
+          <button type="submit" disabled={createMutation.isPending}>
+            {t("createRealIncident")}
+          </button>
+          {createMutation.isError && (
+            <p className="form-error" role="alert">{t("incidentCreateError")}</p>
+          )}
+        </form>
+      </details>
       <PageState
         loading={incidents.isLoading}
         error={incidents.isError}

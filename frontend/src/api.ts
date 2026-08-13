@@ -782,6 +782,15 @@ export async function updateAlertTriage(
 export async function getIncidents(options?: ListQuery): Promise<Incident[]> {
   return z.array(incidentSchema).parse(await authorized(listPath("/api/v1/incidents", options)));
 }
+export async function createIncident(input: {
+  title: string;
+  description: string;
+  severity: "informational" | "low" | "medium" | "high" | "critical";
+  priority: number;
+  classification: string;
+}): Promise<Incident> {
+  return incidentSchema.parse(await authorizedMutation("/api/v1/incidents", "POST", input));
+}
 export async function getIncident(id: string): Promise<Incident> {
   return incidentSchema.parse(await authorized(`/api/v1/incidents/${id}`));
 }

@@ -85,3 +85,7 @@ def test_consumption_requires_one_unambiguous_enabled_binding_and_both_digests()
     assert "binding.desired_digest != version.artifact_sha256" in source
     assert "not settings.playbook_native_engine_enabled" in source
     assert "not settings.n8n_enabled" in source
+    assert "validate_strict_object(version.input_schema, portable_inputs)" in source
+    assert source.index("validate_strict_object(version.input_schema") < source.index(
+        'authorization.status = "CONSUMED"'
+    )

@@ -9,6 +9,9 @@ Estado: implementación preparada; validación funcional manual pendiente del op
 - Probes reales manuales para SMTP, HTTP allowlisted, n8n, OpenSearch, Ollama y Wazuh.
 - La redacción Ollama y la ingesta Wazuh/OpenSearch resuelven exclusivamente conexiones activas y verificadas del tenant; una configuración ausente o ambigua falla cerrado.
 - Motor NATIVE exclusivamente LIVE, con kill switch y doble activación operativa.
+- Inputs y resultados LIVE usan schemas internos recursivamente estrictos y tipados; la
+  autorización se consume sólo después de validar inputs y los recibos deben corresponder
+  exactamente a los pasos de la versión publicada.
 - Todo nombre de evento productivo queda registrado en el worker: handlers con efectos conservan su función y el resto completa inbox como observación durable, evitando outbox permanentemente no enrutable.
 - El scheduler materializa solicitudes de aprobación y autorizaciones vencidas mediante descubrimiento privilegiado acotado, revalidación con bloqueo tenant-scoped, auditoría y evento outbox para la autorización.
 - El despacho pendiente considera todos los tenants activos, filtra motores y bindings habilitados, reparte el lote round-robin y aplica los switches LIVE/dispatch/kill también al adaptador n8n.

@@ -14,6 +14,7 @@ from cyrvanta.modules.playbooks.application.administration_service import (
 )
 from cyrvanta.modules.playbooks.application.portable import PortablePlaybookV1
 from cyrvanta.modules.playbooks.infrastructure.schema_registry import (
+    is_strict_schema,
     resolve_schema,
     validate_strict_object,
 )
@@ -60,13 +61,60 @@ def test_binding_contract_is_discriminated_and_native_has_no_secret_fields() -> 
         )
 
 
-def test_internal_schema_registry_is_strict_and_non_remote() -> None:
+def test_internal_schema_registry_is_typed_strict_and_non_remote() -> None:
     schema = resolve_schema("security/incident-notification-input-v1")
+    incident_id = "00000000-0000-0000-0000-000000000001"
+    valid = {
+        "incident_id": incident_id,
+        "incident_version": 7,
+        "targets": [incident_id],
+        "parameters": {},
+        "evidence_refs": [],
+    }
 
-    assert validate_strict_object(schema, {"severity": "critical"}) is True
-    assert validate_strict_object(schema, {"unexpected": "value"}) is False
+    assert validate_strict_object(schema, valid) is True
+    invalid = (
+        {**valid, "incident_id": "not-a-uuid"},
+        {**valid, "incident_version": True},
+        {**valid, "targets": []},
+        {**valid, "targets": ["not-a-uuid"]},
+        {**valid, "targets": [incident_id, incident_id]},
+        {**valid, "parameters": {"free_command": "forbidden"}},
+        {**valid, "evidence_refs": ["not-a-uuid"]},
+        {**valid, "unexpected": "value"},
+        {key: value for key, value in valid.items() if key != "incident_id"},
+    )
+    assert all(not validate_strict_object(schema, item) for item in invalid)
+    assert (
+        is_strict_schema(
+            {
+                "type": "object",
+                "additionalProperties": False,
+                "properties": {"open": {"type": "object"}},
+            }
+        )
+        is False
+    )
     with pytest.raises(ValueError, match="PLAYBOOK_INVALID"):
         resolve_schema("https://example.invalid/schema.json")
+
+
+def test_result_schema_types_and_bounds_dynamic_receipts() -> None:
+    schema = resolve_schema("security/incident-notification-result-v1")
+    valid = {
+        "effect": "applied",
+        "workflow_code": "notify-critical-incident",
+        "step_receipts": {"step-1": "receipt-1"},
+    }
+
+    assert validate_strict_object(schema, valid) is True
+    assert validate_strict_object(schema, {**valid, "step_receipts": {"step-1": None}}) is True
+    assert validate_strict_object(schema, {**valid, "effect": "simulated"}) is False
+    assert (
+        validate_strict_object(schema, {**valid, "step_receipts": {"step-1": {"raw": "forbidden"}}})
+        is False
+    )
+    assert validate_strict_object(schema, {**valid, "step_receipts": {"step-1": ""}}) is False
 
 
 def test_configuration_rejects_secret_like_keys_recursively() -> None:

@@ -19,6 +19,7 @@ from cyrvanta.modules.decision.infrastructure.models import (
 )
 from cyrvanta.modules.identity.infrastructure.models import AuditEventModel
 from cyrvanta.modules.incident.infrastructure.models import IncidentModel
+from cyrvanta.modules.playbooks.application.portable import PortablePlaybookV1
 from cyrvanta.modules.playbooks.application.schemas import (
     ExecutionClaim,
     ExecutionUpdate,
@@ -29,7 +30,6 @@ from cyrvanta.modules.playbooks.domain.models import (
     ExecutionStatus,
     validate_transition,
 )
-from cyrvanta.modules.playbooks.infrastructure.schema_registry import validate_strict_object
 from cyrvanta.modules.playbooks.infrastructure.action_registry import (
     ActionRegistry,
     ActionUnavailableError,
@@ -44,6 +44,7 @@ from cyrvanta.modules.playbooks.infrastructure.models import (
     PlaybookStepExecutionModel,
     PlaybookVersionModel,
 )
+from cyrvanta.modules.playbooks.infrastructure.schema_registry import validate_strict_object
 from cyrvanta.shared.config import get_settings
 from cyrvanta.shared.database import SessionFactory, tenant_session
 from cyrvanta.shared.domain.events import DomainEvent
@@ -221,6 +222,15 @@ class PlaybookExecutionService:
                     raise PlaybookConflict("n8n automation engine is disabled")
             else:
                 raise PlaybookConflict("Automation engine is unavailable")
+            portable_inputs: dict[str, object] = {
+                "targets": list(proposal.targets),
+                "parameters": dict(proposal.parameters),
+                "evidence_refs": [str(item) for item in proposal.evidence_refs],
+                "incident_id": str(incident.id),
+                "incident_version": incident.version,
+            }
+            if not validate_strict_object(version.input_schema, portable_inputs):
+                raise PlaybookConflict("Authorized input does not match the released schema")
             execution = PlaybookExecutionModel(
                 tenant_id=tenant_id,
                 authorization_id=authorization.id,
@@ -233,14 +243,7 @@ class PlaybookExecutionService:
                 proposal_fingerprint=proposal.fingerprint,
                 execution_mode="LIVE",
                 status=ExecutionStatus.QUEUED.value,
-                inputs={
-                    "targets": list(proposal.targets),
-                    "parameters": dict(proposal.parameters),
-                    "evidence_refs": list(proposal.evidence_refs),
-                    "incident_id": str(incident.id),
-                    "incident_version": incident.version,
-                    "actor_user_id": str(actor_user_id),
-                },
+                inputs={**portable_inputs, "actor_user_id": str(actor_user_id)},
                 deadline_at=now + timedelta(seconds=version.timeout_seconds),
             )
             session.add(execution)
@@ -538,7 +541,7 @@ class PlaybookExecutionService:
                     adapter_event_id=payload.dispatch_id,
                     sequence=1,
                     status=ExecutionStatus.RUNNING.value,
-                    safe_detail="Automation engine claimed the authorized synthetic execution",
+                    safe_detail="Automation engine claimed the authorized LIVE execution",
                     occurred_at=execution.claimed_at,
                 )
             )
@@ -675,6 +678,14 @@ class PlaybookExecutionService:
             or result.get("workflow_code") != version.workflow_code
         ):
             raise PlaybookSecurityError("LIVE result does not match its released schema")
+        try:
+            artifact = PortablePlaybookV1.model_validate(version.portable_artifact)
+        except ValueError as exc:
+            raise PlaybookSecurityError("Released playbook artifact is invalid") from exc
+        receipts = result.get("step_receipts")
+        if not isinstance(receipts, dict) or set(receipts) != {step.id for step in artifact.steps}:
+            raise PlaybookSecurityError("LIVE result receipts do not match released steps")
+
     @staticmethod
     async def _nonce_digest(
         session: AsyncSession, tenant_id: UUID, direction: str, key_id: str, nonce: UUID

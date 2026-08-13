@@ -50,6 +50,7 @@ from cyrvanta.modules.playbooks.infrastructure.models import (
 )
 from cyrvanta.modules.playbooks.infrastructure.schema_registry import (
     SchemaReferenceUnknown,
+    is_strict_schema,
     resolve_schema,
     validate_strict_object,
 )
@@ -1154,6 +1155,10 @@ class PlaybookAdministrationService:
             self._validate_registered_actions(artifact)
             resolve_schema(artifact.input_schema_ref)
             resolve_schema(artifact.result_schema_ref)
+            if not is_strict_schema(version.input_schema) or not is_strict_schema(
+                version.result_schema
+            ):
+                return ["PLAYBOOK_INVALID"]
         except (
             ValueError,
             SchemaReferenceUnknown,

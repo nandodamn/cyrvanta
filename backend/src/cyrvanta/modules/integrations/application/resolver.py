@@ -4,6 +4,10 @@ from uuid import UUID
 
 from sqlalchemy import select
 
+from cyrvanta.modules.integrations.application.connection_service import (
+    CURRENT_CONFIGURATION_SCHEMA_VERSION,
+)
+
 from cyrvanta.modules.integrations.infrastructure.models import IntegrationModel
 from cyrvanta.shared.database import tenant_session
 
@@ -90,6 +94,8 @@ class ConnectionResolver:
                 IntegrationModel.status == "active",
                 IntegrationModel.last_health_check_at.is_not(None),
                 IntegrationModel.last_error_code.is_(None),
+                IntegrationModel.configuration_schema_version
+                == CURRENT_CONFIGURATION_SCHEMA_VERSION,
             )
             if explicit_connection_id is not None:
                 stmt = stmt.where(IntegrationModel.id == explicit_connection_id)

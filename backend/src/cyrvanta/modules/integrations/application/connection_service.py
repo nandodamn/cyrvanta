@@ -30,6 +30,7 @@ from cyrvanta.shared.target_validation import (
 )
 
 ConnectorType = Literal["SMTP", "HTTP_ALLOWLISTED", "N8N", "OPENSEARCH", "OLLAMA", "WAZUH"]
+CURRENT_CONFIGURATION_SCHEMA_VERSION = "1.1"
 
 _REQUIRED: dict[str, frozenset[str]] = {
     "SMTP": frozenset({"host", "port", "from_address"}),
@@ -157,7 +158,7 @@ class IntegrationConnectionService:
                     connector_type=payload.connector_type,
                     name=payload.name,
                     status="pending_verification" if payload.enabled else "disabled",
-                    configuration_schema_version="1.0",
+                    configuration_schema_version=CURRENT_CONFIGURATION_SCHEMA_VERSION,
                     configuration_encrypted=encrypted.encode(),
                     capabilities_snapshot={
                         "capabilities": self._capabilities(payload.connector_type)
@@ -168,7 +169,8 @@ class IntegrationConnectionService:
                 row.connector_type = payload.connector_type
                 row.name = payload.name
                 row.status = "pending_verification" if payload.enabled else "disabled"
-                row.configuration_schema_version = "1.0"
+                if not preserve_secret:
+                    row.configuration_schema_version = CURRENT_CONFIGURATION_SCHEMA_VERSION
                 row.configuration_encrypted = encrypted.encode()
                 row.capabilities_snapshot = {
                     "capabilities": self._capabilities(payload.connector_type)
@@ -219,12 +221,18 @@ class IntegrationConnectionService:
                 raise IntegrationConfigurationError("INTEGRATION_DISABLED")
             values = self._decrypt(row)
             started = perf_counter()
-            healthy, error_code = await self._probe(row.connector_type, values)
+            try:
+                self._validate(row.connector_type, values)
+            except IntegrationConfigurationError as exc:
+                healthy, error_code = False, str(exc)
+            else:
+                healthy, error_code = await self._probe(row.connector_type, values)
             latency_ms = max(0, round((perf_counter() - started) * 1000))
             row.last_health_check_at = datetime.now(UTC)
             row.last_error_code = error_code
             row.status = "active" if healthy else "unhealthy"
             if healthy:
+                row.configuration_schema_version = CURRENT_CONFIGURATION_SCHEMA_VERSION
                 row.last_successful_sync_at = row.last_health_check_at
             session.add(
                 IntegrationHealthHistoryModel(
@@ -267,11 +275,18 @@ class IntegrationConnectionService:
                     IntegrationModel.status == "active",
                     IntegrationModel.last_health_check_at.is_not(None),
                     IntegrationModel.last_error_code.is_(None),
+                    IntegrationModel.configuration_schema_version
+                    == CURRENT_CONFIGURATION_SCHEMA_VERSION,
                 )
             )
             if row is None:
                 raise IntegrationConfigurationError("PLAYBOOK_CREDENTIAL_UNAVAILABLE")
-            return StoredIntegrationCredential(str(row.id), self._decrypt(row))
+            values = self._decrypt(row)
+            try:
+                self._validate(row.connector_type, values)
+            except IntegrationConfigurationError as exc:
+                raise IntegrationConfigurationError("PLAYBOOK_CREDENTIAL_UNAVAILABLE") from exc
+            return StoredIntegrationCredential(str(row.id), values)
 
     async def resolve_single_connector(
         self, tenant_id: UUID, connector_type: ConnectorType
@@ -287,6 +302,8 @@ class IntegrationConnectionService:
                             IntegrationModel.status == "active",
                             IntegrationModel.last_health_check_at.is_not(None),
                             IntegrationModel.last_error_code.is_(None),
+                            IntegrationModel.configuration_schema_version
+                            == CURRENT_CONFIGURATION_SCHEMA_VERSION,
                         )
                         .order_by(IntegrationModel.id)
                         .limit(2)
@@ -300,7 +317,12 @@ class IntegrationConnectionService:
                     else "INTEGRATION_CONNECTION_UNAVAILABLE"
                 )
             row = rows[0]
-            return StoredIntegrationCredential(str(row.id), self._decrypt(row))
+            values = self._decrypt(row)
+            try:
+                self._validate(row.connector_type, values)
+            except IntegrationConfigurationError as exc:
+                raise IntegrationConfigurationError("INTEGRATION_CONNECTION_UNAVAILABLE") from exc
+            return StoredIntegrationCredential(str(row.id), values)
 
     def _decrypt(self, row: IntegrationModel) -> dict[str, object]:
         try:

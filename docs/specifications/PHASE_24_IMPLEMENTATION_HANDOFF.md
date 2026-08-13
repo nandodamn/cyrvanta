@@ -18,6 +18,8 @@ Estado: implementación preparada; validación funcional manual pendiente del op
 - Destinos SMTP/HTTPS y credenciales validados por conector: mailbox único, origen sin
   credenciales/query/fragment, autenticación no ambigua y path POST relativo sin traversal;
   configuración, publicación o habilitación no producen egreso automático.
+- La validación de conexiones está versionada: readiness y runtime exigen la versión vigente;
+  conexiones heredadas sólo se promueven después de revalidación y probe real exitoso.
 - n8n sin éxito prefabricado: el workflow debe enviar el resultado real firmado por HMAC.
 - Biblioteca completa visible; playbooks no implementados o incompletos permanecen bloqueados.
 - Menús bilingües para reemplazar, habilitar, deshabilitar y verificar conexiones sin volver a mostrar secretos, además de configurar bindings, validar/publicar y activar.

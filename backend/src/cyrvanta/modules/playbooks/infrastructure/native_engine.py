@@ -12,6 +12,7 @@ from sqlalchemy import select, text
 
 from cyrvanta.modules.identity.infrastructure.models import AuditEventModel
 from cyrvanta.modules.integrations.application.connection_service import (
+    CURRENT_CONFIGURATION_SCHEMA_VERSION,
     IntegrationConfigurationError,
     IntegrationConnectionService,
 )
@@ -147,9 +148,7 @@ class NativePlaybookDispatcher:
         return not failed
 
     @asynccontextmanager
-    async def _execution_lease(
-        self, tenant_id: UUID, execution_id: UUID
-    ) -> AsyncIterator[bool]:
+    async def _execution_lease(self, tenant_id: UUID, execution_id: UUID) -> AsyncIterator[bool]:
         lock_key = self._execution_lock_key(tenant_id, execution_id)
         async with engine.connect() as connection, connection.begin():
             acquired = bool(
@@ -390,6 +389,8 @@ class NativePlaybookDispatcher:
                         IntegrationModel.status == "active",
                         IntegrationModel.last_health_check_at.is_not(None),
                         IntegrationModel.last_error_code.is_(None),
+                        IntegrationModel.configuration_schema_version
+                        == CURRENT_CONFIGURATION_SCHEMA_VERSION,
                     )
                 )
                 if credential_ready is None:
@@ -402,13 +403,9 @@ class NativePlaybookDispatcher:
         connector = self.registry.get(step.action, step.action_version)
         step_input: dict[str, object]
         async with tenant_session(context.tenant_id) as session:
-            execution = await self._active_execution(
-                session, context.tenant_id, execution_id
-            )
+            execution = await self._active_execution(session, context.tenant_id, execution_id)
             self._guard_global(context.tenant_id, execution)
-            step_row = await self._locked_step(
-                session, context.tenant_id, execution_id, step.id
-            )
+            step_row = await self._locked_step(session, context.tenant_id, execution_id, step.id)
             binding = await session.scalar(
                 select(NativeActionBindingModel).where(
                     NativeActionBindingModel.action_code == step.action,
@@ -622,9 +619,7 @@ class NativePlaybookDispatcher:
         matched: bool,
     ) -> None:
         async with tenant_session(context.tenant_id) as session:
-            row = await self._locked_step(
-                session, context.tenant_id, execution_id, step.id
-            )
+            row = await self._locked_step(session, context.tenant_id, execution_id, step.id)
             row.status = "SUCCEEDED"
             row.result = {"matched": matched}
             row.completed_at = datetime.now(UTC)
@@ -639,9 +634,7 @@ class NativePlaybookDispatcher:
         step: ActionStep | ConditionStep,
     ) -> None:
         async with tenant_session(context.tenant_id) as session:
-            row = await self._locked_step(
-                session, context.tenant_id, execution_id, step.id
-            )
+            row = await self._locked_step(session, context.tenant_id, execution_id, step.id)
             row.status = "SKIPPED"
             row.completed_at = datetime.now(UTC)
             await self._record_step_completion(
@@ -881,9 +874,7 @@ class NativePlaybookDispatcher:
         return execution
 
     @staticmethod
-    async def _locked_step(
-        session: Any, tenant_id: UUID, execution_id: UUID, step_id: str
-    ) -> Any:
+    async def _locked_step(session: Any, tenant_id: UUID, execution_id: UUID, step_id: str) -> Any:
         row = await session.scalar(
             select(PlaybookStepExecutionModel)
             .where(

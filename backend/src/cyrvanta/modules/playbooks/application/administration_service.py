@@ -9,6 +9,9 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from cyrvanta.modules.identity.infrastructure.models import AuditEventModel
+from cyrvanta.modules.integrations.application.connection_service import (
+    CURRENT_CONFIGURATION_SCHEMA_VERSION,
+)
 from cyrvanta.modules.integrations.infrastructure.models import IntegrationModel
 from cyrvanta.modules.playbooks.application.administration_schemas import (
     ActionList,
@@ -450,6 +453,7 @@ class PlaybookAdministrationService:
                 )
             )
         await session.flush()
+
     async def get_definition(self, tenant_id: UUID, definition_id: UUID) -> DefinitionResponse:
         async with tenant_session(tenant_id) as session:
             definition = await session.scalar(
@@ -649,15 +653,20 @@ class PlaybookAdministrationService:
                         except ValueError:
                             credential_ready = False
                         else:
-                            credential_ready = await session.scalar(
-                                select(IntegrationModel.id).where(
-                                    IntegrationModel.tenant_id == tenant_id,
-                                    IntegrationModel.id == credential_id,
-                                    IntegrationModel.status == "active",
-                                    IntegrationModel.last_health_check_at.is_not(None),
-                                    IntegrationModel.last_error_code.is_(None),
+                            credential_ready = (
+                                await session.scalar(
+                                    select(IntegrationModel.id).where(
+                                        IntegrationModel.tenant_id == tenant_id,
+                                        IntegrationModel.id == credential_id,
+                                        IntegrationModel.status == "active",
+                                        IntegrationModel.last_health_check_at.is_not(None),
+                                        IntegrationModel.last_error_code.is_(None),
+                                        IntegrationModel.configuration_schema_version
+                                        == CURRENT_CONFIGURATION_SCHEMA_VERSION,
+                                    )
                                 )
-                            ) is not None
+                                is not None
+                            )
                     ready = binding_ready and credential_ready
                     results.append(
                         {
@@ -665,8 +674,12 @@ class PlaybookAdministrationService:
                             "action": step.action,
                             "required_capability": step.action,
                             "resolution_status": "resolved" if ready else "not_resolved",
-                            "connection_id": str(credential_id) if credential_ready and credential_id else None,
-                            "connector_type": binding.connector_type if binding is not None else None,
+                            "connection_id": str(credential_id)
+                            if credential_ready and credential_id
+                            else None,
+                            "connector_type": binding.connector_type
+                            if binding is not None
+                            else None,
                             "requires_approval": descriptor.impact in {"HIGH", "CRITICAL"},
                             "simulation_supported": False,
                             "verification_supported": True,
@@ -676,6 +689,7 @@ class PlaybookAdministrationService:
             except (ValueError, ActionUnavailableError) as exc:
                 raise PlaybookAdministrationConflict("PLAYBOOK_INVALID") from exc
         return results
+
     async def publish_version(
         self,
         *,
@@ -971,6 +985,8 @@ class PlaybookAdministrationService:
                         IntegrationModel.status == "active",
                         IntegrationModel.last_health_check_at.is_not(None),
                         IntegrationModel.last_error_code.is_(None),
+                        IntegrationModel.configuration_schema_version
+                        == CURRENT_CONFIGURATION_SCHEMA_VERSION,
                     )
                 )
                 if credential is None:
@@ -1021,6 +1037,7 @@ class PlaybookAdministrationService:
                 },
             )
             return self._action_binding_response(binding)
+
     async def verify_action_binding(
         self,
         *,
@@ -1047,9 +1064,8 @@ class PlaybookAdministrationService:
             except (ActionUnavailableError, ValueError) as exc:
                 raise PlaybookAdministrationConflict("PLAYBOOK_CREDENTIAL_UNAVAILABLE") from exc
             validation = connector.validate_configuration(binding.configuration)
-            if (
-                not validation.valid
-                or binding.configuration_sha256 != self._digest(binding.configuration)
+            if not validation.valid or binding.configuration_sha256 != self._digest(
+                binding.configuration
             ):
                 raise PlaybookAdministrationConflict("PLAYBOOK_ACTION_CONFIG_INVALID")
             credential = None
@@ -1062,6 +1078,8 @@ class PlaybookAdministrationService:
                         IntegrationModel.status == "active",
                         IntegrationModel.last_health_check_at.is_not(None),
                         IntegrationModel.last_error_code.is_(None),
+                        IntegrationModel.configuration_schema_version
+                        == CURRENT_CONFIGURATION_SCHEMA_VERSION,
                     )
                 )
                 if credential is None:
@@ -1084,6 +1102,7 @@ class PlaybookAdministrationService:
                 },
             )
             return self._action_binding_response(binding)
+
     async def _native_actions_ready(
         self, session: AsyncSession, tenant_id: UUID, artifact: PortablePlaybookV1
     ) -> bool:
@@ -1099,9 +1118,8 @@ class PlaybookAdministrationService:
                     NativeActionBindingModel.last_verified_at.is_not(None),
                 )
             )
-            if (
-                binding is None
-                or binding.configuration_sha256 != self._digest(binding.configuration)
+            if binding is None or binding.configuration_sha256 != self._digest(
+                binding.configuration
             ):
                 return False
             try:
@@ -1120,11 +1138,14 @@ class PlaybookAdministrationService:
                         IntegrationModel.status == "active",
                         IntegrationModel.last_health_check_at.is_not(None),
                         IntegrationModel.last_error_code.is_(None),
+                        IntegrationModel.configuration_schema_version
+                        == CURRENT_CONFIGURATION_SCHEMA_VERSION,
                     )
                 )
                 if credential_ready is None:
                     return False
         return True
+
     def _version_errors(self, version: PlaybookVersionModel) -> list[str]:
         if version.workflow_code not in IMPLEMENTED_REAL_PLAYBOOKS:
             return ["PLAYBOOK_ACTION_UNAVAILABLE"]

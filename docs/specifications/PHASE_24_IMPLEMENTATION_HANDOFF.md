@@ -14,6 +14,7 @@ Estado: implementación preparada; validación funcional manual pendiente del op
 - n8n sin éxito prefabricado: el workflow debe enviar el resultado real firmado por HMAC.
 - Biblioteca completa visible; playbooks no implementados o incompletos permanecen bloqueados.
 - Menús bilingües para reemplazar, habilitar, deshabilitar y verificar conexiones sin volver a mostrar secretos, además de configurar bindings, validar/publicar y activar.
+- Administración LDAP/AD completa: bind y CA write-only, transporte seguro, timeout, atributos y grupos, JIT condicionado a mappings no privilegiados, activación posterior a una prueba vigente y vínculo explícito de identidades locales.
 - Generadores de escenarios y propuesta sintética retirados de API/UI.
 - Listas, detalles, mutaciones, métricas, memoria, correlaciones, decisiones y ejecuciones operativas excluyen registros sintéticos históricos; el dispatcher rechaza cualquier versión que no sea `LIVE`.
 

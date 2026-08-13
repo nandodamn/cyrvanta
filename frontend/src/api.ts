@@ -64,7 +64,13 @@ export type AdminUser = z.infer<typeof adminUserSchema>;
 export type Role = z.infer<typeof roleSchema>;
 export type Permission = z.infer<typeof permissionSchema>;
 export type AuditEvent = z.infer<typeof auditEventSchema>;
+const directoryGroupMappingSchema = z.object({
+  id: z.string().uuid(),
+  external_group: z.string(),
+  role_id: z.string().uuid(),
+});
 export type DirectoryConfiguration = z.infer<typeof directoryConfigurationSchema>;
+export type DirectoryGroupMapping = z.infer<typeof directoryGroupMappingSchema>;
 const alertSchema = z.object({
   id: z.string().uuid(),
   source: z.string(),
@@ -709,6 +715,31 @@ export async function testDirectoryConfiguration(): Promise<{
     .parse(await authorizedMutation("/api/v1/directory/configuration/test", "POST", {}));
 }
 
+export async function linkUserDirectoryIdentity(
+  userId: string,
+  input: { external_subject: string; normalized_username: string },
+): Promise<void> {
+  await authorizedMutation(`/api/v1/users/${userId}/directory-link`, "POST", input);
+}
+
+export async function unlinkUserDirectoryIdentity(userId: string): Promise<void> {
+  await checked(
+    await authenticatedFetch(`/api/v1/users/${userId}/directory-link`, { method: "DELETE" }),
+  );
+}
+export async function getDirectoryGroupMappings(): Promise<DirectoryGroupMapping[]> {
+  return z.array(directoryGroupMappingSchema).parse(
+    await authorized("/api/v1/directory/group-mappings"),
+  );
+}
+
+export async function replaceDirectoryGroupMappings(
+  mappings: Array<{ external_group: string; role_id: string }>,
+): Promise<DirectoryGroupMapping[]> {
+  return z.array(directoryGroupMappingSchema).parse(
+    await authorizedMutation("/api/v1/directory/group-mappings", "PUT", { mappings }),
+  );
+}
 export async function activateDirectoryConfiguration(): Promise<DirectoryConfiguration> {
   return directoryConfigurationSchema.parse(
     await authorizedMutation("/api/v1/directory/configuration/activate", "POST", {}),

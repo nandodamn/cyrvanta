@@ -24,6 +24,7 @@ import {
   getClaims,
   getCorrelations,
   getDirectoryConfiguration,
+  getDirectoryGroupMappings,
   getIncident,
   getIncidentAlerts,
   getIncidentEnrichment,
@@ -38,13 +39,16 @@ import {
   getTimeline,
   getUserRoles,
   getUsers,
+  linkUserDirectoryIdentity,
   login,
   recalculateIncidentRisk,
+  replaceDirectoryGroupMappings,
   replaceRolePermissions,
   replaceUserRoles,
   saveDirectoryConfiguration,
   testDirectoryConfiguration,
   transitionIncident,
+  unlinkUserDirectoryIdentity,
   updateAlertTriage,
 } from "./api";
 import { OperationalPulse } from "./OperationalPulse";
@@ -2105,8 +2109,13 @@ function Administration() {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [formError, setFormError] = useState("");
+  const [directoryIdentityMessage, setDirectoryIdentityMessage] = useState("");
   const [selectedUser, setSelectedUser] = useState("");
   const [selectedRole, setSelectedRole] = useState("");
+  const [directoryMappingDrafts, setDirectoryMappingDrafts] = useState<Array<{
+    external_group: string;
+    role_id: string;
+  }>>([]);
   const userControls = useListControls();
   const tenant = useQuery({ queryKey: ["tenant"], queryFn: getTenant });
   const users = useQuery({
@@ -2145,6 +2154,20 @@ function Administration() {
     queryFn: getDirectoryConfiguration,
     retry: false,
   });
+  const directoryMappings = useQuery({
+    queryKey: ["directory-group-mappings"],
+    queryFn: getDirectoryGroupMappings,
+  });
+  useEffect(() => {
+    if (directoryMappings.data) {
+      setDirectoryMappingDrafts(
+        directoryMappings.data.map(({ external_group, role_id }) => ({
+          external_group,
+          role_id,
+        })),
+      );
+    }
+  }, [directoryMappings.data]);
   const userMutation = useMutation({
     mutationFn: createUser,
     onSuccess: async () => {
@@ -2221,6 +2244,65 @@ function Administration() {
     },
     onError: () => setFormError(t("adminMutationError")),
   });
+  const directoryMappingsMutation = useMutation({
+    mutationFn: () =>
+      replaceDirectoryGroupMappings(
+        directoryMappingDrafts.map((item) => ({
+          external_group: item.external_group.trim(),
+          role_id: item.role_id,
+        })),
+      ),
+    onSuccess: async (items) => {
+      setFormError("");
+      setDirectoryMappingDrafts(
+        items.map(({ external_group, role_id }) => ({ external_group, role_id })),
+      );
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["directory-group-mappings"] }),
+        queryClient.invalidateQueries({ queryKey: ["audit-events"] }),
+      ]);
+    },
+    onError: () => setFormError(t("adminMutationError")),
+  });
+  const directoryIdentityLinkMutation = useMutation({
+    mutationFn: ({
+      userId,
+      externalSubject,
+      normalizedUsername,
+    }: {
+      userId: string;
+      externalSubject: string;
+      normalizedUsername: string;
+    }) =>
+      linkUserDirectoryIdentity(userId, {
+        external_subject: externalSubject,
+        normalized_username: normalizedUsername,
+      }),
+    onSuccess: async () => {
+      setFormError("");
+      setDirectoryIdentityMessage(t("directoryIdentityLinked"));
+      await queryClient.invalidateQueries({ queryKey: ["audit-events"] });
+    },
+    onError: () => setFormError(t("adminMutationError")),
+  });
+  const directoryIdentityUnlinkMutation = useMutation({
+    mutationFn: unlinkUserDirectoryIdentity,
+    onSuccess: async () => {
+      setFormError("");
+      setDirectoryIdentityMessage(t("directoryIdentityUnlinked"));
+      await queryClient.invalidateQueries({ queryKey: ["audit-events"] });
+    },
+    onError: () => setFormError(t("adminMutationError")),
+  });
+  const mappableDirectoryRoles = (roles.data ?? []).filter(
+    (role) => role.code !== "tenant-admin",
+  );
+  const normalizedDirectoryMappings = directoryMappingDrafts.map((item) =>
+    `${item.external_group.trim().toLowerCase()}\u0000${item.role_id}`,
+  );
+  const directoryMappingsInvalid = directoryMappingDrafts.some(
+    (item) => !item.external_group.trim() || !item.role_id,
+  ) || new Set(normalizedDirectoryMappings).size !== normalizedDirectoryMappings.length;
   const failed = tenant.isError || users.isError || roles.isError || audit.isError;
   const submitUser = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -2276,12 +2358,12 @@ function Administration() {
       subject_attribute: String(data.get("subject_attribute")),
       email_attribute: String(data.get("email_attribute")),
       display_name_attribute: String(data.get("display_name_attribute")),
-      group_base_dn: null,
-      group_filter: null,
+      group_base_dn: String(data.get("group_base_dn")) || null,
+      group_filter: String(data.get("group_filter")) || null,
       group_attribute: String(data.get("group_attribute")) || null,
-      ca_certificate_pem: null,
-      jit_enabled: false,
-      timeout_seconds: 5,
+      ca_certificate_pem: String(data.get("ca_certificate_pem")) || null,
+      jit_enabled: data.get("jit_enabled") === "on",
+      timeout_seconds: Number(data.get("timeout_seconds")) || 5,
     });
   };
   const [activeSubTab, setActiveSubTab] = useState<"overview" | "users" | "rbac" | "directory">("overview");
@@ -2422,7 +2504,10 @@ function Administration() {
                     <p className="eyebrow">RBAC</p>
                     <h2>{t("assignRoles")}</h2>
                   </div>
-                  <select value={selectedUser} onChange={(event) => setSelectedUser(event.target.value)}>
+                  <select value={selectedUser} onChange={(event) => {
+                      setSelectedUser(event.target.value);
+                      setDirectoryIdentityMessage("");
+                    }}>
                     <option value="">{t("selectUser")}</option>
                     {userOptions.data?.map((user) => (
                       <option key={user.id} value={user.id}>
@@ -2444,7 +2529,65 @@ function Administration() {
                   ))}
                   <button disabled={!selectedUser || userRolesMutation.isPending}>{t("save")}</button>
                 </form>
-              </section>
+
+                <form
+                  className="panel compact-panel"
+                  autoComplete="off"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    const data = new FormData(event.currentTarget);
+                    directoryIdentityLinkMutation.mutate({
+                      userId: selectedUser,
+                      externalSubject: String(data.get("external_subject")).trim(),
+                      normalizedUsername: String(data.get("normalized_username")).trim(),
+                    });
+                  }}
+                >
+                  <div>
+                    <p className="eyebrow">LDAP / Active Directory</p>
+                    <h2>{t("directoryIdentityLink")}</h2>
+                    <p className="muted">{t("directoryIdentityLinkHelp")}</p>
+                  </div>
+                  <label>
+                    {t("externalSubject")}
+                    <input
+                      name="external_subject"
+                      required
+                      maxLength={1000}
+                      disabled={!selectedUser}
+                    />
+                  </label>
+                  <label>
+                    {t("normalizedUsername")}
+                    <input
+                      name="normalized_username"
+                      required
+                      maxLength={256}
+                      disabled={!selectedUser}
+                    />
+                  </label>
+                  <div className="form-actions">
+                    <button
+                      type="submit"
+                      disabled={!selectedUser || directoryIdentityLinkMutation.isPending}
+                    >
+                      {t("linkIdentity")}
+                    </button>
+                    <button
+                      className="ghost"
+                      type="button"
+                      disabled={!selectedUser || directoryIdentityUnlinkMutation.isPending}
+                      onClick={() => directoryIdentityUnlinkMutation.mutate(selectedUser)}
+                    >
+                      {t("unlinkIdentity")}
+                    </button>
+                  </div>
+                  {directoryIdentityMessage && (
+                    <p className="status-message" role="status">
+                      {directoryIdentityMessage}
+                    </p>
+                  )}
+                </form>              </section>
 
               <section className="panel admin-panel">
                 <div>
@@ -2635,6 +2778,53 @@ function Administration() {
                     defaultValue={directory.data?.group_attribute ?? "memberOf"}
                   />
                 </label>
+                <label>
+                  {t("groupBaseDn")}
+                  <input
+                    name="group_base_dn"
+                    defaultValue={directory.data?.group_base_dn ?? ""}
+                  />
+                </label>
+                <label>
+                  {t("groupFilter")}
+                  <input
+                    name="group_filter"
+                    defaultValue={directory.data?.group_filter ?? ""}
+                  />
+                </label>
+                <label>
+                  {t("directoryTimeout")}
+                  <input
+                    name="timeout_seconds"
+                    type="number"
+                    min={1}
+                    max={30}
+                    required
+                    defaultValue={directory.data?.timeout_seconds ?? 5}
+                  />
+                </label>
+                <label>
+                  {t("caCertificate")}
+                  <textarea
+                    name="ca_certificate_pem"
+                    rows={4}
+                    maxLength={100000}
+                    autoComplete="off"
+                    placeholder={
+                      directory.data?.has_ca_certificate
+                        ? t("caCertificateStored")
+                        : t("caCertificateOptional")
+                    }
+                  />
+                </label>
+                <label className="check-row">
+                  <input
+                    name="jit_enabled"
+                    type="checkbox"
+                    defaultChecked={directory.data?.jit_enabled}
+                  />
+                  {t("jitProvisioning")}
+                </label>
                 <label className="check-row">
                   <input
                     name="use_starttls"
@@ -2679,6 +2869,93 @@ function Administration() {
             </form>
           )}
 
+          {activeSubTab === "directory" && (
+            <section className="panel directory-panel" style={{ marginTop: "1rem" }}>
+              <div>
+                <p className="eyebrow">LDAP / Active Directory</p>
+                <h2>{t("directoryGroupMappings")}</h2>
+                <p className="muted">{t("directoryGroupMappingsHelp")}</p>
+              </div>
+              {directoryMappings.isError && (
+                <p className="form-error">{t("loadError")}</p>
+              )}
+              <div className="form-grid">
+                {directoryMappingDrafts.map((mapping, index) => (
+                  <div className="directory-grid" key={`${index}-${mapping.role_id}`}>
+                    <label>
+                      {t("externalDirectoryGroup")}
+                      <input
+                        required
+                        maxLength={1000}
+                        value={mapping.external_group}
+                        onChange={(event) =>
+                          setDirectoryMappingDrafts((current) =>
+                            current.map((item, itemIndex) =>
+                              itemIndex === index
+                                ? { ...item, external_group: event.target.value }
+                                : item,
+                            ),
+                          )}
+                      />
+                    </label>
+                    <label>
+                      {t("mappedRole")}
+                      <select
+                        required
+                        value={mapping.role_id}
+                        onChange={(event) =>
+                          setDirectoryMappingDrafts((current) =>
+                            current.map((item, itemIndex) =>
+                              itemIndex === index
+                                ? { ...item, role_id: event.target.value }
+                                : item,
+                            ),
+                          )}
+                      >
+                        <option value="">{t("selectRole")}</option>
+                        {mappableDirectoryRoles.map((role) => (
+                          <option key={role.id} value={role.id}>
+                            {role.name} ({role.code})
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <button
+                      className="ghost"
+                      type="button"
+                      onClick={() =>
+                        setDirectoryMappingDrafts((current) =>
+                          current.filter((_, itemIndex) => itemIndex !== index),
+                        )}
+                    >
+                      {t("removeMapping")}
+                    </button>
+                  </div>
+                ))}
+              </div>
+              <div className="form-actions">
+                <button
+                  className="ghost"
+                  type="button"
+                  disabled={directoryMappingDrafts.length >= 100}
+                  onClick={() =>
+                    setDirectoryMappingDrafts((current) => [
+                      ...current,
+                      { external_group: "", role_id: "" },
+                    ])}
+                >
+                  {t("addMapping")}
+                </button>
+                <button
+                  type="button"
+                  disabled={directoryMappingsInvalid || directoryMappingsMutation.isPending}
+                  onClick={() => directoryMappingsMutation.mutate()}
+                >
+                  {t("saveMappings")}
+                </button>
+              </div>
+            </section>
+          )}
         </main>
       </div>
     </>

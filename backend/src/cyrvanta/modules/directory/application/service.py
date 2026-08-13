@@ -54,6 +54,7 @@ class DirectoryAdministrationService:
                     DirectoryConfigurationModel.tenant_id == tenant_id
                 )
             )
+            is_new = configuration is None
             if configuration is None:
                 if payload.bind_password is None:
                     raise DirectoryConfigurationConflict
@@ -83,8 +84,13 @@ class DirectoryAdministrationService:
                 "jit_enabled",
                 "timeout_seconds",
             ):
-                setattr(configuration, field, getattr(payload, field))
+                value = getattr(payload, field)
+                if field == "ca_certificate_pem" and value is None and not is_new:
+                    continue
+                setattr(configuration, field, value)
             configuration.status = "draft"
+            configuration.last_tested_at = None
+            configuration.last_test_success = None
             await session.flush()
             self._audit(
                 session,
@@ -138,6 +144,12 @@ class DirectoryAdministrationService:
             configuration = await self._get(session, tenant_id)
             if enabled and configuration.last_test_success is not True:
                 raise DirectoryConfigurationConflict
+            if enabled and configuration.jit_enabled:
+                mapping_exists = await session.scalar(
+                    select(DirectoryGroupMappingModel.id).limit(1)
+                )
+                if mapping_exists is None:
+                    raise DirectoryConfigurationConflict
             configuration.status = "active" if enabled else "disabled"
             self._audit(
                 session,
@@ -171,7 +183,18 @@ class DirectoryAdministrationService:
                     DirectoryIdentityModel.external_subject == payload.external_subject,
                 )
             )
-            if existing is not None and existing.user_id != user_id:
+            user_identity = await session.scalar(
+                select(DirectoryIdentityModel).where(
+                    DirectoryIdentityModel.user_id == user_id,
+                    DirectoryIdentityModel.provider_type == configuration.provider_type,
+                )
+            )
+            if (
+                existing is not None and existing.user_id != user_id
+            ) or (
+                user_identity is not None
+                and user_identity.external_subject != payload.external_subject
+            ):
                 raise DirectoryConfigurationConflict
             if existing is None:
                 session.add(
@@ -180,9 +203,11 @@ class DirectoryAdministrationService:
                         user_id=user_id,
                         provider_type=configuration.provider_type,
                         external_subject=payload.external_subject,
-                        normalized_username=payload.normalized_username.lower(),
+                        normalized_username=payload.normalized_username.casefold(),
                     )
                 )
+            else:
+                existing.normalized_username = payload.normalized_username.casefold()
             self._audit(
                 session,
                 tenant_id,
@@ -241,6 +266,19 @@ class DirectoryAdministrationService:
         correlation_id: UUID,
     ) -> list[DirectoryGroupMappingResponse]:
         async with tenant_session(tenant_id) as session:
+            configuration = await session.scalar(select(DirectoryConfigurationModel))
+            if (
+                configuration is not None
+                and configuration.status == "active"
+                and configuration.jit_enabled
+                and not payload.mappings
+            ):
+                raise DirectoryConfigurationConflict
+            normalized_pairs = [
+                (item.external_group.casefold(), item.role_id) for item in payload.mappings
+            ]
+            if len(set(normalized_pairs)) != len(normalized_pairs):
+                raise DirectoryConfigurationConflict
             role_ids = {item.role_id for item in payload.mappings}
             roles = (
                 await session.scalars(select(RoleModel).where(RoleModel.id.in_(role_ids)))
@@ -260,7 +298,6 @@ class DirectoryAdministrationService:
             ]
             session.add_all(created)
             await session.flush()
-            configuration = await session.scalar(select(DirectoryConfigurationModel))
             self._audit(
                 session,
                 tenant_id,

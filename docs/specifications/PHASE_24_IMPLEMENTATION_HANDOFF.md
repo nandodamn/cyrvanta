@@ -9,6 +9,7 @@ Estado: implementación preparada; validación funcional manual pendiente del op
 - Probes reales manuales para SMTP, HTTP allowlisted, n8n, OpenSearch, Ollama y Wazuh.
 - La redacción Ollama y la ingesta Wazuh/OpenSearch resuelven exclusivamente conexiones activas y verificadas del tenant; una configuración ausente o ambigua falla cerrado.
 - Motor NATIVE exclusivamente LIVE, con kill switch y doble activación operativa.
+- Todo nombre de evento productivo queda registrado en el worker: handlers con efectos conservan su función y el resto completa inbox como observación durable, evitando outbox permanentemente no enrutable.
 - Acción `incident.status.transition@1.0.0` mediante `IncidentService`, control optimista,
   auditoría y recibo.
 - Acciones SMTP y HTTP allowlisted con idempotency key, TLS y recibos sin secretos.

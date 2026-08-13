@@ -1,86 +1,93 @@
-# Operación de entrega de eventos
+# Operación de entrega de eventos reales
 
-**Estado:** implementado para la prueba sintética de Fase 15.
-**Alcance:** outbox, RabbitMQ, inbox, retries y DLQ.
+**Estado:** outbox, RabbitMQ, inbox, retries y DLQ habilitados para eventos
+productivos tenant-scoped.
 
 ## Seguridad
 
-- Ejecutar únicamente en infraestructura administrada.
-- No copiar payloads de colas o tablas a tickets, chats o logs.
-- No exponer RabbitMQ fuera de la red interna.
-- La prueba usa datos sintéticos; no representa una detección real.
-- No reprocesar DLQ sin revisar tenant, schema y código de error.
+- RabbitMQ permanece en la red interna con credenciales del entorno.
+- No copie payloads de colas o tablas a tickets, chats o logs.
+- El tenant procede del envelope validado y se aplica antes del handler.
+- No reprocesar DLQ sin revisar schema, tenant, causalidad y código de error.
+- Un evento observado no sustituye auditoría ni el registro de negocio.
 
-## Crear una prueba sintética
+## Eventos enrutados
 
-1. Levantar el perfil `core`.
-2. Obtener el UUID de un tenant demo mediante una consulta administrativa
-   controlada.
-3. Ejecutar:
+El worker declara bindings y consumidores para:
 
-```powershell
-docker compose --profile core run --rm backend python -m cyrvanta.traceability_probe `
-  --tenant-id "<tenant-uuid>" `
-  --code "manual-probe"
-```
+- findings normalizados y correlación;
+- claims, evaluaciones, relaciones y presentaciones;
+- mappings, riesgo y explicaciones;
+- propuestas, policy, aprobaciones y autorizaciones;
+- feedback y memoria gobernada;
+- versiones, bindings, pasos y ejecuciones de playbooks.
 
-El comando imprime `event_id`, `correlation_id` y
-`data_classification=synthetic`. No imprime payload ni credenciales.
+Sólo estos handlers producen efectos posteriores:
+
+- `security.finding.normalized` inicia correlación;
+- eventos de correlación inician enriquecimiento;
+- `security.playbook_execution.dispatch_requested` entrega al motor elegido.
+
+Los demás eventos completan inbox como observaciones durables. No vuelven a
+ejecutar la mutación que los originó.
 
 ## Resultado esperado
 
-1. `event_outbox.status` cambia de `pending` a `published`.
-2. RabbitMQ entrega `platform.traceability.probe.created`.
-3. `event_inbox.status` termina en `completed`.
-4. Outbox e inbox conservan el mismo tenant/event/correlation.
-5. Una entrega duplicada produce log `event_duplicate` y no repite el handler.
+1. La mutación funcional y su outbox confirman en una transacción.
+2. El dispatcher publica con confirmación en `cyrvanta.events`.
+3. RabbitMQ entrega el evento a la cola durable.
+4. Inbox reclama `(tenant, consumer, event)` y deduplica reentregas.
+5. El handler ejecuta dentro de `tenant_session` y completa inbox tras commit.
+6. Eventos hijos conservan correlation ID y declaran causation ID.
+7. Un duplicado genera `event_duplicate` sin repetir el efecto.
 
-## Diagnóstico
+## Diagnóstico manual
 
-Revisar logs sin payload:
+Revise logs redactados del worker:
 
 ```powershell
 docker compose --profile core logs worker --no-color --tail 200
 ```
 
-Indicadores:
+Códigos principales:
 
-- `outbox_publish_failed`: RabbitMQ no confirmó; la fila vuelve a `pending`.
-- `event_retry_scheduled`: fallo transitorio enviado a una cola TTL.
-- `event_deadlettered`: agotó retries o falló validación permanente.
-- `event_rejected`: envelope, schema, metadata o tamaño inválidos.
-- `event_completed`: handler e inbox confirmados.
+- `outbox_publish_failed`: publicación no confirmada;
+- `event_retry_scheduled`: fallo transitorio enviado a retry;
+- `event_deadlettered`: retries agotados o error permanente;
+- `event_rejected`: envelope, schema, tenant o tamaño inválido;
+- `event_completed`: handler e inbox confirmados;
+- `event_duplicate`: redelivery sin segundo efecto.
 
-## Colas
-
-- Principal: `cyrvanta.traceability.v1`
-- Retry: `cyrvanta.traceability.v1.retry.1..N`
-- Dead letter: `cyrvanta.traceability.v1.dlq`
-
-Los delays se leen de `EVENT_RETRY_DELAYS_SECONDS`.
+Una fila outbox que repite `rabbitmq_publish_failed` puede indicar un evento sin
+binding, caída de RabbitMQ o topología divergente. No la marque manualmente como
+publicada.
 
 ## Reprocesamiento de DLQ
 
-La primera fase no expone API de replay. Antes de cualquier reproceso:
+Antes de cualquier replay:
 
-1. detener el consumidor si se requiere una inspección consistente;
-2. verificar el tenant y que el schema sea soportado;
-3. clasificar el error como corregido;
-4. registrar aprobación administrativa;
-5. republicar preservando `event_id`, `correlation_id` y payload;
-6. verificar inbox y resultado;
-7. registrar el resultado de la intervención.
+1. detenga el consumidor si necesita una inspección consistente;
+2. compruebe tenant, nombre, schema y que el error esté corregido;
+3. registre aprobación administrativa;
+4. preserve `event_id`, correlation ID, causation ID y cuerpo exacto;
+5. publique una sola vez y verifique inbox y resultado;
+6. documente el resultado sin payload sensible.
 
-No usar requeue masivo ni modificar el payload para forzar aceptación. La
-automatización auditada de este procedimiento pertenece a una fase posterior.
+No use requeue masivo, no modifique el payload para forzar aceptación y no
+elimine evidencia para vaciar la cola.
 
 ## Rollback
 
-1. Detener productores nuevos.
-2. Drenar outbox y cola principal.
-3. Respaldar outbox, inbox y DLQ.
-4. Detener worker.
-5. Ejecutar downgrade únicamente cuando outbox e inbox estén vacíos.
+1. Detenga productores nuevos.
+2. Drene outbox y cola principal cuando sea seguro.
+3. Respalde outbox, inbox y DLQ.
+4. Detenga el worker.
+5. No elimine exchanges, colas o filas automáticamente.
+6. Ejecute downgrade físico sólo bajo las condiciones no destructivas de la
+   migración correspondiente.
 
-La migración rechaza el downgrade si existen filas y nunca elimina colas
-automáticamente.
+## Pruebas no ejecutadas por Codex
+
+Existe una prueba de registro que descubre nombres de eventos en código
+productivo y exige que todos estén incluidos en el worker. Codex no la ejecutó
+ni inició RabbitMQ; el operador verificará entrega y redelivery manualmente.

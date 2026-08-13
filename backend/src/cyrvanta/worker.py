@@ -48,6 +48,60 @@ from cyrvanta.shared.infrastructure.rabbitmq import (
 from cyrvanta.shared.logging import configure_logging
 
 
+OBSERVED_EVENT_NAMES = frozenset(
+    {
+        "security.action_proposal.created",
+        "security.policy_evaluation.completed",
+        "security.approval.requested",
+        "security.approval.decided",
+        "security.authorization.issued",
+        "security.authorization.revoked",
+        "security.authorization.expired",
+        "security.feedback.recorded",
+        "security.memory_candidate.proposed",
+        "security.memory_candidate.review_requested",
+        "security.memory_candidate.reviewed",
+        "security.memory_version.activated",
+        "security.memory_version.disabled",
+        "security.memory_version.expired",
+        "security.memory.influence_recorded",
+        "security.playbook_version.validated",
+        "security.playbook_version.published",
+        "security.playbook_binding.probed",
+        "security.native_playbook.dispatch_requested",
+        "security.playbook_step.claimed",
+        "security.playbook_step.completed",
+        "security.playbook_execution.claimed",
+        "security.playbook_execution.dispatched",
+        "security.playbook_execution.updated",
+        "security.playbook_execution.completed",
+        "security.playbook_execution.failed",
+        "security.playbook_execution.timed_out",
+    }
+)
+WORKER_EVENT_NAMES = OBSERVED_EVENT_NAMES | {
+    TRACEABILITY_EVENT,
+    FINDING_NORMALIZED_EVENT,
+    CLAIM_CREATED_EVENT,
+    CLAIM_ASSESSED_EVENT,
+    CLAIM_RELATED_EVENT,
+    CLAIM_PRESENTATION_CREATED_EVENT,
+    CORRELATION_MATCHED_EVENT,
+    CORRELATION_MEMBER_ADDED_EVENT,
+    THREAT_MAPPING_ASSESSED_EVENT,
+    RISK_ASSESSED_EVENT,
+    EXPLANATION_GENERATED_EVENT,
+    EXPLANATION_FAILED_EVENT,
+    DISPATCH_REQUESTED_EVENT,
+}
+
+
+async def handle_observed_event(event: DomainEvent) -> None:
+    """Complete inbox delivery for events without a downstream side effect."""
+    if event.event_name not in OBSERVED_EVENT_NAMES:
+        raise ValueError("unexpected observed event")
+
+
 async def handle_traceability_probe(event: DomainEvent) -> None:
     # The durable inbox completion is the probe's observable effect.
     if event.event_name != TRACEABILITY_EVENT:
@@ -113,6 +167,10 @@ async def run() -> None:
         store,
         settings,
         {
+            **{
+                (event_name, 1): lambda _session: handle_observed_event
+                for event_name in OBSERVED_EVENT_NAMES
+            },
             (TRACEABILITY_EVENT, 1): lambda _session: handle_traceability_probe,
             (FINDING_NORMALIZED_EVENT, 1): lambda session: (
                 lambda event: handle_normalized_finding(

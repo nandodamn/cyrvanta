@@ -122,28 +122,53 @@ class NetworkTopologyService:
                     ).all()
                 )
 
+                # Map core stack integrations to base nodes to keep topology unified and updated
+                mapped_core_types = {
+                    "WAZUH": "siem-01",
+                    "OPENSEARCH": "telemetry-01",
+                    "N8N": "soar-01",
+                }
+
                 for integ in integrations:
-                    integ_id = f"integ-{integ.connector_type.lower()}"
-                    node_type = "FIREWALL" if "FIREWALL" in integ.connector_type or "PALO" in integ.name.upper() else "SERVER"
-                    if integ.connector_type == "WAZUH":
-                        node_type = "SIEM"
                     status = "ONLINE" if integ.status in ("active", "healthy") else "WARNING" if integ.status == "pending_verification" else "OFFLINE"
-                    
-                    if integ_id not in nodes_dict:
-                        nodes_dict[integ_id] = TopologyNode(
-                            id=integ_id,
+                    target_base_node = mapped_core_types.get(integ.connector_type)
+
+                    if target_base_node and target_base_node in nodes_dict:
+                        # Enrich existing stack node with real tenant integration state
+                        existing_node = nodes_dict[target_base_node]
+                        nodes_dict[target_base_node] = TopologyNode(
+                            id=existing_node.id,
                             name=integ.name,
-                            type=node_type,
-                            ip_address="10.0.3." + str(10 + len(nodes_dict)),
-                            subnet="10.0.3.0/24 Integrations",
+                            type=existing_node.type,
+                            ip_address=existing_node.ip_address,
+                            subnet=existing_node.subnet,
                             status=status,
-                            latency_ms=12,
-                            last_ping=now_iso,
-                            active_alerts_count=0,
-                            active_alerts=[],
-                            role_description_es=f"Conector de integración {integ.connector_type}",
-                            role_description_en=f"Integration connector {integ.connector_type}",
+                            latency_ms=existing_node.latency_ms,
+                            last_ping=integ.last_health_check_at.isoformat() if integ.last_health_check_at else now_iso,
+                            active_alerts_count=existing_node.active_alerts_count,
+                            active_alerts=existing_node.active_alerts,
+                            role_description_es=existing_node.role_description_es,
+                            role_description_en=existing_node.role_description_en,
                         )
+                    else:
+                        # Additional or custom external connector
+                        integ_id = f"integ-{integ.connector_type.lower()}"
+                        node_type = "FIREWALL" if "FIREWALL" in integ.connector_type or "PALO" in integ.name.upper() else "SERVER"
+                        if integ_id not in nodes_dict:
+                            nodes_dict[integ_id] = TopologyNode(
+                                id=integ_id,
+                                name=integ.name,
+                                type=node_type,
+                                ip_address="10.0.3." + str(10 + len(nodes_dict)),
+                                subnet="10.0.3.0/24 Integrations",
+                                status=status,
+                                latency_ms=12,
+                                last_ping=integ.last_health_check_at.isoformat() if integ.last_health_check_at else now_iso,
+                                active_alerts_count=0,
+                                active_alerts=[],
+                                role_description_es=f"Conector de integración {integ.connector_type}",
+                                role_description_en=f"Integration connector {integ.connector_type}",
+                            )
 
                 # Query recent alert references to discover active assets and workstations
                 alerts = list(

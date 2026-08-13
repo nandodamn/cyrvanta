@@ -1,97 +1,112 @@
-# Administración local de playbooks n8n
+# Administración del adaptador n8n opcional
 
-Estado: procedimiento de Etapa 7 para demo synthetic. El modo `live` continúa
-bloqueado hasta aprobación operativa separada. El contrato autoritativo está en
-`docs/specifications/PHASE_21_N8N_WORKFLOWS_EXECUTION.md`.
+**Estado:** n8n es opcional; `Cyrvanta Native` es el motor predeterminado.
 
-## Centro de llaves en Cyrvanta
+Este runbook prepara una instancia n8n real sin otorgarle autoridad de negocio.
+PostgreSQL conserva playbooks, autorizaciones, ejecuciones y resultados. n8n no
+aprueba acciones y un ACK HTTP nunca equivale a éxito.
 
-La navegación **Llaves API** permite preparar `N8N_API_KEY`,
-`N8N_DISPATCH_KEY` y `N8N_CALLBACK_KEY` en campos enmascarados. Es una
-superficie de entrega local: los valores permanecen únicamente en memoria del
-componente y Cyrvanta no los envía, persiste, registra ni copia
-automáticamente.
+## Condiciones previas
 
-El operador debe transferir cada valor directamente a las variables de entorno
-protegidas o al gestor externo de secretos, configurar `N8N_KEY_ID`, reiniciar
-los procesos afectados y borrar los campos. La página no reemplaza el gestor de
-secretos ni modifica la configuración en ejecución.
+- Use una instancia o proyecto con aislamiento administrativo verificable para
+  el tenant; en caso contrario, una instancia dedicada.
+- Mantenga `N8N_ENABLED=false`, bindings N8N inactivos, switches LIVE apagados
+  y kill switch disponible durante la configuración.
+- El editor sólo se publica en loopback o en una red administrativa protegida.
+- No configure secretos en Git, argumentos, logs o JSON de workflow.
+- No habilite el adaptador hasta completar una aceptación específica de la
+  misma instancia, workflow, digest, callbacks y destinos reales.
 
-## Límites de seguridad
+## Configuración normal en Cyrvanta
 
-- El editor se publica únicamente en `127.0.0.1:5678`.
-- Solo usuarios Cyrvanta con `playbook.manage` reciben el enlace administrativo.
-- Las credenciales y sus secretos se crean, cifran y conservan en n8n.
-- Cyrvanta nunca consulta ni persiste valores de credenciales.
-- Cyrvanta muestra únicamente workflows registrados en
-  `N8N_ALLOWED_WORKFLOW_IDS`.
-- Un workflow visible no queda autorizado para ejecución automática.
+En **Integraciones** cree una conexión `N8N` con:
 
-## Primer acceso
+- URL base interna de la instancia;
+- API key administrativa write-only;
+- nombre no sensible de la conexión.
 
-1. Iniciar el perfil `automation`.
-2. Abrir `http://localhost:5678`.
-3. Crear la cuenta propietaria local de n8n cuando la instalación lo solicite.
-4. En n8n, crear las credenciales necesarias desde **Credentials**.
-5. Crear o importar el workflow y probarlo con datos sintéticos.
-6. Crear una API key de propietario desde la configuración de n8n.
-7. Guardar la clave únicamente como `N8N_API_KEY` en el `.env` local.
-8. Configurar `N8N_API_URL=http://localhost:5678` para los scripts host-side;
-   no reutilizar ni derivar `N8N_BASE_URL`, que pertenece al backend.
-9. Ejecutar `python infrastructure/n8n/scripts/validate_workflows.py`.
-10. Ejecutar primero
-   `python infrastructure/n8n/scripts/reconcile.py` sin `--apply` y revisar el
-   diff redactado.
-11. Añadir el ID exacto del workflow a `N8N_ALLOWED_WORKFLOW_IDS` después de
-   revisión humana.
-12. Usar `--apply` solo después de aprobar el diff y verificar nuevamente.
-13. Reconstruir el backend para cargar la nueva configuración.
+Guarde, habilite y ejecute **Probar conexión real**. El probe consulta de forma
+acotada la API de workflows con `X-N8N-API-KEY`; sólo conserva salud, latencia,
+fecha y código de error redactado. La API key nunca vuelve a mostrarse.
 
-## Reflejo en Cyrvanta
+Una conexión saludable no habilita dispatch, no publica workflows y no activa
+bindings por sí sola.
 
-La pantalla **Playbooks** consulta n8n a través del backend. Solo refleja:
+## Secretos internos
 
-- ID, nombre, estado y versión del workflow;
-- tipos y nombres de nodos;
-- nombres descriptivos de credenciales enlazadas, nunca sus valores;
-- estado de sincronización.
+Dispatch y callback usan claves separadas por propósito. Normalmente se derivan
+de la clave maestra de instalación con versión explícita y leases de un solo
+uso para el adaptador. Los overrides de despliegue son write-only y sólo deben
+usarse durante una migración coordinada.
 
-Si no existe `N8N_API_KEY`, la pantalla conserva el catálogo allowlisted y
-marca la sincronización como pendiente. Si n8n está caído, no presenta éxito
-falso ni habilita workflows desconocidos.
+- La clave de dispatch firma Cyrvanta → n8n.
+- La clave de callback firma n8n → Cyrvanta.
+- Ninguna clave administrativa, de dispatch o callback se guarda en artefactos
+  de playbook.
+- La rotación conserva una ventana controlada para callbacks en vuelo y genera
+  auditoría sin valores.
 
-## Verificación de outcomes append-only
+## Workflows como código
 
-Cada envío crea primero un registro inmutable en
-`playbook_execution_attempts`. El ACK o fallo observado se agrega por `INSERT`
-en `playbook_execution_attempt_outcomes`; el rol de aplicación no posee
-`UPDATE` ni `DELETE` sobre ninguna de las dos tablas. Un outcome `UNKNOWN`
-permite un nuevo intento con otro `dispatch_id`. Claims y callbacks posteriores
-siguen siendo la evidencia autoritativa y nunca se sobrescriben.
-## Conectores iniciales recomendados
+Antes de importar o actualizar:
 
-La instalación no debe configurar credenciales ficticias. Según el entorno del
-cliente, los primeros conectores de respuesta suelen ser:
+1. valide manifest, schemas, digest y artefacto;
+2. confirme que no haya credential IDs ni valores secretos;
+3. permita sólo nodos y expresiones del contrato aprobado;
+4. prohíba shell, SSH, Code/Function, filesystem, Git, base de datos,
+   community nodes y subworkflows no registrados;
+5. compruebe que todo camino con efecto exige primero un claim `proceed` de
+   Cyrvanta;
+6. ejecute reconciliación en modo diff redactado;
+7. aplique sólo el diff revisado y nunca borre automáticamente recursos.
 
-- correo o Microsoft Teams/Slack para notificación;
-- Jira, ServiceNow u otro sistema de tickets;
-- Microsoft Active Directory/Entra ID para acciones de identidad;
-- firewall, EDR o Wazuh para acciones de contención compatibles;
-- HTTP Request con autenticación tipada para APIs sin nodo nativo.
+Las credenciales de correo, ticketing u otros proveedores se administran dentro
+del límite autorizado de n8n con cuentas de mínimo privilegio. Cyrvanta sólo
+muestra aliases y estado; nunca IDs o valores.
 
-No se permiten nodos genéricos de shell en playbooks aprobados. Cada conector
-debe usar una cuenta de servicio de mínimo privilegio y tener una acción de
-prueba no destructiva.
+## Binding por playbook
 
-## Rollback
+1. Publique una versión lógica inmutable en Cyrvanta.
+2. Registre el workflow instalado y su digest observado.
+3. Cree un binding `N8N` para esa versión e instancia.
+4. Ejecute probe y compruebe estado sincronizado, workflow activo y ausencia de
+   drift.
+5. Verifique que la conexión tenant-scoped aceptada y la instancia usada por el
+   dispatcher sean la misma. Si esta comprobación no está disponible, el
+   binding debe permanecer inactivo.
+6. Active el binding sólo tras aceptación operativa específica.
 
-Quitar el ID de `N8N_ALLOWED_WORKFLOW_IDS` impide nuevas ejecuciones desde
-Cyrvanta. `AUTOMATION_KILL_SWITCH=true` bloquea todas las ejecuciones.
-Desactivar `cyrvanta-simulate-user-block` no reactiva automáticamente
-`cyrvanta-demo-response`; el legado permanece inactivo. Retirar
-la publicación `127.0.0.1:5678:5678` deshabilita el acceso local al editor sin
-eliminar el volumen `n8n_data`.
+Cambiar `NATIVE | N8N` no reescribe el playbook lógico ni ejecuciones históricas.
 
-La migración `0018_dispatch_outcomes` solo puede revertirse cuando
-`playbook_execution_attempt_outcomes` está vacía. Si contiene evidencia, el
-rollback falla cerrado y exige exportación/revisión previa.
+## Ejecución segura
+
+Una ejecución N8N válida debe demostrar:
+
+1. autorización activa consumida una sola vez;
+2. ejecución y outbox creados atómicamente;
+3. binding tenant-scoped y digest coincidente;
+4. dispatch HMAC con timestamp y nonce;
+5. claim durable anterior a cualquier efecto;
+6. intento y outcome técnico append-only;
+7. callback HMAC idempotente con schema estricto;
+8. estado terminal persistido en Cyrvanta;
+9. correlación, causalidad y auditoría reconstruibles.
+
+Timeout, ACK ambiguo, callback inválido, replay, drift o caída de n8n nunca se
+presentan como éxito.
+
+## Desactivación y rollback
+
+1. Active el kill switch si existe riesgo de egreso no deseado.
+2. Desactive nuevos bindings N8N y `N8N_ENABLED`.
+3. Conserve ejecuciones reclamadas para conciliación; no reactive
+   autorizaciones consumidas.
+4. Desactive workflows administrados sin borrarlos.
+5. No elimine volumen, credenciales, historia, outcomes, callbacks o DLQ.
+6. Reasigne futuras versiones a `Cyrvanta Native` cuando corresponda.
+
+## Pruebas no ejecutadas por Codex
+
+Codex no consultó la API n8n, no importó workflows, no probó credenciales, no
+activó bindings y no ejecutó acciones. La aceptación del adaptador debe ser
+manual y específica del entorno.

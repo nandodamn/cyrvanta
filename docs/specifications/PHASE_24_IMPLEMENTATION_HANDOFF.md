@@ -41,6 +41,7 @@ publicarse ni activarse.
 2. Para LDAP/AD: guardar, ejecutar la prueba real y activar la configuración desde Administración; la activación queda bloqueada si la última prueba no fue exitosa.
 3. Abrir Playbooks, elegir **Configurar** y guardar/verificar cada binding requerido.
 4. Ejecutar **Validar y publicar**.
+   En el detalle de un incidente, el selector de respuesta sólo ofrece versiones publicadas con binding sincronizado, acciones verificadas, conexiones saludables y activación LIVE completa; la propuesta conserva código y versión elegidos.
 5. Activar el binding NATIVE.
 6. Activar de forma consciente `PLAYBOOK_LIVE_ENABLED=true` y
    `PLAYBOOK_DISPATCH_ENABLED=true`; mantener `AUTOMATION_KILL_SWITCH=false`.

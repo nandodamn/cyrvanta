@@ -23,7 +23,11 @@ class ActionProposalCreate(BaseModel):
         "escalation-notification",
         "evidence-preservation",
         "closure-controlled-learning",
-    ]    impact: ActionImpact
+        "notify-critical-incident",
+        "create-security-ticket",
+        "incident-report-email",
+    ]
+    impact: ActionImpact
     requested_mode: ResponseMode
     workflow_id: str = Field(min_length=1, max_length=120)
     workflow_version: str = Field(min_length=1, max_length=80)

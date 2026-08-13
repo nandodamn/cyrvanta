@@ -946,23 +946,27 @@ export async function getResponseDecisions(incidentId: string): Promise<Response
   ).items;
 }
 
-export async function createResponseProposal(id: string): Promise<ResponseDecision> {
+export async function createResponseProposal(
+  incidentId: string,
+  playbook: Pick<PlaybookDefinition, "code" | "latest_version" | "impact">,
+): Promise<ResponseDecision> {
+  if (!playbook.latest_version) throw new Error("PLAYBOOK_NOT_PUBLISHED");
   return responseDecisionSchema.parse(
     await checked(
       await authenticatedFetch("/api/v1/response-proposals", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Idempotency-Key": `response-proposal-${id}`,
+          "Idempotency-Key": `response-proposal-${incidentId}-${playbook.code}-${playbook.latest_version}`,
         },
         body: JSON.stringify({
-          incident_id: id,
-          action_type: "contain-and-document-incident",
-          impact: "MODERATE",
+          incident_id: incidentId,
+          action_type: playbook.code,
+          impact: playbook.impact === "MEDIUM" ? "MODERATE" : (playbook.impact ?? "MODERATE"),
           requested_mode: "HUMAN_APPROVAL",
-          workflow_id: "contain-and-document-incident",
-          workflow_version: "1.0.0",
-          targets: [id],
+          workflow_id: playbook.code,
+          workflow_version: playbook.latest_version,
+          targets: [incidentId],
           parameters: {},
           evidence_refs: [],
         }),

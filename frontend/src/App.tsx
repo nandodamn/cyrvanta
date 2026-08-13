@@ -32,6 +32,7 @@ import {
   getMe,
   getPermissions,
   getPlaybookExecutions,
+  getPlaybookDefinitions,
   getRolePermissions,
   getResponseDecisions,
   getRoles,
@@ -922,6 +923,7 @@ function IncidentDetailPage() {
   const [activeTab, setActiveTab] = useState<"overview" | "alerts" | "threatIntel" | "audit">("overview");
   const [expandedAlertId, setExpandedAlertId] = useState<string | null>(null);
   const [showMoreMenu, setShowMoreMenu] = useState(false);
+  const [selectedPlaybookCode, setSelectedPlaybookCode] = useState("");
 
   const incident = useQuery({ queryKey: ["incident", id], queryFn: () => getIncident(id) });
   const currentUser = useQuery({ queryKey: ["me"], queryFn: getMe, retry: false });
@@ -945,6 +947,21 @@ function IncidentDetailPage() {
     queryFn: () => getResponseDecisions(id),
     retry: false,
   });
+  const playbookDefinitions = useQuery({
+    queryKey: ["playbook-definitions"],
+    queryFn: getPlaybookDefinitions,
+    retry: false,
+  });
+  const executablePlaybooks = (playbookDefinitions.data?.items ?? []).filter(
+    (item) =>
+      item.readiness_status === "READY"
+      && item.publication_status === "PUBLISHED"
+      && item.binding_active
+      && Boolean(item.latest_version),
+  );
+  const selectedPlaybook = executablePlaybooks.find(
+    (item) => item.code === selectedPlaybookCode,
+  ) ?? executablePlaybooks[0];
   const playbookExecutions = useQuery({
     queryKey: ["playbook-executions", id],
     queryFn: () => getPlaybookExecutions(id),
@@ -984,7 +1001,10 @@ function IncidentDetailPage() {
     },
   });
   const responseProposal = useMutation({
-    mutationFn: () => createResponseProposal(id),
+    mutationFn: () => {
+      if (!selectedPlaybook) throw new Error("PLAYBOOK_NOT_READY");
+      return createResponseProposal(id, selectedPlaybook);
+    },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["response-decisions", id] });
     },
@@ -1271,16 +1291,49 @@ function IncidentDetailPage() {
               </div>
 
               {(() => {
-                const hasExistingProposal = (responseDecisions.data?.length ?? 0) > 0;
+                const hasExistingProposal = (responseDecisions.data ?? []).some(
+                  (item) => ["AWAITING_APPROVAL", "AUTHORIZED"].includes(item.status),
+                );
                 return (
-                  <button
-                    type="button"
-                    disabled={responseProposal.isPending || hasExistingProposal}
-                    title={hasExistingProposal ? t("proposalAlreadyExecuted", { defaultValue: "Un Playbook ya ha sido propuesto o procesado para este incidente." }) : undefined}
-                    onClick={() => responseProposal.mutate()}
-                  >
-                    ⚡ {t("proposeSafeResponse")}
-                  </button>
+                  <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+                    <label>
+                      <span className="muted">{t("selectReadyPlaybook")}</span>
+                      <select
+                        value={selectedPlaybook?.code ?? ""}
+                        disabled={executablePlaybooks.length === 0 || hasExistingProposal}
+                        onChange={(event) => setSelectedPlaybookCode(event.target.value)}
+                      >
+                        {executablePlaybooks.length === 0 && (
+                          <option value="">{t("noReadyPlaybooks")}</option>
+                        )}
+                        {executablePlaybooks.map((item) => (
+                          <option key={item.id} value={item.code}>
+                            {i18n.language.startsWith("es")
+                              ? item.title_i18n.es
+                              : item.title_i18n.en} · {item.latest_version}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <button
+                      type="button"
+                      disabled={
+                        responseProposal.isPending
+                        || hasExistingProposal
+                        || !selectedPlaybook
+                      }
+                      title={
+                        hasExistingProposal
+                          ? t("proposalAlreadyExecuted")
+                          : !selectedPlaybook
+                            ? t("noReadyPlaybooks")
+                            : undefined
+                      }
+                      onClick={() => responseProposal.mutate()}
+                    >
+                      ⚡ {t("proposeSafeResponse")}
+                    </button>
+                  </div>
                 );
               })()}
             </div>

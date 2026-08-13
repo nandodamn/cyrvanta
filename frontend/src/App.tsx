@@ -8,6 +8,7 @@ import { z } from "zod";
 
 import {
   Alert,
+  addClaimPresentation,
   addIncidentTimelineEntry,
   assessClaim,
   activateDirectoryConfiguration,
@@ -1036,6 +1037,16 @@ function IncidentDetailPage() {
     outcome: "VALIDATED" as "VALIDATED" | "REJECTED" | "INSUFFICIENT_EVIDENCE" | "RETRACTED",
     explanation: "",
   });
+  const [claimRelation, setClaimRelation] = useState({
+    sourceClaimId: "",
+    targetClaimId: "",
+    relationshipType: "SUPPORTS" as "SUPPORTS" | "CONTRADICTS" | "DERIVED_FROM" | "SUPERSEDES" | "RESPONDS_TO",
+  });
+  const [claimPresentation, setClaimPresentation] = useState({
+    claimId: "",
+    locale: "en" as "es" | "en",
+    text: "",
+  });
   const [transitionTarget, setTransitionTarget] = useState("");
   const [closeReason, setCloseReason] = useState<
     "false_positive" | "duplicate" | "accepted_risk" | "resolved" | "other"
@@ -1218,6 +1229,29 @@ function IncidentDetailPage() {
     ),
     onSuccess: async () => {
       setClaimAssessment({ claimId: "", outcome: "VALIDATED", explanation: "" });
+      await queryClient.invalidateQueries({ queryKey: ["claims", id] });
+    },
+  });
+
+  const relate = useMutation({
+    mutationFn: () => relateClaim(
+      claimRelation.sourceClaimId,
+      claimRelation.targetClaimId,
+      claimRelation.relationshipType,
+    ),
+    onSuccess: async () => {
+      setClaimRelation({ sourceClaimId: "", targetClaimId: "", relationshipType: "SUPPORTS" });
+      await queryClient.invalidateQueries({ queryKey: ["claims", id] });
+    },
+  });
+  const presentClaim = useMutation({
+    mutationFn: () => addClaimPresentation(
+      claimPresentation.claimId,
+      claimPresentation.locale,
+      claimPresentation.text.trim(),
+    ),
+    onSuccess: async () => {
+      setClaimPresentation({ claimId: "", locale: "en", text: "" });
       await queryClient.invalidateQueries({ queryKey: ["claims", id] });
     },
   });
@@ -2450,6 +2484,97 @@ function IncidentDetailPage() {
                         {claim.origin_type === "HUMAN" && claim.origin_actor_user_id === currentUser.data?.id
                           ? t("retractClaim")
                           : t("assessClaim")}
+                      </button>
+                    )}
+                    {claims.data && claims.data.length > 1 && (
+                      claimRelation.sourceClaimId === claim.id ? (
+                        <form
+                          style={{ marginTop: "0.75rem", display: "grid", gap: "0.5rem" }}
+                          onSubmit={(event) => {
+                            event.preventDefault();
+                            relate.mutate();
+                          }}
+                        >
+                          <label>
+                            {t("claimRelationship")}
+                            <select value={claimRelation.relationshipType} onChange={(event) => setClaimRelation({
+                              ...claimRelation,
+                              relationshipType: event.target.value as typeof claimRelation.relationshipType,
+                            })}>
+                              {(["SUPPORTS", "CONTRADICTS", "DERIVED_FROM", "SUPERSEDES", "RESPONDS_TO"] as const).map(
+                                (relationship) => <option key={relationship} value={relationship}>{t(`claimRelationships.${relationship}`)}</option>,
+                              )}
+                            </select>
+                          </label>
+                          <label>
+                            {t("targetClaim")}
+                            <select value={claimRelation.targetClaimId} onChange={(event) => setClaimRelation({
+                              ...claimRelation,
+                              targetClaimId: event.target.value,
+                            })}>
+                              {claims.data.filter((item) => item.id !== claim.id).map((item) => (
+                                <option key={item.id} value={item.id}>{item.claim_type} · {item.statement}</option>
+                              ))}
+                            </select>
+                          </label>
+                          <button type="submit" disabled={relate.isPending || !claimRelation.targetClaimId}>{t("recordRelationship")}</button>
+                          {relate.isError && <p className="form-error" role="alert">{t("actionError")}</p>}
+                        </form>
+                      ) : (
+                        <button
+                          type="button"
+                          className="ghost"
+                          style={{ marginTop: "0.5rem" }}
+                          onClick={() => setClaimRelation({
+                            sourceClaimId: claim.id,
+                            targetClaimId: claims.data!.find((item) => item.id !== claim.id)?.id ?? "",
+                            relationshipType: "SUPPORTS",
+                          })}
+                        >
+                          {t("relateClaim")}
+                        </button>
+                      )
+                    )}
+                    {claimPresentation.claimId === claim.id ? (
+                      <form
+                        style={{ marginTop: "0.75rem", display: "grid", gap: "0.5rem" }}
+                        onSubmit={(event) => {
+                          event.preventDefault();
+                          presentClaim.mutate();
+                        }}
+                      >
+                        <label>
+                          {t("presentationLocale")}
+                          <select value={claimPresentation.locale} onChange={(event) => setClaimPresentation({
+                            ...claimPresentation,
+                            locale: event.target.value as "es" | "en",
+                          })}>
+                            <option value="es">Español</option>
+                            <option value="en">English</option>
+                          </select>
+                        </label>
+                        <label>
+                          {t("translatedPresentation")}
+                          <textarea required minLength={1} maxLength={2000} rows={3} value={claimPresentation.text} onChange={(event) => setClaimPresentation({
+                            ...claimPresentation,
+                            text: event.target.value,
+                          })} />
+                        </label>
+                        <button type="submit" disabled={presentClaim.isPending}>{t("savePresentation")}</button>
+                        {presentClaim.isError && <p className="form-error" role="alert">{t("actionError")}</p>}
+                      </form>
+                    ) : (
+                      <button
+                        type="button"
+                        className="ghost"
+                        style={{ marginTop: "0.5rem" }}
+                        onClick={() => setClaimPresentation({
+                          claimId: claim.id,
+                          locale: claim.language_code === "es" ? "en" : "es",
+                          text: "",
+                        })}
+                      >
+                        {t("addPresentation")}
                       </button>
                     )}
                   </article>

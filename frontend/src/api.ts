@@ -878,6 +878,26 @@ export async function assessClaim(
     explanation,
   });
 }
+export async function relateClaim(
+  sourceClaimId: string,
+  targetClaimId: string,
+  relationshipType: "SUPPORTS" | "CONTRADICTS" | "DERIVED_FROM" | "SUPERSEDES" | "RESPONDS_TO",
+): Promise<void> {
+  await authorizedMutation(`/api/v1/claims/${sourceClaimId}/relationships`, "POST", {
+    target_claim_id: targetClaimId,
+    relationship_type: relationshipType,
+  });
+}
+export async function addClaimPresentation(
+  claimId: string,
+  locale: "es" | "en",
+  presentationText: string,
+): Promise<void> {
+  await authorizedMutation(`/api/v1/claims/${claimId}/presentations`, "POST", {
+    locale,
+    text: presentationText,
+  });
+}
 export async function getCorrelations(id: string): Promise<Correlation[]> {
   return z
     .array(correlationSchema)

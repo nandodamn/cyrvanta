@@ -21,6 +21,7 @@ Estado: implementación preparada; validación funcional manual pendiente del op
 - El detalle de incidente permite editar sus datos, asignar o desasignar usuarios activos del tenant y agregar comentarios operativos a la línea temporal usando control optimista de versión y auditoría backend.
 - Las transiciones muestran todos los destinos válidos del estado actual; cierre y reapertura exigen justificación, y el cierre exige seleccionar explícitamente uno de los motivos aprobados.
 - La vista de conocimiento permite crear claims humanos con evidencia tenant-scoped e invariantes por tipo, además de evaluar claims ajenos o retractar claims propios mediante registros append-only.
+- La misma vista registra relaciones dirigidas entre claims y presentaciones bilingües versionadas; contradicción y supersesión actualizan la proyección sin editar ni eliminar el historial.
 
 ## Playbooks habilitables actualmente
 

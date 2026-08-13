@@ -10,7 +10,6 @@ from cyrvanta.modules.directory.application.authentication_service import (
 from cyrvanta.modules.directory.application.crypto import SecretCipher
 from cyrvanta.modules.directory.application.schemas import DirectoryLoginRequest
 from cyrvanta.modules.directory.infrastructure.ldap_provider import LdapDirectoryProvider
-from cyrvanta.modules.directory.infrastructure.simulated_provider import SimulatedDirectoryProvider
 from cyrvanta.modules.identity.application.schemas import AccessTokenResponse, TokenResponse
 from cyrvanta.modules.identity.presentation.session_cookie import set_refresh_cookie
 from cyrvanta.shared.config import get_settings
@@ -20,9 +19,7 @@ router = APIRouter(prefix="/auth/directory", tags=["authentication"])
 
 def get_service(request: Request) -> DirectoryAuthenticationService:
     settings = get_settings()
-    provider = (
-        SimulatedDirectoryProvider() if settings.directory_demo_enabled else LdapDirectoryProvider()
-    )
+    provider = LdapDirectoryProvider()
     return DirectoryAuthenticationService(
         request.app.state.redis,
         SecretCipher(settings.integration_encryption_key),

@@ -28,6 +28,8 @@ class DefinitionResponse(StrictModel):
     description_i18n: LocalizedDescription
     created_at: datetime
     latest_version: str | None = None
+    latest_version_id: UUID | None = None
+    latest_artifact_sha256: str | None = None
     publication_status: str | None = None
     engine_type: Literal["NATIVE", "N8N"] | None = None
     binding_status: str | None = None
@@ -36,6 +38,7 @@ class DefinitionResponse(StrictModel):
     impact: str | None = None
     required_parameters: list[str] = Field(default_factory=list)
     credential_aliases: list[str] = Field(default_factory=list)
+    required_actions: list[str] = Field(default_factory=list)
     target_incident_types: list[str] = Field(default_factory=list)
     mitre_codes: list[str] = Field(default_factory=list)
     rollback_supported: bool = False
@@ -45,6 +48,8 @@ class DefinitionResponse(StrictModel):
     approval_mode: Literal["AUTOMATIC", "SINGLE", "FOUR_EYES"] = "AUTOMATIC"
     last_execution_status: str | None = None
     last_executed_at: datetime | None = None
+    readiness_status: Literal["READY", "DISABLED", "CONFIGURATION_REQUIRED"] = "DISABLED"
+    blocking_reasons: list[str] = Field(default_factory=list)
 
 
 class ToggleBindingPayload(StrictModel):
@@ -153,7 +158,7 @@ class BindingList(StrictModel):
 class NativeActionBindingCreate(StrictModel):
     action_code: str = Field(pattern=r"^[a-z][a-z0-9_.-]{2,95}$")
     action_version: str = Field(pattern=r"^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$")
-    connector_type: Literal["SIMULATED", "HTTP_ALLOWLISTED"]
+    connector_type: Literal["INTERNAL", "SMTP", "HTTP_ALLOWLISTED"]
     credential_key_id: str | None = Field(default=None, min_length=1, max_length=120)
     configuration: dict[str, object] = Field(default_factory=dict)
 

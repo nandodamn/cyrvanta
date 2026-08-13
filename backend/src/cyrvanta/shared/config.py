@@ -1,7 +1,7 @@
 import base64
 import binascii
 from functools import lru_cache
-from typing import Self
+from typing import Literal, Self
 from urllib.parse import urlsplit
 
 from pydantic import Field, model_validator
@@ -33,23 +33,23 @@ class Settings(BaseSettings):
     access_token_ttl_minutes: int = 15
     refresh_token_ttl_days: int = 7
     session_cookie_secure: bool | None = None
-    opensearch_mode: str = "simulated"
+    opensearch_mode: Literal["disabled", "live"] = "disabled"
     opensearch_url: str = "http://opensearch:9200"
     opensearch_index_pattern: str = "wazuh-alerts-*"
-    wazuh_mode: str = "simulated"
+    wazuh_mode: Literal["disabled", "live"] = "disabled"
     wazuh_manager_host: str = "wazuh-manager"
     wazuh_manager_port: int = 1514
-    ollama_mode: str = "simulated"
+    ollama_mode: Literal["disabled", "live"] = "disabled"
     ollama_base_url: str = "http://host.docker.internal:11434"
     ollama_model: str = "gemma4:e4b"
     ai_request_timeout_seconds: int = 120
-    n8n_mode: str = "disabled"
+    n8n_mode: Literal["disabled", "live"] = "disabled"
     n8n_enabled: bool = False
     n8n_base_url: str = "http://n8n:5678"
     n8n_editor_url: str = "http://localhost:5678"
     n8n_api_key: str = ""
     n8n_allowed_workflow_ids: str = (
-        "cyrvanta-simulate-user-block,notify-critical-incident,create-security-ticket,"
+        "notify-critical-incident,create-security-ticket,"
         "request-dual-approval,incident-report-email"
     )
     n8n_dispatch_key: str = ""
@@ -67,9 +67,6 @@ class Settings(BaseSettings):
     memory_max_explanation_length: int = Field(default=2000, ge=128, le=8000)
     internal_api_url: str = "http://backend:8000"
     automation_kill_switch: bool = False
-    directory_demo_enabled: bool = False
-    directory_demo_username: str = "ldap-demo"
-    directory_demo_password: str = ""
 
     @model_validator(mode="after")
     def validate_production_security(self) -> Self:

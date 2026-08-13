@@ -55,11 +55,7 @@ export function PlaybookDetailsModal({ playbook, onClose }: PlaybookDetailsModal
       : playbook.engine_type === "N8N"
         ? "n8n"
         : t("engineNotBound");
-  const simulationReady =
-    playbook.publication_status === "PUBLISHED" &&
-    playbook.binding_active &&
-    playbook.binding_status === "SYNCHRONIZED" &&
-    playbook.execution_mode === "SIMULATED";
+  const runtimeReady = playbook.readiness_status === "READY";
   const policy = playbook.automation_policy_i18n
     ? english
       ? playbook.automation_policy_i18n.en
@@ -123,8 +119,8 @@ export function PlaybookDetailsModal({ playbook, onClose }: PlaybookDetailsModal
           <div style={{ minWidth: 0 }}>
             <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "6px" }}>
               <span className="demo-badge active">{engine}</span>
-              <span className={simulationReady ? "demo-badge active" : "demo-badge"}>
-                {simulationReady ? t("verifiedForSimulation") : t("configurationPending")}
+              <span className={runtimeReady ? "demo-badge active" : "demo-badge"}>
+                {runtimeReady ? "LIVE READY" : t("configurationPending")}
               </span>
             </div>
             <h2 id="playbook-details-title" style={{ margin: 0, fontSize: "1.35rem" }}>

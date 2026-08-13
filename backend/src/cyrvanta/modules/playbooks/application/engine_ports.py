@@ -144,6 +144,7 @@ class ActionConnectorPort(Protocol):
         self,
         context: EngineContext,
         action_input: dict[str, object],
+        configuration: dict[str, object],
         idempotency_key: str,
         credential_handle: CredentialHandle | None,
     ) -> ActionResult: ...

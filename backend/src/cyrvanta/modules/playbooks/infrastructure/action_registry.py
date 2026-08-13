@@ -1,24 +1,36 @@
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import json
+import smtplib
+import ssl
+from email.message import EmailMessage
+from urllib.parse import urljoin, urlsplit
+from uuid import UUID
 
-from cyrvanta.modules.playbooks.application.engine_ports import (
-    ActionConnectorPort,
-    ActionDescriptor,
-    ActionResult,
-    CredentialHandle,
-    EngineContext,
-    ProbeResult,
-    ValidationResult,
+import httpx
+
+from cyrvanta.modules.incident.application.schemas import IncidentTransition
+from cyrvanta.modules.incident.application.service import (
+    IncidentConflict,
+    IncidentNotFound,
+    IncidentService,
+    InvalidTransition,
 )
 
-SIMULATED_ACTIONS = (
+from cyrvanta.modules.integrations.application.connection_service import StoredIntegrationCredential
+from cyrvanta.modules.playbooks.application.engine_ports import (
+    ActionConnectorPort, ActionDescriptor, ActionResult, CredentialHandle,
+    EngineContext, ProbeResult, ValidationResult,
+)
+
+REAL_ACTIONS = (
+    "incident.status.transition",
     "notification.send",
     "ticket.create",
     "incident.report.generate",
     "webhook.invoke_allowlisted",
-    "endpoint.isolate_simulated",
 )
 
 
@@ -26,78 +38,179 @@ class ActionUnavailableError(LookupError):
     pass
 
 
-class SimulatedActionConnector:
+class RealActionConnector:
     def __init__(self, code: str) -> None:
-        if code not in SIMULATED_ACTIONS:
-            raise ValueError("action is not allowlisted")
+        if code not in REAL_ACTIONS:
+            raise ValueError("action is not registered")
         self._code = code
 
     def describe(self) -> ActionDescriptor:
+        is_http = self._code in {"ticket.create", "webhook.invoke_allowlisted"}
+        is_internal = self._code == "incident.status.transition"
         return ActionDescriptor(
-            code=self._code,
-            version="1.0.0",
-            modes=("SIMULATED",),
-            impact="LOW",
-            timeout_seconds=30,
-            retry_safe=True,
-            cancellable=True,
-            egress="NONE",
+            code=self._code, version="1.0.0", modes=("LIVE",), impact="MEDIUM",
+            timeout_seconds=30, retry_safe=False, cancellable=False,
+            egress="NONE" if is_internal else "HTTPS" if is_http else "SMTP",
         )
 
     def validate_configuration(self, configuration: dict[str, object]) -> ValidationResult:
-        if configuration:
+        if self._code == "incident.status.transition":
+            if configuration != {"target_status": "contained"}:
+                return ValidationResult(False, ("PLAYBOOK_ACTION_CONFIG_INVALID",))
+            return ValidationResult(True)
+        if self._code in {"notification.send", "incident.report.generate"}:
+            required, allowed = {"to"}, {"to", "subject_prefix"}
+        else:
+            required, allowed = {"path"}, {"path", "method"}
+        if set(configuration) - allowed or any(
+            key not in configuration or configuration[key] in ("", None) for key in required
+        ):
             return ValidationResult(False, ("PLAYBOOK_ACTION_CONFIG_INVALID",))
+        if self._code in {"ticket.create", "webhook.invoke_allowlisted"}:
+            path = str(configuration["path"])
+            if (
+                not path.startswith("/")
+                or urlsplit(path).scheme
+                or ".." in path.split("/")
+                or str(configuration.get("method", "POST")).upper() != "POST"
+            ):
+                return ValidationResult(False, ("PLAYBOOK_ACTION_CONFIG_INVALID",))
         return ValidationResult(True)
 
     async def probe(self, context: EngineContext, configuration: dict[str, object]) -> ProbeResult:
         del context
         validation = self.validate_configuration(configuration)
-        return ProbeResult(
-            healthy=validation.valid,
-            error_code=None if validation.valid else validation.error_codes[0],
-        )
+        return ProbeResult(validation.valid, None if validation.valid else validation.error_codes[0])
 
     async def execute(
         self,
         context: EngineContext,
         action_input: dict[str, object],
+        configuration: dict[str, object],
         idempotency_key: str,
         credential_handle: CredentialHandle | None,
     ) -> ActionResult:
-        del context, credential_handle
-        material = json.dumps(
-            {"action": self._code, "input": action_input, "key": idempotency_key},
-            ensure_ascii=False,
-            separators=(",", ":"),
-            sort_keys=True,
-        ).encode()
-        output: dict[str, object] = {
-            "simulated": True,
-            "effect": "none",
-            "action_code": self._code,
-            "receipt": hashlib.sha256(material).hexdigest()[:24],
-        }
-        if self._code == "notification.send":
-            output["status"] = "DELIVERED"
-        elif self._code == "ticket.create":
-            output["status"] = "CREATED"
-        elif self._code == "incident.report.generate":
-            output["status"] = "GENERATED"
-        elif self._code == "webhook.invoke_allowlisted":
-            output["status"] = "ACCEPTED"
-        else:
-            output["status"] = "ISOLATION_SIMULATED"
+        validation = self.validate_configuration(configuration)
+        if not validation.valid:
+            return ActionResult(False, {}, validation.error_codes[0])
+        if self._code == "incident.status.transition":
+            inputs = action_input.get("inputs")
+            if not isinstance(inputs, dict):
+                return ActionResult(False, {}, "PLAYBOOK_ACTION_CONFIG_INVALID")
+            try:
+                incident_id = UUID(str(inputs["incident_id"]))
+                actor_user_id = UUID(str(inputs["actor_user_id"]))
+                expected_version = int(inputs["incident_version"])
+                incident = await IncidentService().transition(
+                    context.tenant_id,
+                    actor_user_id,
+                    incident_id,
+                    IncidentTransition(
+                        expected_version=expected_version,
+                        target_status="contained",
+                        reason="Authorized Cyrvanta NATIVE playbook",
+                    ),
+                    context.correlation_id,
+                )
+            except (KeyError, ValueError, IncidentConflict, IncidentNotFound, InvalidTransition):
+                return ActionResult(False, {}, "PLAYBOOK_ACTION_FAILED")
+            receipt = hashlib.sha256(
+                f"{idempotency_key}:{incident.id}:{incident.version}:contained".encode()
+            ).hexdigest()[:24]
+            return ActionResult(
+                True,
+                {
+                    "effect": "applied",
+                    "action_code": self._code,
+                    "status": incident.status,
+                    "incident_id": str(incident.id),
+                    "incident_version": incident.version,
+                    "receipt": receipt,
+                },
+                safe_detail="Incident transitioned to contained",
+            )
+        if not isinstance(credential_handle, StoredIntegrationCredential):
+            return ActionResult(False, {}, "PLAYBOOK_CREDENTIAL_UNAVAILABLE")
+        try:
+            if self._code in {"notification.send", "incident.report.generate"}:
+                receipt = await self._send_email(
+                    action_input, configuration, idempotency_key, credential_handle.values
+                )
+                status = "DELIVERED"
+            else:
+                receipt = await self._post_http(
+                    context, action_input, configuration, idempotency_key,
+                    credential_handle.values,
+                )
+                status = "CREATED" if self._code == "ticket.create" else "ACCEPTED"
+        except (OSError, smtplib.SMTPException, httpx.HTTPError, ValueError, KeyError):
+            return ActionResult(False, {}, "PLAYBOOK_ACTION_FAILED", "External action failed")
         return ActionResult(
-            succeeded=True,
-            output=output,
-            safe_detail="Simulated action completed without external effects",
+            True,
+            {"effect": "applied", "action_code": self._code, "status": status, "receipt": receipt},
+            safe_detail="External action completed",
         )
+
+    async def _send_email(
+        self, action_input: dict[str, object], configuration: dict[str, object],
+        idempotency_key: str, credential: dict[str, object],
+    ) -> str:
+        message = EmailMessage()
+        prefix = str(configuration.get("subject_prefix", "[Cyrvanta]"))
+        title = str(action_input.get("title") or action_input.get("incident_title") or self._code)
+        message["Subject"] = f"{prefix} {title}"[:240]
+        message["From"] = str(credential["from_address"])
+        message["To"] = str(configuration["to"])
+        digest = hashlib.sha256(idempotency_key.encode()).hexdigest()
+        message["Message-ID"] = f"<{digest}@cyrvanta>"
+        body = json.dumps(action_input, ensure_ascii=False, indent=2, sort_keys=True)
+        message.set_content(body[:100000])
+        await asyncio.to_thread(self._smtp_send, credential, message)
+        return hashlib.sha256(f"{idempotency_key}:{message['Message-ID']}".encode()).hexdigest()[:24]
+
+    @staticmethod
+    def _smtp_send(credential: dict[str, object], message: EmailMessage) -> None:
+        timeout = min(30, max(1, int(credential.get("timeout_seconds", 10))))
+        with smtplib.SMTP(str(credential["host"]), int(credential["port"]), timeout=timeout) as client:
+            client.ehlo()
+            if bool(credential.get("use_starttls", True)):
+                client.starttls(context=ssl.create_default_context())
+                client.ehlo()
+            if credential.get("username") and credential.get("password"):
+                client.login(str(credential["username"]), str(credential["password"]))
+            client.send_message(message)
+
+    async def _post_http(
+        self, context: EngineContext, action_input: dict[str, object],
+        configuration: dict[str, object], idempotency_key: str,
+        credential: dict[str, object],
+    ) -> str:
+        base_url = str(credential["base_url"]).rstrip("/") + "/"
+        target = urljoin(base_url, str(configuration["path"]).lstrip("/"))
+        if urlsplit(target).netloc != urlsplit(base_url).netloc:
+            raise ValueError("target escaped allowlisted origin")
+        headers = {
+            "Content-Type": "application/json",
+            "Idempotency-Key": idempotency_key,
+            "X-Cyrvanta-Tenant": str(context.tenant_id),
+            "X-Cyrvanta-Correlation": str(context.correlation_id),
+        }
+        token = credential.get("api_key") or credential.get("bearer_token")
+        if token:
+            headers["Authorization"] = f"Bearer {token}"
+        timeout = min(30, max(1, int(credential.get("timeout_seconds", 10))))
+        async with httpx.AsyncClient(timeout=timeout, follow_redirects=False) as client:
+            response = await client.post(target, headers=headers, json=action_input)
+            response.raise_for_status()
+        remote_id = response.headers.get("Location") or response.headers.get("X-Request-Id")
+        material = remote_id or f"{response.status_code}:{idempotency_key}"
+        return hashlib.sha256(material.encode()).hexdigest()[:24]
 
 
 class ActionRegistry:
     def __init__(self) -> None:
         self._connectors: dict[tuple[str, str], ActionConnectorPort] = {
-            (code, "1.0.0"): SimulatedActionConnector(code) for code in SIMULATED_ACTIONS
+            (code, "1.0.0"): RealActionConnector(code) for code in REAL_ACTIONS
         }
 
     def get(self, code: str, version: str) -> ActionConnectorPort:

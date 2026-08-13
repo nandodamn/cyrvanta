@@ -11,6 +11,11 @@ from uuid import UUID, uuid4
 from sqlalchemy import select, text
 
 from cyrvanta.modules.identity.infrastructure.models import AuditEventModel
+from cyrvanta.modules.integrations.application.connection_service import (
+    IntegrationConfigurationError,
+    IntegrationConnectionService,
+)
+from cyrvanta.modules.integrations.infrastructure.models import IntegrationModel
 from cyrvanta.modules.playbooks.application.engine_ports import EngineContext
 from cyrvanta.modules.playbooks.application.portable import (
     ActionStep,
@@ -311,7 +316,7 @@ class NativePlaybookDispatcher:
                         resource_id=execution.id,
                         outcome="success",
                         correlation_id=correlation_id,
-                        details={"engine_type": "NATIVE", "mode": "SIMULATED"},
+                        details={"engine_type": "NATIVE", "mode": "LIVE"},
                     )
                 )
                 await self._event(
@@ -338,7 +343,11 @@ class NativePlaybookDispatcher:
         allowed = self.settings.native_enabled_tenant_ids
         if allowed and str(tenant_id) not in allowed:
             raise NativeEngineRejected("PLAYBOOK_ENGINE_DISABLED")
-        if execution.execution_mode != "SYNTHETIC":
+        if (
+            not self.settings.playbook_live_enabled
+            or not self.settings.playbook_dispatch_enabled
+            or execution.execution_mode != "LIVE"
+        ):
             raise NativeEngineRejected("PLAYBOOK_LIVE_DISABLED")
         if datetime.now(UTC) >= execution.deadline_at:
             raise NativeEngineRejected("PLAYBOOK_DEADLINE_EXCEEDED")
@@ -358,20 +367,33 @@ class NativePlaybookDispatcher:
                     NativeActionBindingModel.action_code == step.action,
                     NativeActionBindingModel.tenant_id == tenant_id,
                     NativeActionBindingModel.action_version == step.action_version,
-                    NativeActionBindingModel.connector_type == "SIMULATED",
                     NativeActionBindingModel.active.is_(True),
                     NativeActionBindingModel.last_verified_at.is_not(None),
                 )
             )
-            if binding is None or binding.credential_key_id is not None:
+            if binding is None:
                 raise NativeEngineRejected("PLAYBOOK_ACTION_UNAVAILABLE")
             if binding.configuration_sha256 != self._digest(binding.configuration):
                 raise NativeEngineRejected("PLAYBOOK_ACTION_CONFIG_INVALID")
             validation = connector.validate_configuration(binding.configuration)
             if not validation.valid:
                 raise NativeEngineRejected(validation.error_codes[0])
-            if step.credential_aliases:
-                raise NativeEngineRejected("PLAYBOOK_CREDENTIAL_UNAVAILABLE")
+            if connector.describe().egress != "NONE":
+                try:
+                    credential_id = UUID(binding.credential_key_id or "")
+                except ValueError as exc:
+                    raise NativeEngineRejected("PLAYBOOK_CREDENTIAL_UNAVAILABLE") from exc
+                credential_ready = await session.scalar(
+                    select(IntegrationModel.id).where(
+                        IntegrationModel.tenant_id == tenant_id,
+                        IntegrationModel.id == credential_id,
+                        IntegrationModel.status == "active",
+                        IntegrationModel.last_health_check_at.is_not(None),
+                        IntegrationModel.last_error_code.is_(None),
+                    )
+                )
+                if credential_ready is None:
+                    raise NativeEngineRejected("PLAYBOOK_CREDENTIAL_UNAVAILABLE")
 
     async def _execute_action(
         self, context: EngineContext, execution_id: UUID, step: ActionStep
@@ -391,13 +413,14 @@ class NativePlaybookDispatcher:
                     NativeActionBindingModel.action_code == step.action,
                     NativeActionBindingModel.tenant_id == context.tenant_id,
                     NativeActionBindingModel.action_version == step.action_version,
-                    NativeActionBindingModel.connector_type == "SIMULATED",
                     NativeActionBindingModel.active.is_(True),
                     NativeActionBindingModel.last_verified_at.is_not(None),
                 )
             )
             if binding is None:
                 raise NativeEngineRejected("PLAYBOOK_ACTION_UNAVAILABLE")
+            binding_configuration = dict(binding.configuration)
+            credential_reference = binding.credential_key_id
             step_input = self._step_input(execution.inputs, step)
             input_digest = self._digest(step_input)
             attempt = await session.scalar(
@@ -469,7 +492,21 @@ class NativePlaybookDispatcher:
             idempotency_key = attempt.idempotency_key
 
         connector = self.registry.get(step.action, step.action_version)
-        result = await connector.execute(context, step_input, idempotency_key, None)
+        credential = None
+        if connector.describe().egress != "NONE":
+            try:
+                credential = await IntegrationConnectionService(self.settings).resolve_credential(
+                    context.tenant_id, credential_reference
+                )
+            except IntegrationConfigurationError as exc:
+                raise NativeEngineRejected("PLAYBOOK_CREDENTIAL_UNAVAILABLE") from exc
+        result = await connector.execute(
+            context,
+            step_input,
+            binding_configuration,
+            idempotency_key,
+            credential,
+        )
         completed_at = datetime.now(UTC)
         status = "SUCCEEDED" if result.succeeded else "FAILED"
         late_after_cancel = False
@@ -621,10 +658,23 @@ class NativePlaybookDispatcher:
             execution.error_code = error_code
             execution.completed_at = datetime.now(UTC)
             if status == ExecutionStatus.SUCCEEDED.value:
+                steps = list(
+                    (
+                        await session.scalars(
+                            select(PlaybookStepExecutionModel).where(
+                                PlaybookStepExecutionModel.tenant_id == context.tenant_id,
+                                PlaybookStepExecutionModel.execution_id == execution_id,
+                                PlaybookStepExecutionModel.step_type == "ACTION",
+                            )
+                        )
+                    ).all()
+                )
                 execution.result = {
-                    "simulated": True,
-                    "effect": "none",
+                    "effect": "applied",
                     "workflow_code": workflow_code,
+                    "step_receipts": {
+                        step.step_id: (step.result or {}).get("receipt") for step in steps
+                    },
                 }
             session.add(
                 AuditEventModel(

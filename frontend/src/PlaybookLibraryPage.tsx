@@ -9,14 +9,17 @@ import {
   PlaybookDefinition,
   togglePlaybookBinding,
   updatePlaybookApprovalGovernance,
+  validateAndPublishPlaybookVersion,
 } from "./api";
 import "./playbook-library.css";
 import { PlaybookDetailsModal } from "./PlaybookDetailsModal";
+import { PlaybookConfigurationModal } from "./PlaybookConfigurationModal";
 
 export function PlaybookLibraryPage() {
   const { t, i18n } = useTranslation();
   const queryClient = useQueryClient();
   const [selectedDetails, setSelectedDetails] = useState<PlaybookDefinition | null>(null);
+  const [selectedConfiguration, setSelectedConfiguration] = useState<PlaybookDefinition | null>(null);
 
   const nativeLibrary = useQuery({
     queryKey: ["playbook-definitions"],
@@ -40,6 +43,14 @@ export function PlaybookLibraryPage() {
       id: string;
       input: { active?: boolean; engine_type?: "NATIVE" | "N8N" };
     }) => togglePlaybookBinding(id, input),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["playbook-definitions"] });
+    },
+  });
+
+  const publishMutation = useMutation({
+    mutationFn: ({ versionId, digest }: { versionId: string; digest: string }) =>
+      validateAndPublishPlaybookVersion(versionId, digest),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["playbook-definitions"] });
     },
@@ -115,8 +126,8 @@ export function PlaybookLibraryPage() {
                 <div className="playbook-heading" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "12px", flexWrap: "wrap", marginBottom: "0.75rem" }}>
                   <div>
                     <div style={{ display: "flex", gap: "6px", alignItems: "center", flexWrap: "wrap", marginBottom: "6px" }}>
-                      <span className={`demo-badge ${playbook.binding_active ? "active" : ""}`}>
-                        {playbook.binding_active ? t("active") : t("inactive")}
+                      <span className={`demo-badge ${playbook.readiness_status === "READY" ? "active" : ""}`}>
+                        {playbook.readiness_status}
                       </span>
                       <span
                         className="demo-badge"
@@ -162,6 +173,27 @@ export function PlaybookLibraryPage() {
                     <button
                       type="button"
                       className="ghost"
+                      onClick={() => setSelectedConfiguration(playbook)}
+                    >
+                      Configurar
+                    </button>                    {playbook.publication_status === "DRAFT"
+                      && playbook.latest_version_id
+                      && playbook.latest_artifact_sha256 && (
+                      <button
+                        type="button"
+                        className="ghost"
+                        disabled={publishMutation.isPending}
+                        onClick={() => publishMutation.mutate({
+                          versionId: playbook.latest_version_id!,
+                          digest: playbook.latest_artifact_sha256!,
+                        })}
+                      >
+                        Validar y publicar
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      className="ghost"
                       style={{
                         padding: "6px 12px",
                         fontSize: "0.775rem",
@@ -190,7 +222,12 @@ export function PlaybookLibraryPage() {
                         width: "auto",
                         whiteSpace: "nowrap",
                       }}
-                      disabled={toggleMutation.isPending || !isPublished}
+                      disabled={
+                        toggleMutation.isPending
+                        || !isPublished
+                        || (!playbook.binding_active
+                          && playbook.blocking_reasons.includes("PLAYBOOK_CONFIGURATION_REQUIRED"))
+                      }
                       onClick={() =>
                         toggleMutation.mutate({
                           id: playbook.id,
@@ -212,7 +249,12 @@ export function PlaybookLibraryPage() {
                         width: "auto",
                         whiteSpace: "nowrap",
                       }}
-                      disabled={toggleMutation.isPending || !isPublished}
+                      disabled={
+                        toggleMutation.isPending
+                        || !isPublished
+                        || (!playbook.binding_active
+                          && playbook.blocking_reasons.includes("PLAYBOOK_CONFIGURATION_REQUIRED"))
+                      }
                       onClick={() =>
                         toggleMutation.mutate({
                           id: playbook.id,
@@ -258,6 +300,14 @@ export function PlaybookLibraryPage() {
                     <strong>{playbook.last_execution_status ?? t("neverExecuted")}</strong>
                   </div>
                 </div>
+                {playbook.blocking_reasons.length > 0 && (
+                  <div className="security-note" role="status">
+                    <strong>Deshabilitado hasta completar:</strong>
+                    <ul>
+                      {playbook.blocking_reasons.map((reason) => <li key={reason}>{reason}</li>)}
+                    </ul>
+                  </div>
+                )}
 
                 {/* Gobernanza Bar */}
                 <div className="connector-grid" style={{ marginBottom: "0.5rem" }}>
@@ -330,6 +380,13 @@ export function PlaybookLibraryPage() {
         <PlaybookDetailsModal
           playbook={selectedDetails}
           onClose={() => setSelectedDetails(null)}
+        />
+      )}
+
+      {selectedConfiguration && (
+        <PlaybookConfigurationModal
+          playbook={selectedConfiguration}
+          onClose={() => setSelectedConfiguration(null)}
         />
       )}
 

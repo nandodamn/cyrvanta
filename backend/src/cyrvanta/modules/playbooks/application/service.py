@@ -29,6 +29,7 @@ from cyrvanta.modules.playbooks.domain.models import (
     ExecutionStatus,
     validate_transition,
 )
+from cyrvanta.modules.playbooks.infrastructure.schema_registry import validate_strict_object
 from cyrvanta.modules.playbooks.infrastructure.action_registry import (
     ActionRegistry,
     ActionUnavailableError,
@@ -174,8 +175,12 @@ class PlaybookExecutionService:
                 raise PlaybookConflict("Authorized playbook version is not released")
             if version.workflow_code != proposal.workflow_id:
                 raise PlaybookConflict("Authorized workflow does not match the released artifact")
-            if version.classification != "SYNTHETIC":
-                raise PlaybookConflict("LIVE playbook execution requires an operational approval")
+            if (
+                version.classification != "LIVE"
+                or not settings.playbook_live_enabled
+                or not settings.playbook_dispatch_enabled
+            ):
+                raise PlaybookConflict("LIVE playbook execution requires operational activation")
             bindings = list(
                 (
                     await session.scalars(
@@ -223,12 +228,15 @@ class PlaybookExecutionService:
                 origin="AUTHORIZED_RESPONSE",
                 idempotency_key=idempotency_key,
                 proposal_fingerprint=proposal.fingerprint,
-                execution_mode="SYNTHETIC",
+                execution_mode="LIVE",
                 status=ExecutionStatus.QUEUED.value,
                 inputs={
                     "targets": list(proposal.targets),
                     "parameters": dict(proposal.parameters),
                     "evidence_refs": list(proposal.evidence_refs),
+                    "incident_id": str(incident.id),
+                    "incident_version": incident.version,
+                    "actor_user_id": str(actor_user_id),
                 },
                 deadline_at=now + timedelta(seconds=version.timeout_seconds),
             )
@@ -249,7 +257,7 @@ class PlaybookExecutionService:
                         "authorization_id": str(authorization.id),
                         "proposal_id": str(proposal.id),
                         "playbook_version_id": str(version.id),
-                        "execution_mode": "SYNTHETIC",
+                        "execution_mode": "LIVE",
                     },
                 )
             )
@@ -263,7 +271,7 @@ class PlaybookExecutionService:
                     "binding_id": str(binding.id),
                     "playbook_version_id": str(version.id),
                     "proposal_fingerprint": proposal.fingerprint,
-                    "execution_mode": "SYNTHETIC",
+                    "execution_mode": "LIVE",
                 },
             )
             return self._response(execution)
@@ -652,30 +660,14 @@ class PlaybookExecutionService:
         )
         if version is None:
             raise PlaybookSecurityError("Released playbook version is unavailable")
-        if execution.execution_mode == "SYNTHETIC":
-            if version.workflow_code == "simulate-user-block":
-                if result != {
-                    "execution_mode": "demo",
-                    "action": "block_user",
-                    "result": "simulated_success",
-                }:
-                    raise PlaybookSecurityError(
-                        "Simulated user block result does not match its exact schema"
-                    )
-                return
-            if result is None or set(result) != {
-                "simulated",
-                "effect",
-                "workflow_code",
-            }:
-                raise PlaybookSecurityError("Synthetic result does not match its schema")
-            if (
-                result["simulated"] is not True
-                or result["effect"] != "none"
-                or result["workflow_code"] != version.workflow_code
-            ):
-                raise PlaybookSecurityError("Synthetic result material is invalid")
-
+        if (
+            execution.execution_mode != "LIVE"
+            or result is None
+            or not validate_strict_object(version.result_schema, result)
+            or result.get("effect") != "applied"
+            or result.get("workflow_code") != version.workflow_code
+        ):
+            raise PlaybookSecurityError("LIVE result does not match its released schema")
     @staticmethod
     async def _nonce_digest(
         session: AsyncSession, tenant_id: UUID, direction: str, key_id: str, nonce: UUID

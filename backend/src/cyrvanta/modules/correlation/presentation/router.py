@@ -1,9 +1,8 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 
-from cyrvanta.modules.correlation.application.demo import CanonicalCorrelationDemo
 from cyrvanta.modules.correlation.application.query_service import (
     CorrelationNotFound,
     CorrelationQueryService,
@@ -51,16 +50,3 @@ async def get_correlation(
         return await service.get(context.tenant_id, match_id)
     except CorrelationNotFound as exc:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Resource not found") from exc
-
-
-@router.post(
-    "/demo/scenarios/credential-attack-v2",
-    response_model=CanonicalDemoResponse,
-)
-async def generate_canonical_correlation_demo(
-    request: Request,
-    context: CorrelationEvaluate,
-) -> CanonicalDemoResponse:
-    return await CanonicalCorrelationDemo().generate(
-        context.tenant_id, UUID(request.state.correlation_id)
-    )

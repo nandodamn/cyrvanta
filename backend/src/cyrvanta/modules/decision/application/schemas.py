@@ -10,12 +10,20 @@ from cyrvanta.modules.decision.domain.models import ActionImpact, ResponseMode
 class ActionProposalCreate(BaseModel):
     incident_id: UUID
     action_type: Literal[
-        "simulate-user-block",
-        "notify-critical-incident",
-        "create-security-ticket",
-        "incident-report-email",
-    ]
-    impact: ActionImpact
+        "contain-and-document-incident",
+        "compromised-account",
+        "compromised-endpoint",
+        "phishing-malicious-email",
+        "ransomware-destructive",
+        "lateral-movement",
+        "malicious-indicator",
+        "privilege-escalation",
+        "security-control-disabled",
+        "automated-enrichment",
+        "escalation-notification",
+        "evidence-preservation",
+        "closure-controlled-learning",
+    ]    impact: ActionImpact
     requested_mode: ResponseMode
     workflow_id: str = Field(min_length=1, max_length=120)
     workflow_version: str = Field(min_length=1, max_length=80)

@@ -1,6 +1,6 @@
 # ADR 0019 — Acciones nativas reales acotadas
 
-Estado: `DRAFT — REQUIERE APROBACIÓN EXPRESA`
+Estado: `ACEPTADO — 2026-08-13`
 
 ## Contexto
 

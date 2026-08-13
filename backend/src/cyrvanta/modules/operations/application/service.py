@@ -2,7 +2,6 @@ import json
 from datetime import UTC, datetime
 from hashlib import sha256
 from typing import Literal
-from urllib.parse import quote
 from uuid import NAMESPACE_URL, UUID, uuid5
 
 import httpx
@@ -34,8 +33,6 @@ from cyrvanta.modules.operations.application.ports import (
 )
 from cyrvanta.modules.operations.application.schemas import (
     AnalysisResponse,
-    AutomationRequest,
-    AutomationResponse,
     IntegrationHealth,
     PlaybookCatalogResponse,
     PlaybookConnector,
@@ -72,9 +69,6 @@ CATALOG = {
 }
 
 PLAYBOOK_METADATA = {
-    "cyrvanta-simulate-user-block": ("Cyrvanta — Simulate User Block", ()),
-    "cyrvanta-demo-response": ("Cyrvanta — Simulate User Block", ()),
-    "simulate-user-block": ("Cyrvanta — Simulate User Block", ()),
     "block-ip-address": ("Cyrvanta — Block IP Address", ("firewall-gateway",)),
     "isolate-endpoint": ("Cyrvanta — Isolate Host Endpoint", ("edr-agent",)),
     "revoke-user-sessions": ("Cyrvanta — Revoke Active User Sessions", ("identity-provider",)),
@@ -125,10 +119,6 @@ class OperationsService:
         normalized = self._mode(mode)
         if normalized == "disabled":
             return IntegrationHealth(code=code, mode=normalized, healthy=False, detail="disabled")
-        if normalized == "simulated":
-            return IntegrationHealth(
-                code=code, mode=normalized, healthy=True, detail="simulated; no external call"
-            )
         try:
             async with httpx.AsyncClient(timeout=5) as client:
                 response = await client.get(url)
@@ -148,13 +138,6 @@ class OperationsService:
         if normalized == "disabled":
             return IntegrationHealth(
                 code="wazuh", mode=normalized, healthy=False, detail="disabled"
-            )
-        if normalized == "simulated":
-            return IntegrationHealth(
-                code="wazuh",
-                mode=normalized,
-                healthy=True,
-                detail="simulated; no external call",
             )
         if self.siem_connector is None:
             return IntegrationHealth(
@@ -478,50 +461,6 @@ class OperationsService:
             ),
         )
 
-    async def execute(self, payload: AutomationRequest) -> AutomationResponse:
-        if self.settings.automation_kill_switch:
-            raise ValueError("Automation kill switch is active")
-        if payload.workflow_id not in self.settings.allowed_workflow_ids:
-            raise ValueError("Workflow is not allowlisted")
-        if not payload.approved:
-            raise ValueError("Explicit approval is required")
-        digest = sha256(payload.idempotency_key.encode()).hexdigest()[:20]
-        if self.settings.n8n_mode == "live":
-            raise ValueError(
-                "Live automation requires a durable Stage 7 authorization and callback"
-            )
-        if self.settings.n8n_mode != "simulated":
-            raise ValueError("Automation adapter is disabled")
-        return AutomationResponse(
-            execution_id=f"demo-{digest}",
-            status="simulated_completed",
-            mode=self.settings.n8n_mode,
-            workflow_id=payload.workflow_id,
-        )
-
-    async def _n8n_execute(self, payload: AutomationRequest) -> None:
-        workflow_path = quote(payload.workflow_id, safe="")
-        try:
-            async with httpx.AsyncClient(timeout=15) as client:
-                response = await client.post(
-                    f"{self.settings.n8n_base_url}/webhook/{workflow_path}",
-                    json={
-                        "incident_id": str(payload.incident_id),
-                        "idempotency_key": payload.idempotency_key,
-                    },
-                )
-                response.raise_for_status()
-            result = response.json()
-            if (
-                not isinstance(result, dict)
-                or result.get("accepted") is not True
-                or result.get("workflow_id") != payload.workflow_id
-                or result.get("idempotency_key") != payload.idempotency_key
-            ):
-                raise ValueError("Automation adapter returned an invalid acknowledgement")
-        except (httpx.HTTPError, json.JSONDecodeError) as exc:
-            raise ValueError("Automation adapter is unavailable") from exc
-
     async def audit(
         self,
         tenant_id: UUID,
@@ -551,7 +490,7 @@ class OperationsService:
         return list(CATALOG.values())
 
     @staticmethod
-    def _mode(value: str) -> Literal["disabled", "simulated", "live"]:
-        if value not in {"disabled", "simulated", "live"}:
+    def _mode(value: str) -> Literal["disabled", "live"]:
+        if value not in {"disabled", "live"}:
             return "disabled"
         return value  # type: ignore[return-value]

@@ -1,5 +1,4 @@
-from datetime import UTC, datetime, timedelta
-from hashlib import sha256
+from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
 from sqlalchemy import or_, select
@@ -9,7 +8,6 @@ from cyrvanta.modules.identity.infrastructure.models import AuditEventModel, Use
 from cyrvanta.modules.incident.application.schemas import (
     AlertResponse,
     AlertTriageUpdate,
-    DemoScenarioResponse,
     IncidentAssign,
     IncidentCreate,
     IncidentResponse,
@@ -19,7 +17,6 @@ from cyrvanta.modules.incident.application.schemas import (
 )
 from cyrvanta.modules.incident.infrastructure.models import (
     AlertReferenceModel,
-    CorrelationRunModel,
     IncidentAlertModel,
     IncidentModel,
     IncidentTimelineModel,
@@ -367,118 +364,6 @@ class IncidentService:
             )
             await session.flush()
             return entry
-
-    async def generate_demo(
-        self, tenant_id: UUID, actor_id: UUID, correlation_id: UUID
-    ) -> DemoScenarioResponse:
-        fingerprint = sha256(b"credential-attack-v1").hexdigest()
-        now = datetime.now(UTC)
-        async with tenant_session(tenant_id) as session:
-            existing_run = await session.scalar(
-                select(CorrelationRunModel).where(
-                    CorrelationRunModel.rule_code == "credential-attack",
-                    CorrelationRunModel.rule_version == "1",
-                    CorrelationRunModel.input_fingerprint == fingerprint,
-                )
-            )
-            if existing_run is not None and existing_run.incident_id is not None:
-                incident = await self._get(session, existing_run.incident_id)
-                return DemoScenarioResponse(
-                    scenario="credential-attack-v1",
-                    incident=IncidentResponse.model_validate(incident),
-                    alerts_created=0,
-                    idempotent_replay=True,
-                )
-            definitions = (
-                ("failed-logins", "Repeated authentication failures", "medium", -8),
-                ("atypical-login", "Successful login from atypical location", "high", -5),
-                ("privilege-change", "Simulated privilege elevation", "high", -3),
-                ("resource-access", "Anomalous access to synthetic resource", "critical", -1),
-            )
-            alerts: list[AlertReferenceModel] = []
-            for external_id, title, severity, minutes in definitions:
-                alert = AlertReferenceModel(
-                    tenant_id=tenant_id,
-                    source="cyrvanta-demo",
-                    external_id=f"credential-attack-v1-{external_id}",
-                    observed_at=now + timedelta(minutes=minutes),
-                    title=title,
-                    category="credential-access",
-                    severity=severity,
-                    asset_summary="demo-workstation-01",
-                    identity_summary="demo-user",
-                    indicator_summary="synthetic-indicator",
-                    raw_reference=f"synthetic://credential-attack-v1/{external_id}",
-                    snapshot_sha256=sha256(title.encode()).hexdigest(),
-                    provenance="synthetic",
-                    is_simulated=True,
-                )
-                session.add(alert)
-                alerts.append(alert)
-            incident = IncidentModel(
-                tenant_id=tenant_id,
-                code="DEMO-CRED-001",
-                title="Credential compromise simulation",
-                description=(
-                    "Synthetic chain of authentication failures, atypical login, "
-                    "privilege change, and anomalous resource access."
-                ),
-                severity="high",
-                priority=2,
-                classification="credential-compromise",
-                detected_at=now,
-                is_simulated=True,
-            )
-            session.add(incident)
-            await session.flush()
-            for alert in alerts:
-                session.add(
-                    IncidentAlertModel(
-                        tenant_id=tenant_id,
-                        incident_id=incident.id,
-                        alert_id=alert.id,
-                    )
-                )
-            session.add(
-                CorrelationRunModel(
-                    tenant_id=tenant_id,
-                    incident_id=incident.id,
-                    rule_code="credential-attack",
-                    rule_version="1",
-                    rule_definition_sha256=sha256(b"legacy-demo-v0").hexdigest(),
-                    grouping_key_hash=fingerprint,
-                    score=0,
-                    threshold=0,
-                    window_start=None,
-                    window_end=None,
-                    claim_id=None,
-                    result_type="LEGACY_SIMULATED_V0",
-                    schema_version=0,
-                    explanation=(
-                        "Four synthetic signals share tenant, asset, identity, "
-                        "category, and a ten-minute window."
-                    ),
-                    input_fingerprint=fingerprint,
-                    is_simulated=True,
-                )
-            )
-            self._timeline(
-                session,
-                incident,
-                actor_id,
-                "correlated",
-                "Synthetic alerts correlated by credential-attack rule v1",
-                now,
-            )
-            self._audit(
-                session, tenant_id, actor_id, "demo.scenario.generated", incident.id, correlation_id
-            )
-            return DemoScenarioResponse(
-                scenario="credential-attack-v1",
-                incident=IncidentResponse.model_validate(incident),
-                alerts_created=len(alerts),
-                idempotent_replay=False,
-            )
 
     @staticmethod
     async def _get(session: AsyncSession, incident_id: UUID) -> IncidentModel:

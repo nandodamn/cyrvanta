@@ -1,6 +1,6 @@
 # PHASE 24 — Runtime real sin simulaciones
 
-Estado: `DRAFT — REQUIERE APROBACIÓN EXPRESA`
+Estado: `APROBADO — 2026-08-13`
 
 ## Objetivo
 
@@ -22,8 +22,9 @@ registran en el contenedor productivo ni son alcanzables desde API o UI.
 5. Ningún estado `simulated` se considera saludable.
 6. El dashboard usa exclusivamente registros tenant-scoped persistidos; sin datos muestra cero
    y `Sin actividad registrada`.
-7. La biblioteca muestra sólo playbooks publicados cuyo binding y acciones reales estén
-   configurados y saludables. Los playbooks incompletos no se publican ni se muestran.
+7. La biblioteca muestra todos los playbooks aprobados del catálogo. Los incompletos permanecen
+   visibles y deshabilitados, con su menú de configuración y bloqueos de readiness; sólo pueden
+   activarse cuando versión, binding, acciones y conexiones reales estén saludables.
 8. Toda ejecución NATIVE publicada produce un efecto real, verificable e idempotente.
 9. Un conector ausente o sin credenciales falla cerrado antes de crear autorización ejecutable.
 10. Las credenciales se guardan cifradas por alias, nunca se devuelven y sólo pueden
@@ -78,7 +79,7 @@ Las respuestas de catálogo incorporarán readiness y razones bloqueantes sin re
 
 - Se elimina toda acción `Generar demo`, etiqueta `Simulado` y contador de fuentes simuladas.
 - Integraciones muestra `Deshabilitada`, `Sin configurar`, `No saludable` o `Conectada`.
-- Playbooks muestra `Real`, efecto, conexión, credenciales pendientes, aprobación y readiness.
+- Playbooks muestra `Real`, efecto, conexión, credenciales pendientes, aprobación y readiness.`n- Todos los playbooks conservan su menú de configuración aunque estén deshabilitados.
 - Los controles no ejecutables explican exactamente qué configuración real falta.
 - Ninguna cifra estática se presenta como dato operativo.
 

@@ -104,10 +104,3 @@ class TimelineResponse(BaseModel):
     incident_version: int
     effective_at: datetime
     recorded_at: datetime
-
-
-class DemoScenarioResponse(BaseModel):
-    scenario: str
-    incident: IncidentResponse
-    alerts_created: int
-    idempotent_replay: bool

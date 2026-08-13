@@ -6,7 +6,6 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from cyrvanta.modules.incident.application.schemas import (
     AlertResponse,
     AlertTriageUpdate,
-    DemoScenarioResponse,
     IncidentAssign,
     IncidentCreate,
     IncidentResponse,
@@ -252,10 +251,3 @@ async def add_timeline(
     except (IncidentNotFound, IncidentConflict) as exc:
         raise translate_error(exc) from exc
     return TimelineResponse.model_validate(entry)
-
-
-@router.post("/demo/scenarios/credential-attack", response_model=DemoScenarioResponse)
-async def generate_credential_attack_demo(
-    request: Request, context: IncidentCreatePermission, service: Service
-) -> DemoScenarioResponse:
-    return await service.generate_demo(context.tenant_id, context.user_id, correlation_id(request))

@@ -153,12 +153,6 @@ class N8nPlaybookDispatcher:
             purpose="n8n-dispatch",
             explicit_value=self.settings.n8n_dispatch_key,
         )
-        callback_secret = resolve_internal_secret(
-            master_key=self.settings.integration_encryption_key,
-            version=self.settings.n8n_internal_key_version,
-            purpose="n8n-callback",
-            explicit_value=self.settings.n8n_callback_key,
-        )
         dispatch_id = uuid4()
         async with tenant_session(tenant_id) as session:
             execution = await session.scalar(
@@ -171,7 +165,10 @@ class N8nPlaybookDispatcher:
             )
             if execution is None or execution.status != ExecutionStatus.QUEUED.value:
                 return None
-            if execution.execution_mode != "SYNTHETIC":
+            if (
+                execution.execution_mode != "LIVE"
+                or not self.settings.playbook_live_enabled
+            ):
                 return None
             binding = await session.scalar(
                 select(AutomationEngineBindingModel).where(
@@ -243,25 +240,6 @@ class N8nPlaybookDispatcher:
             secret=dispatch_secret,
             key_id=str(snapshot["key_id"]),
         )
-        terminal_body = self._json_bytes(
-            {
-                "adapter_event_id": str(uuid4()),
-                "sequence": 2,
-                "status": "SUCCEEDED",
-                "result": self.synthetic_result(str(snapshot["workflow_code"])),
-                "error_code": None,
-                "safe_detail": "Synthetic workflow completed without changing a target system",
-                "occurred_at": datetime.now(UTC).isoformat(),
-            }
-        )
-        terminal_path = f"/api/v1/internal/playbook-executions/{execution_id}/updates"
-        terminal = self._package(
-            tenant_id=tenant_id,
-            path=terminal_path,
-            body=terminal_body,
-            secret=callback_secret,
-            key_id=str(snapshot["key_id"]),
-        )
         dispatch_body = self._json_bytes(
             {
                 "schema_version": 1,
@@ -270,17 +248,33 @@ class N8nPlaybookDispatcher:
                 "incident_id": str(snapshot["incident_id"]),
                 "workflow_code": snapshot["workflow_code"],
                 "workflow_version": snapshot["version"],
-                "execution_mode": "SYNTHETIC",
+                "execution_mode": "LIVE",
                 "inputs": snapshot["inputs"],
                 "claim": {
                     "url": claim.url,
                     "body": claim.body,
                     "headers": claim.headers,
                 },
-                "terminal_callback": {
-                    "url": terminal.url,
-                    "body": terminal.body,
-                    "headers": terminal.headers,
+                "result_callback": {
+                    "url": (
+                        f"{self.settings.internal_api_url}/api/v1/internal/"
+                        f"playbook-executions/{execution_id}/updates"
+                    ),
+                    "authentication": {
+                        "scheme": "CYRVANTA_HMAC_SHA256",
+                        "key_id": str(snapshot["key_id"]),
+                        "secret_source": "N8N_CALLBACK_KEY",
+                        "canonical_material": (
+                            "method,path,timestamp,nonce,body_sha256,tenant_id"
+                        ),
+                        "required_headers": [
+                            "X-Cyrvanta-Key-Id",
+                            "X-Cyrvanta-Timestamp",
+                            "X-Cyrvanta-Nonce",
+                            "X-Cyrvanta-Signature",
+                            "X-Cyrvanta-Tenant",
+                        ],
+                    },
                 },
             }
         )
@@ -459,20 +453,6 @@ class N8nPlaybookDispatcher:
             "X-Cyrvanta-Timestamp": str(timestamp),
             "X-Cyrvanta-Nonce": str(nonce),
             "X-Cyrvanta-Signature": sign_request(secret, material),
-        }
-
-    @staticmethod
-    def synthetic_result(workflow_code: str) -> dict[str, object]:
-        if workflow_code == "simulate-user-block":
-            return {
-                "execution_mode": "demo",
-                "action": "block_user",
-                "result": "simulated_success",
-            }
-        return {
-            "simulated": True,
-            "effect": "none",
-            "workflow_code": workflow_code,
         }
 
     @staticmethod

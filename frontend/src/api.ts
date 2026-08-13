@@ -134,9 +134,24 @@ const operationalActivity24hSchema = z.object({
 });
 const integrationHealthSchema = z.object({
   code: z.string(),
-  mode: z.enum(["disabled", "simulated", "live"]),
+  mode: z.enum(["disabled", "live"]),
   healthy: z.boolean(),
   detail: z.string(),
+});const integrationConnectionSchema = z.object({
+  id: z.string().uuid(),
+  connector_type: z.enum(["SMTP", "HTTP_ALLOWLISTED", "N8N", "OPENSEARCH", "OLLAMA", "WAZUH"]),
+  name: z.string(),
+  status: z.string(),
+  configured: z.boolean(),
+  last_health_check_at: z.string().nullable(),
+  last_error_code: z.string().nullable(),
+  capabilities: z.array(z.string()),
+});
+const integrationProbeSchema = z.object({
+  id: z.string().uuid(),
+  healthy: z.boolean(),
+  latency_ms: z.number().int().nonnegative(),
+  error_code: z.string().nullable(),
 });
 const techniqueSchema = z.object({
   external_id: z.string(),
@@ -294,6 +309,8 @@ const playbookDefinitionSchema = z.object({
   description_i18n: z.object({ es: z.string(), en: z.string() }),
   created_at: z.string(),
   latest_version: z.string().nullable(),
+  latest_version_id: z.string().uuid().nullable(),
+  latest_artifact_sha256: z.string().nullable(),
   publication_status: z.string().nullable(),
   engine_type: z.enum(["NATIVE", "N8N"]).nullable(),
   binding_status: z.string().nullable(),
@@ -302,6 +319,7 @@ const playbookDefinitionSchema = z.object({
   impact: z.string().nullable(),
   required_parameters: z.array(z.string()),
   credential_aliases: z.array(z.string()),
+  required_actions: z.array(z.string()),
   target_incident_types: z.array(z.string()).default([]),
   mitre_codes: z.array(z.string()).default([]),
   rollback_supported: z.boolean().default(false),
@@ -311,10 +329,22 @@ const playbookDefinitionSchema = z.object({
   approval_mode: z.enum(["AUTOMATIC", "SINGLE", "FOUR_EYES"]).default("AUTOMATIC"),
   last_execution_status: z.string().nullable(),
   last_executed_at: z.string().nullable(),
+  readiness_status: z.enum(["READY", "DISABLED", "CONFIGURATION_REQUIRED"]),
+  blocking_reasons: z.array(z.string()),
 });
 const playbookDefinitionListSchema = z.object({
   items: z.array(playbookDefinitionSchema),
   total: z.number().int().nonnegative(),
+});const nativeActionBindingSchema = z.object({
+  id: z.string().uuid(),
+  action_code: z.string(),
+  action_version: z.string(),
+  connector_type: z.string(),
+  credential_configured: z.boolean(),
+  configuration_sha256: z.string(),
+  active: z.boolean(),
+  last_verified_at: z.string().nullable(),
+  created_at: z.string(),
 });
 const playbookManagementSchema = z.object({
   editor_url: z.string().url(),
@@ -389,6 +419,8 @@ const playbookExecutionListSchema = z.object({
   total: z.number().int().nonnegative(),
 });
 export type IntegrationHealth = z.infer<typeof integrationHealthSchema>;
+export type IntegrationConnection = z.infer<typeof integrationConnectionSchema>;
+export type IntegrationProbe = z.infer<typeof integrationProbeSchema>;
 export type OperationalActivity24h = z.infer<typeof operationalActivity24hSchema>;
 export type Analysis = z.infer<typeof analysisSchema>;
 export type Claim = z.infer<typeof claimSchema>;
@@ -396,6 +428,7 @@ export type Correlation = z.infer<typeof correlationSchema>;
 export type Enrichment = z.infer<typeof enrichmentSchema>;
 export type PlaybookCatalog = z.infer<typeof playbookCatalogSchema>;
 export type PlaybookDefinition = z.infer<typeof playbookDefinitionSchema>;
+export type NativeActionBinding = z.infer<typeof nativeActionBindingSchema>;
 export type PlaybookManagement = z.infer<typeof playbookManagementSchema>;
 export type ResponseDecision = z.infer<typeof responseDecisionSchema>;
 export type PlaybookExecution = z.infer<typeof playbookExecutionSchema>;
@@ -723,27 +756,6 @@ export async function generateIncidentExplanation(id: string): Promise<Enrichmen
     await authorizedMutation(`/api/v1/incidents/${id}/explanations`, "POST", {}),
   );
 }
-export async function generateDemoScenario() {
-  return z
-    .object({
-      scenario: z.string(),
-      incident: incidentSchema,
-      alerts_created: z.number(),
-      idempotent_replay: z.boolean(),
-    })
-    .parse(await authorizedMutation("/api/v1/demo/scenarios/credential-attack", "POST", {}));
-}
-export async function generateCanonicalDemoScenario() {
-  return z
-    .object({
-      scenario: z.string(),
-      findings_created: z.number().int().nonnegative(),
-      duplicates: z.number().int().nonnegative(),
-      correlation_queued: z.boolean(),
-      correlation_id: z.string().uuid(),
-    })
-    .parse(await authorizedMutation("/api/v1/demo/scenarios/credential-attack-v2", "POST", {}));
-}
 export async function transitionIncident(
   id: string,
   expectedVersion: number,
@@ -767,12 +779,62 @@ export async function getOperationalActivity24h(): Promise<OperationalActivity24
 export async function getIntegrationHealth(): Promise<IntegrationHealth[]> {
   return z.array(integrationHealthSchema).parse(await authorized("/api/v1/integrations/health"));
 }
+
+export async function getIntegrationConnections(): Promise<IntegrationConnection[]> {
+  return z.array(integrationConnectionSchema).parse(
+    await authorized("/api/v1/integrations/connections"),
+  );
+}
+
+export async function configureIntegrationConnection(
+  connectionId: string,
+  input: {
+    connector_type: IntegrationConnection["connector_type"];
+    name: string;
+    configuration: Record<string, string | number | boolean>;
+    enabled: boolean;
+  },
+): Promise<IntegrationConnection> {
+  return integrationConnectionSchema.parse(
+    await authorizedMutation(
+      `/api/v1/integrations/connections/${connectionId}/configure`,
+      "POST",
+      input,
+    ),
+  );
+}
+
+export async function probeIntegrationConnection(connectionId: string): Promise<IntegrationProbe> {
+  return integrationProbeSchema.parse(
+    await authorizedMutation(`/api/v1/integrations/connections/${connectionId}/test`, "POST", {}),
+  );
+}
 export async function getPlaybookDefinitions(): Promise<{
   items: PlaybookDefinition[];
   total: number;
 }> {
   return playbookDefinitionListSchema.parse(
     await authorized("/api/v1/playbook-definitions?limit=100&offset=0"),
+  );
+}
+
+export async function validateAndPublishPlaybookVersion(
+  versionId: string,
+  expectedDigest: string,
+): Promise<void> {
+  await authorizedMutation(
+    `/api/v1/playbook-versions/${versionId}/validate`,
+    "POST",
+    {},
+  );
+  await checked(
+    await authenticatedFetch(
+      `/api/v1/playbook-versions/${versionId}/publish`,
+      {
+        method: "POST",
+        headers: { "If-Match": expectedDigest },
+      },
+    ),
   );
 }
 
@@ -789,6 +851,27 @@ export async function togglePlaybookBinding(
   );
 }
 
+export async function configureNativeActionBinding(input: {
+  action_code: string;
+  action_version: string;
+  connector_type: "INTERNAL" | "SMTP" | "HTTP_ALLOWLISTED";
+  credential_key_id?: string;
+  configuration: Record<string, string>;
+}): Promise<NativeActionBinding> {
+  return nativeActionBindingSchema.parse(
+    await authorizedMutation("/api/v1/native-action-bindings", "POST", input),
+  );
+}
+
+export async function verifyNativeActionBinding(bindingId: string): Promise<NativeActionBinding> {
+  return nativeActionBindingSchema.parse(
+    await authorizedMutation(
+      `/api/v1/native-action-bindings/${bindingId}/verify`,
+      "POST",
+      {},
+    ),
+  );
+}
 export async function getPlaybooks(options?: ListQuery): Promise<PlaybookCatalog> {
   return playbookCatalogSchema.parse(await authorized(listPath("/api/v1/playbooks", options)));
 }
@@ -807,24 +890,24 @@ export async function getResponseDecisions(incidentId: string): Promise<Response
   ).items;
 }
 
-export async function createDemoResponseProposal(id: string): Promise<ResponseDecision> {
+export async function createResponseProposal(id: string): Promise<ResponseDecision> {
   return responseDecisionSchema.parse(
     await checked(
       await authenticatedFetch("/api/v1/response-proposals", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Idempotency-Key": `demo-proposal-${id}`,
+          "Idempotency-Key": `response-proposal-${id}`,
         },
         body: JSON.stringify({
           incident_id: id,
-          action_type: "simulate-user-block",
+          action_type: "contain-and-document-incident",
           impact: "MODERATE",
           requested_mode: "HUMAN_APPROVAL",
-          workflow_id: "simulate-user-block",
+          workflow_id: "contain-and-document-incident",
           workflow_version: "1.0.0",
-          targets: ["synthetic-demo-user"],
-          parameters: { execution_mode: "demo" },
+          targets: [id],
+          parameters: {},
           evidence_refs: [],
         }),
       }),
@@ -864,8 +947,8 @@ export async function decideResponse(
       decision,
       reason:
         decision === "APPROVE"
-          ? "Independent demo approval after reviewing the synthetic scope"
-          : "Independent demo rejection",
+          ? "Independent approval after reviewing the real action scope"
+          : "Independent rejection of the real action scope",
       expected_proposal_fingerprint: fingerprint,
     }),
   );

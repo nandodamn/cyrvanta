@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 
 class IntegrationHealth(BaseModel):
     code: str
-    mode: Literal["disabled", "simulated", "live"]
+    mode: Literal["disabled", "live"]
     healthy: bool
     detail: str
 
@@ -32,19 +32,6 @@ class AnalysisResponse(BaseModel):
     grounded: bool
 
 
-class AutomationRequest(BaseModel):
-    incident_id: UUID
-    workflow_id: str = Field(min_length=1, max_length=120)
-    approved: bool
-    idempotency_key: str = Field(min_length=8, max_length=200)
-
-
-class AutomationResponse(BaseModel):
-    execution_id: str
-    status: str
-    mode: str
-    workflow_id: str
-
 
 class PlaybookConnector(BaseModel):
     node_type: str
@@ -66,7 +53,7 @@ class PlaybookCatalogResponse(BaseModel):
     total: int
     synchronized: bool
     sync_detail: str
-    mode: Literal["disabled", "simulated", "live"]
+    mode: Literal["disabled", "live"]
 
 
 class PlaybookManagementResponse(BaseModel):

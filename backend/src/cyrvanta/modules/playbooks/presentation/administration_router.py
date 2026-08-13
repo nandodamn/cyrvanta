@@ -301,3 +301,23 @@ async def create_native_action_binding(
         )
     except PlaybookAdministrationConflict as exc:
         raise _translate(exc) from exc
+
+
+@router.post(
+    "/native-action-bindings/{binding_id}/verify",
+    response_model=NativeActionBindingResponse,
+)
+async def verify_native_action_binding(
+    binding_id: UUID,
+    request: Request,
+    context: BindingManager,
+) -> NativeActionBindingResponse:
+    try:
+        return await PlaybookAdministrationService().verify_action_binding(
+            tenant_id=context.tenant_id,
+            actor_user_id=context.user_id,
+            binding_id=binding_id,
+            correlation_id=_correlation_id(request),
+        )
+    except (PlaybookAdministrationConflict, PlaybookAdministrationNotFound) as exc:
+        raise _translate(exc) from exc

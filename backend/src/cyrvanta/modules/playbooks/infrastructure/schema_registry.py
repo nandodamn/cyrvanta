@@ -16,17 +16,22 @@ SCHEMAS: dict[str, dict[str, object]] = {
         "additionalProperties": False,
         "properties": {
             "incident_id": {"type": "string", "format": "uuid"},
-            "severity": {"type": "string"},
+            "incident_version": {"type": "integer"},
+            "targets": {"type": "array"},
+            "parameters": {"type": "object"},
+            "evidence_refs": {"type": "array"},
         },
+        "required": ["incident_id", "incident_version"],
     },
     "security/incident-notification-result-v1": {
         "type": "object",
         "additionalProperties": False,
         "properties": {
-            "simulated": {"type": "boolean"},
-            "effect": {"type": "string", "const": "none"},
+            "effect": {"type": "string", "const": "applied"},
+            "workflow_code": {"type": "string"},
+            "step_receipts": {"type": "object"},
         },
-        "required": ["simulated", "effect"],
+        "required": ["effect", "workflow_code", "step_receipts"],
     },
 }
 

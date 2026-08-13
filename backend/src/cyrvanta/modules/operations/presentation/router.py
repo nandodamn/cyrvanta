@@ -8,14 +8,19 @@ from cyrvanta.modules.incident.application.service import IncidentService
 from cyrvanta.modules.integrations.infrastructure.composition import (
     configured_wazuh_connector,
 )
+from cyrvanta.modules.integrations.application.connection_service import (
+    IntegrationConfigurationError,
+    IntegrationConfigurationWrite,
+    IntegrationConnectionResponse,
+    IntegrationConnectionService,
+    IntegrationProbeResponse,
+)
 from cyrvanta.modules.operations.application.activity import (
     OperationalActivity24h,
     OperationalActivityService,
 )
 from cyrvanta.modules.operations.application.schemas import (
     AnalysisResponse,
-    AutomationRequest,
-    AutomationResponse,
     IntegrationHealth,
     NetworkTopologyResponse,
     PlaybookCatalogResponse,
@@ -31,7 +36,6 @@ from cyrvanta.shared.dependencies import SecurityContext, authorize, require_per
 router = APIRouter(tags=["operations"])
 IncidentReader = Annotated[SecurityContext, Depends(require_permission("incident.read"))]
 AnalysisRequester = Annotated[SecurityContext, Depends(require_permission("analysis.request"))]
-ResponseExecutor = Annotated[SecurityContext, Depends(require_permission("response.execute"))]
 PlaybookReader = Annotated[SecurityContext, Depends(require_permission("playbook.read"))]
 PlaybookManager = Annotated[SecurityContext, Depends(require_permission("playbook.manage"))]
 IntegrationReader = Annotated[SecurityContext, Depends(require_permission("integration.read"))]
@@ -73,26 +77,53 @@ async def resolve_connection(
     }
 
 
-@router.post("/integrations/connections/{connection_id}/test")
+@router.get("/integrations/connections", response_model=list[IntegrationConnectionResponse])
+async def list_connections(context: IntegrationReader) -> list[IntegrationConnectionResponse]:
+    return await IntegrationConnectionService().list(context.tenant_id)
+
+
+@router.post("/integrations/connections/{connection_id}/test", response_model=IntegrationProbeResponse)
 async def test_connection(
-    connection_id: str,
+    connection_id: UUID,
     context: IntegrationManager,
-) -> dict[str, object]:
-    """Fail closed until a connector-specific, non-destructive probe is registered."""
-    del connection_id, context
-    raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, "INTEGRATION_PROBE_UNAVAILABLE")
+    request: Request,
+) -> IntegrationProbeResponse:
+    try:
+        return await IntegrationConnectionService().probe(
+            tenant_id=context.tenant_id,
+            actor_user_id=context.user_id,
+            connection_id=connection_id,
+            correlation_id=correlation_id(request),
+        )
+    except IntegrationConfigurationError as exc:
+        code = str(exc)
+        raise HTTPException(
+            status.HTTP_404_NOT_FOUND if code == "INTEGRATION_NOT_FOUND" else status.HTTP_409_CONFLICT,
+            code,
+        ) from exc
 
 
-@router.post("/integrations/connections/{connection_id}/configure")
+@router.post("/integrations/connections/{connection_id}/configure", response_model=IntegrationConnectionResponse)
 async def configure_connection(
     connection_id: str,
-    payload: dict[str, object],
+    payload: IntegrationConfigurationWrite,
     context: IntegrationManager,
-) -> dict[str, object]:
-    """Reject configuration until the write-only secret-store contract is implemented."""
-    del connection_id, payload, context
-    raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, "INTEGRATION_CONFIGURATION_UNAVAILABLE")
-
+    request: Request,
+) -> IntegrationConnectionResponse:
+    try:
+        return await IntegrationConnectionService().configure(
+            tenant_id=context.tenant_id,
+            actor_user_id=context.user_id,
+            connection_id=connection_id,
+            payload=payload,
+            correlation_id=correlation_id(request),
+        )
+    except IntegrationConfigurationError as exc:
+        code = str(exc)
+        raise HTTPException(
+            status.HTTP_404_NOT_FOUND if code == "INTEGRATION_NOT_FOUND" else status.HTTP_409_CONFLICT,
+            code,
+        ) from exc
 
 @router.get("/operations/activity-24h", response_model=OperationalActivity24h)
 async def operational_activity_24h(context: IncidentReader) -> OperationalActivity24h:
@@ -156,17 +187,6 @@ async def analyze(
         {"provider": result.provider, "mode": result.mode, "risk_score": result.risk_score},
     )
     return result
-
-
-@router.post("/automations/execute", response_model=AutomationResponse, deprecated=True)
-async def execute(
-    payload: AutomationRequest, request: Request, context: ResponseExecutor
-) -> AutomationResponse:
-    del payload, request, context
-    raise HTTPException(
-        status.HTTP_410_GONE,
-        "Legacy boolean approval is retired; use a durable response authorization",
-    )
 
 
 @router.get("/incidents/{incident_id}/report")

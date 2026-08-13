@@ -1,6 +1,6 @@
 # PHASE 21-B — Acciones nativas reales y acotadas
 
-Estado: `DRAFT — REQUIERE APROBACIÓN EXPRESA`
+Estado: `APROBADO POR ALCANCE REAL-ONLY — 2026-08-13`
 
 ## Objetivo
 
@@ -67,7 +67,7 @@ los eventos y auditorías existentes y agrega el código de acción al resultado
 
 ## Criterios de aceptación manual
 
-1. Un tenant de laboratorio ingresa datos de prueba por los contratos normales.
+1. Un tenant ingresa datos por conexiones o contratos normales, sin generadores sintéticos.
 2. Cyrvanta crea y analiza un incidente mediante los servicios reales.
 3. Un usuario propone `contain-and-document-incident`.
 4. Un usuario distinto aprueba.

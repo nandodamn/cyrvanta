@@ -1,6 +1,6 @@
 # ADR 0020 — Runtime real sin éxitos simulados
 
-Estado: `DRAFT — REQUIERE APROBACIÓN EXPRESA`
+Estado: `ACEPTADO — 2026-08-13`
 
 ## Contexto
 
@@ -19,7 +19,7 @@ exclusivamente en tests.
 
 - Una instalación sin conexiones mostrará capacidades bloqueadas, no datos inventados.
 - La demo requiere Wazuh/OpenSearch/Ollama/LDAP/SMTP/HTTP reales según el caso mostrado.
-- Los playbooks no soportados se ocultan hasta disponer de adaptador final.
+- Los playbooks no soportados permanecen visibles, explican sus dependencias y están deshabilitados.
 - La activación LIVE sigue siendo gradual, auditable y deny-by-default.
 - Los registros sintéticos históricos no se reclasifican y se excluyen de vistas operativas.
 

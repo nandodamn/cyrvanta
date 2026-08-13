@@ -10,13 +10,12 @@ import {
   Alert,
   createRole,
   createUser,
-  createDemoResponseProposal,
+  createResponseProposal,
   decideResponse,
   analyzeIncident,
   directoryLogin,
   downloadIncidentReport,
   executeAuthorizedResponse,
-  generateCanonicalDemoScenario,
   generateIncidentExplanation,
   getAlerts,
   getAuditEvents,
@@ -504,19 +503,6 @@ function Overview() {
     queryKey: ["alerts", "overview"],
     queryFn: () => getAlerts({ pageSize: 100 }),
   });
-  const demo = useMutation({
-    mutationFn: generateCanonicalDemoScenario,
-    onSuccess: async () => {
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["incidents"] }),
-        queryClient.invalidateQueries({ queryKey: ["alerts"] }),
-      ]);
-      window.setTimeout(() => {
-        void queryClient.invalidateQueries({ queryKey: ["incidents"] });
-        void queryClient.invalidateQueries({ queryKey: ["alerts"] });
-      }, 2500);
-    },
-  });
   const open = incidents.data?.filter((item) => item.status !== "closed") ?? [];
   const cards = [
     [t("openIncidents"), String(open.length)],
@@ -550,11 +536,6 @@ function Overview() {
         <OperationalPulse />
         <SecurityTopologyPanel />
       </section>
-      {demo.data && (
-        <p className="demo-badge">
-          {demo.data.correlation_queued ? t("canonicalDemoQueued") : t("canonicalDemoReplay")}
-        </p>
-      )}
     </>
   );
 }
@@ -1013,7 +994,7 @@ function IncidentDetailPage() {
     },
   });
   const responseProposal = useMutation({
-    mutationFn: () => createDemoResponseProposal(id),
+    mutationFn: () => createResponseProposal(id),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["response-decisions", id] });
     },

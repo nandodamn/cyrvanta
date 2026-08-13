@@ -9,6 +9,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from cyrvanta.modules.identity.infrastructure.models import AuditEventModel
+from cyrvanta.modules.integrations.infrastructure.models import IntegrationModel
 from cyrvanta.modules.playbooks.application.administration_schemas import (
     ActionList,
     ActionResponse,
@@ -209,11 +210,25 @@ ESSENTIAL_NATIVE_PLAYBOOKS: list[dict[str, object]] = [
             "proposes candidate memories with human approval."
         ),
     },
+    {
+        "code": "contain-and-document-incident",
+        "title_es": "Contener y documentar incidente",
+        "title_en": "Contain and Document Incident",
+        "description_es": (
+            "Transición interna real y auditada del incidente a estado contenido, "
+            "con control de versión y aprobación."
+        ),
+        "description_en": (
+            "Real audited internal transition of the incident to contained status, "
+            "with optimistic locking and approval."
+        ),
+    },
 ]
 
 ESSENTIAL_NATIVE_ACTIONS: dict[str, str] = {
+    "contain-and-document-incident": "incident.status.transition",
     "compromised-account": "ticket.create",
-    "compromised-endpoint": "endpoint.isolate_simulated",
+    "compromised-endpoint": "endpoint.isolate",
     "phishing-malicious-email": "ticket.create",
     "ransomware-destructive": "notification.send",
     "lateral-movement": "incident.report.generate",
@@ -226,6 +241,11 @@ ESSENTIAL_NATIVE_ACTIONS: dict[str, str] = {
     "closure-controlled-learning": "incident.report.generate",
 }
 
+
+IMPLEMENTED_REAL_PLAYBOOKS = {
+    "contain-and-document-incident",
+    "escalation-notification",
+}
 
 SENSITIVE_KEY = re.compile(
     r"(?:authorization|cookie|password|secret|token|api[_-]?key|private[_-]?key|credential)",
@@ -242,6 +262,7 @@ class PlaybookAdministrationConflict(Exception):
 
 
 PLAYBOOK_GOVERNANCE_TAXONOMY: dict[str, str] = {
+    "contain-and-document-incident": "SINGLE",
     # FOUR_EYES: critical identity containment and host-isolation actions,
     # including evasion and ransomware response.
     "simulate-user-block": "FOUR_EYES",
@@ -301,36 +322,17 @@ class PlaybookAdministrationService:
     async def _ensure_essential_definitions_seeded(
         self, session: AsyncSession, tenant_id: UUID
     ) -> None:
-        for code, desired_approval_mode in PLAYBOOK_GOVERNANCE_TAXONOMY.items():
-            existing_items = list(
-                (
-                    await session.scalars(
-                        select(PlaybookDefinitionModel).where(
-                            PlaybookDefinitionModel.tenant_id == tenant_id,
-                            PlaybookDefinitionModel.code == code,
-                        )
-                    )
-                ).all()
-            )
-            for existing in existing_items:
-                if not self._approval_satisfies_minimum(
-                    existing.approval_mode or "AUTOMATIC",
-                    desired_approval_mode,
-                ):
-                    existing.approval_mode = desired_approval_mode
-
         for pb in ESSENTIAL_NATIVE_PLAYBOOKS:
             code = cast(str, pb["code"])
+            desired_approval_mode = PLAYBOOK_GOVERNANCE_TAXONOMY.get(code, "AUTOMATIC")
             definition = await session.scalar(
                 select(PlaybookDefinitionModel).where(
                     PlaybookDefinitionModel.tenant_id == tenant_id,
                     PlaybookDefinitionModel.code == code,
                 )
             )
-            desired_approval_mode = PLAYBOOK_GOVERNANCE_TAXONOMY.get(code, "AUTOMATIC")
-
             if definition is None:
-                def_model = PlaybookDefinitionModel(
+                definition = PlaybookDefinitionModel(
                     tenant_id=tenant_id,
                     code=code,
                     name_es=cast(str, pb["title_es"]),
@@ -340,16 +342,40 @@ class PlaybookAdministrationService:
                     action_type=code,
                     approval_mode=desired_approval_mode,
                 )
-                session.add(def_model)
+                session.add(definition)
                 await session.flush()
+            elif not self._approval_satisfies_minimum(
+                definition.approval_mode or "AUTOMATIC", desired_approval_mode
+            ):
+                definition.approval_mode = desired_approval_mode
 
-                artifact_dict = {
+            live_version = await session.scalar(
+                select(PlaybookVersionModel).where(
+                    PlaybookVersionModel.tenant_id == tenant_id,
+                    PlaybookVersionModel.definition_id == definition.id,
+                    PlaybookVersionModel.classification == "LIVE",
+                )
+            )
+            if live_version is not None:
+                continue
+            any_version = await session.scalar(
+                select(PlaybookVersionModel.id).where(
+                    PlaybookVersionModel.tenant_id == tenant_id,
+                    PlaybookVersionModel.definition_id == definition.id,
+                )
+            )
+            version_number = "2.0.0" if any_version is not None else "1.0.0"
+            artifact = PortablePlaybookV1.model_validate(
+                {
                     "schema_version": "1.0",
                     "code": code,
-                    "version": "1.0.0",
+                    "version": version_number,
                     "title_i18n": {"es": pb["title_es"], "en": pb["title_en"]},
-                    "description_i18n": {"es": pb["description_es"], "en": pb["description_en"]},
-                    "execution_mode": "SIMULATED",
+                    "description_i18n": {
+                        "es": pb["description_es"],
+                        "en": pb["description_en"],
+                    },
+                    "execution_mode": "LIVE",
                     "impact_level": "MEDIUM",
                     "input_schema_ref": "security/incident-notification-input-v1",
                     "result_schema_ref": "security/incident-notification-result-v1",
@@ -363,16 +389,21 @@ class PlaybookAdministrationService:
                         }
                     ],
                     "edges": [],
-                    "timeouts": {"overall_seconds": 60, "action_seconds": 30, "max_attempts": 1},
+                    "timeouts": {
+                        "overall_seconds": 60,
+                        "action_seconds": 30,
+                        "max_attempts": 1,
+                    },
                 }
-                artifact = PortablePlaybookV1.model_validate(artifact_dict)
-                digest = portable_playbook_sha256(artifact)
-                version_model = PlaybookVersionModel(
+            )
+            digest = portable_playbook_sha256(artifact)
+            session.add(
+                PlaybookVersionModel(
                     tenant_id=tenant_id,
-                    definition_id=def_model.id,
-                    version="1.0.0",
+                    definition_id=definition.id,
+                    version=version_number,
                     impact="MODERATE",
-                    classification="SYNTHETIC",
+                    classification="LIVE",
                     status="DRAFT",
                     approved_at=None,
                     workflow_code=code,
@@ -383,11 +414,8 @@ class PlaybookAdministrationService:
                     result_schema=resolve_schema("security/incident-notification-result-v1"),
                     timeout_seconds=60,
                 )
-                session.add(version_model)
-                await session.flush()
-
+            )
         await session.flush()
-
     async def get_definition(self, tenant_id: UUID, definition_id: UUID) -> DefinitionResponse:
         async with tenant_session(tenant_id) as session:
             definition = await session.scalar(
@@ -450,8 +478,8 @@ class PlaybookAdministrationService:
         correlation_id: UUID,
     ) -> VersionResponse:
         artifact = payload.artifact
-        if artifact.execution_mode != "SIMULATED":
-            raise PlaybookAdministrationConflict("PLAYBOOK_LIVE_DISABLED")
+        if artifact.execution_mode != "LIVE":
+            raise PlaybookAdministrationConflict("PLAYBOOK_INVALID")
         input_schema = resolve_schema(artifact.input_schema_ref)
         result_schema = resolve_schema(artifact.result_schema_ref)
         self._validate_registered_actions(artifact)
@@ -481,7 +509,7 @@ class PlaybookAdministrationService:
                 definition_id=definition_id,
                 version=artifact.version,
                 impact="MODERATE" if artifact.impact_level == "MEDIUM" else artifact.impact_level,
-                classification="SYNTHETIC",
+                classification="LIVE",
                 status="DRAFT",
                 workflow_code=artifact.code,
                 artifact_sha256=digest,
@@ -845,39 +873,73 @@ class PlaybookAdministrationService:
         correlation_id: UUID,
     ) -> NativeActionBindingResponse:
         self._reject_sensitive_configuration(payload.configuration)
-        if payload.connector_type != "SIMULATED" or payload.credential_key_id is not None:
-            raise PlaybookAdministrationConflict("PLAYBOOK_EGRESS_DENIED")
         try:
             connector = self.registry.get(payload.action_code, payload.action_version)
         except ActionUnavailableError as exc:
             raise PlaybookAdministrationConflict("PLAYBOOK_ACTION_UNAVAILABLE") from exc
+        descriptor = connector.describe()
+        expected_connector = (
+            "INTERNAL"
+            if descriptor.egress == "NONE"
+            else "HTTP_ALLOWLISTED"
+            if descriptor.egress == "HTTPS"
+            else "SMTP"
+        )
+        if payload.connector_type != expected_connector:
+            raise PlaybookAdministrationConflict("PLAYBOOK_ACTION_CONFIG_INVALID")
         validation = connector.validate_configuration(payload.configuration)
         if not validation.valid:
             raise PlaybookAdministrationConflict(validation.error_codes[0])
+        credential_id: UUID | None = None
+        if expected_connector != "INTERNAL":
+            try:
+                credential_id = UUID(payload.credential_key_id or "")
+            except ValueError as exc:
+                raise PlaybookAdministrationConflict("PLAYBOOK_CREDENTIAL_UNAVAILABLE") from exc
         digest = self._digest(payload.configuration)
         async with tenant_session(tenant_id) as session:
-            existing = await session.scalar(
-                select(NativeActionBindingModel.id).where(
+            credential = None
+            if credential_id is not None:
+                credential = await session.scalar(
+                    select(IntegrationModel).where(
+                        IntegrationModel.tenant_id == tenant_id,
+                        IntegrationModel.id == credential_id,
+                        IntegrationModel.connector_type == payload.connector_type,
+                        IntegrationModel.status == "active",
+                        IntegrationModel.last_health_check_at.is_not(None),
+                        IntegrationModel.last_error_code.is_(None),
+                    )
+                )
+                if credential is None:
+                    raise PlaybookAdministrationConflict("PLAYBOOK_CREDENTIAL_UNAVAILABLE")
+            binding = await session.scalar(
+                select(NativeActionBindingModel).where(
                     NativeActionBindingModel.tenant_id == tenant_id,
                     NativeActionBindingModel.action_code == payload.action_code,
                     NativeActionBindingModel.action_version == payload.action_version,
                 )
             )
-            if existing is not None:
-                raise PlaybookAdministrationConflict("PLAYBOOK_STATE_CONFLICT")
-            binding = NativeActionBindingModel(
-                tenant_id=tenant_id,
-                action_code=payload.action_code,
-                action_version=payload.action_version,
-                connector_type="SIMULATED",
-                credential_key_id=None,
-                configuration=payload.configuration,
-                configuration_sha256=digest,
-                active=True,
-                created_by_user_id=actor_user_id,
-                last_verified_at=datetime.now(UTC),
-            )
-            session.add(binding)
+            if binding is None:
+                binding = NativeActionBindingModel(
+                    tenant_id=tenant_id,
+                    action_code=payload.action_code,
+                    action_version=payload.action_version,
+                    connector_type=payload.connector_type,
+                    credential_key_id=payload.credential_key_id,
+                    configuration=payload.configuration,
+                    configuration_sha256=digest,
+                    active=False,
+                    created_by_user_id=actor_user_id,
+                    last_verified_at=None,
+                )
+                session.add(binding)
+            else:
+                binding.connector_type = payload.connector_type
+                binding.credential_key_id = payload.credential_key_id
+                binding.configuration = payload.configuration
+                binding.configuration_sha256 = digest
+                binding.active = False
+                binding.last_verified_at = None
             await session.flush()
             self._audit(
                 session,
@@ -890,11 +952,75 @@ class PlaybookAdministrationService:
                 {
                     "action_code": binding.action_code,
                     "action_version": binding.action_version,
-                    "connector_type": "SIMULATED",
+                    "connector_type": binding.connector_type,
+                    "credential_reference": str(credential.id) if credential is not None else None,
+                    "active": False,
                 },
             )
             return self._action_binding_response(binding)
-
+    async def verify_action_binding(
+        self,
+        *,
+        tenant_id: UUID,
+        actor_user_id: UUID,
+        binding_id: UUID,
+        correlation_id: UUID,
+    ) -> NativeActionBindingResponse:
+        async with tenant_session(tenant_id) as session:
+            binding = await session.scalar(
+                select(NativeActionBindingModel).where(
+                    NativeActionBindingModel.tenant_id == tenant_id,
+                    NativeActionBindingModel.id == binding_id,
+                )
+            )
+            if binding is None:
+                raise PlaybookAdministrationNotFound("PLAYBOOK_NOT_FOUND")
+            try:
+                connector = self.registry.get(binding.action_code, binding.action_version)
+                descriptor = connector.describe()
+                credential_id = (
+                    None if descriptor.egress == "NONE" else UUID(binding.credential_key_id or "")
+                )
+            except (ActionUnavailableError, ValueError) as exc:
+                raise PlaybookAdministrationConflict("PLAYBOOK_CREDENTIAL_UNAVAILABLE") from exc
+            validation = connector.validate_configuration(binding.configuration)
+            if (
+                not validation.valid
+                or binding.configuration_sha256 != self._digest(binding.configuration)
+            ):
+                raise PlaybookAdministrationConflict("PLAYBOOK_ACTION_CONFIG_INVALID")
+            credential = None
+            if credential_id is not None:
+                credential = await session.scalar(
+                    select(IntegrationModel.id).where(
+                        IntegrationModel.tenant_id == tenant_id,
+                        IntegrationModel.id == credential_id,
+                        IntegrationModel.connector_type == binding.connector_type,
+                        IntegrationModel.status == "active",
+                        IntegrationModel.last_health_check_at.is_not(None),
+                        IntegrationModel.last_error_code.is_(None),
+                    )
+                )
+                if credential is None:
+                    raise PlaybookAdministrationConflict("PLAYBOOK_CREDENTIAL_UNAVAILABLE")
+            binding.active = True
+            binding.last_verified_at = datetime.now(UTC)
+            await session.flush()
+            self._audit(
+                session,
+                tenant_id,
+                actor_user_id,
+                correlation_id,
+                "playbook.native_action_binding.verified",
+                "native_action_binding",
+                binding.id,
+                {
+                    "action_code": binding.action_code,
+                    "connector_type": binding.connector_type,
+                    "credential_reference": str(credential) if credential is not None else None,
+                },
+            )
+            return self._action_binding_response(binding)
     async def _native_actions_ready(
         self, session: AsyncSession, tenant_id: UUID, artifact: PortablePlaybookV1
     ) -> bool:
@@ -906,18 +1032,39 @@ class PlaybookAdministrationService:
                     NativeActionBindingModel.tenant_id == tenant_id,
                     NativeActionBindingModel.action_code == step.action,
                     NativeActionBindingModel.action_version == step.action_version,
-                    NativeActionBindingModel.connector_type == "SIMULATED",
                     NativeActionBindingModel.active.is_(True),
                     NativeActionBindingModel.last_verified_at.is_not(None),
                 )
             )
-            if binding is None or binding.configuration_sha256 != self._digest(
-                binding.configuration
+            if (
+                binding is None
+                or binding.configuration_sha256 != self._digest(binding.configuration)
             ):
                 return False
+            try:
+                connector = self.registry.get(step.action, step.action_version)
+            except ActionUnavailableError:
+                return False
+            if connector.describe().egress != "NONE":
+                try:
+                    credential_id = UUID(binding.credential_key_id or "")
+                except ValueError:
+                    return False
+                credential_ready = await session.scalar(
+                    select(IntegrationModel.id).where(
+                        IntegrationModel.tenant_id == tenant_id,
+                        IntegrationModel.id == credential_id,
+                        IntegrationModel.status == "active",
+                        IntegrationModel.last_health_check_at.is_not(None),
+                        IntegrationModel.last_error_code.is_(None),
+                    )
+                )
+                if credential_ready is None:
+                    return False
         return True
-
     def _version_errors(self, version: PlaybookVersionModel) -> list[str]:
+        if version.workflow_code not in IMPLEMENTED_REAL_PLAYBOOKS:
+            return ["PLAYBOOK_ACTION_UNAVAILABLE"]
         try:
             artifact = self._artifact(version)
             self._validate_registered_actions(artifact)
@@ -931,15 +1078,15 @@ class PlaybookAdministrationService:
             return ["PLAYBOOK_INVALID"]
         if portable_playbook_sha256(artifact) != version.artifact_sha256:
             return ["PLAYBOOK_DIGEST_MISMATCH"]
-        if artifact.execution_mode != "SIMULATED" or version.classification != "SYNTHETIC":
-            return ["PLAYBOOK_LIVE_DISABLED"]
+        if artifact.execution_mode != "LIVE" or version.classification != "LIVE":
+            return ["PLAYBOOK_INVALID"]
         return []
 
     def _validate_registered_actions(self, artifact: PortablePlaybookV1) -> None:
         for step in artifact.steps:
             if isinstance(step, ActionStep):
                 descriptor = self.registry.get(step.action, step.action_version).describe()
-                if "SIMULATED" not in descriptor.modes:
+                if "LIVE" not in descriptor.modes:
                     raise ActionUnavailableError("PLAYBOOK_ACTION_UNAVAILABLE")
 
     @staticmethod
@@ -1008,9 +1155,41 @@ class PlaybookAdministrationService:
             if (binding is not None and binding.active and binding.engine_type == "N8N")
             else "NATIVE"
         )
+        blocking_reasons: list[str] = []
+        version_errors = self._version_errors(version)
+        blocking_reasons.extend(version_errors)
+        actions_ready = (
+            artifact is not None
+            and not version_errors
+            and await self._native_actions_ready(session, item.tenant_id, artifact)
+        )
+        if version.status != "APPROVED":
+            blocking_reasons.append("PLAYBOOK_NOT_PUBLISHED")
+        if binding is None:
+            blocking_reasons.append("PLAYBOOK_BINDING_UNAVAILABLE")
+        elif (
+            not binding.active
+            or binding.sync_status != "SYNCHRONIZED"
+            or binding.observed_digest != binding.desired_digest
+        ):
+            blocking_reasons.append("PLAYBOOK_BINDING_UNAVAILABLE")
+        if not actions_ready:
+            blocking_reasons.append("PLAYBOOK_CONFIGURATION_REQUIRED")
+        if not self.settings.playbook_live_enabled or not self.settings.playbook_dispatch_enabled:
+            blocking_reasons.append("PLAYBOOK_LIVE_DISABLED")
+        blocking_reasons = list(dict.fromkeys(blocking_reasons))
+        readiness_status = (
+            "READY"
+            if not blocking_reasons
+            else "CONFIGURATION_REQUIRED"
+            if "PLAYBOOK_CONFIGURATION_REQUIRED" in blocking_reasons
+            else "DISABLED"
+        )
         return response.model_copy(
             update={
                 "latest_version": version.version,
+                "latest_version_id": version.id,
+                "latest_artifact_sha256": version.artifact_sha256,
                 "publication_status": (
                     "PUBLISHED" if version.status == "APPROVED" else version.status
                 ),
@@ -1027,6 +1206,11 @@ class PlaybookAdministrationService:
                 "credential_aliases": (
                     list(artifact.credential_aliases) if artifact is not None else []
                 ),
+                "required_actions": (
+                    [step.action for step in artifact.steps if isinstance(step, ActionStep)]
+                    if artifact is not None
+                    else []
+                ),
                 "target_incident_types": [],
                 "mitre_codes": [],
                 "rollback_supported": False,
@@ -1036,6 +1220,8 @@ class PlaybookAdministrationService:
                 "approval_mode": getattr(item, "approval_mode", "AUTOMATIC") or "AUTOMATIC",
                 "last_execution_status": (execution.status if execution is not None else None),
                 "last_executed_at": (execution.created_at if execution is not None else None),
+                "readiness_status": readiness_status,
+                "blocking_reasons": blocking_reasons,
             }
         )
 
@@ -1144,6 +1330,13 @@ class PlaybookAdministrationService:
                     raise PlaybookAdministrationConflict("PLAYBOOK_BINDING_UNAVAILABLE")
                 session.add(binding)
             else:
+                if desired_active and target_engine == "NATIVE":
+                    synchronized = await self._native_actions_ready(
+                        session, tenant_id, self._artifact(version)
+                    )
+                    binding.observed_digest = version.artifact_sha256 if synchronized else None
+                    binding.sync_status = "SYNCHRONIZED" if synchronized else "PENDING"
+                    binding.last_verified_at = datetime.now(UTC) if synchronized else None
                 if desired_active:
                     self._assert_binding_activatable(binding)
                 binding.active = desired_active

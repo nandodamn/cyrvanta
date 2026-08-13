@@ -139,7 +139,7 @@ def test_recovery_rejects_ambiguous_terminal_step() -> None:
         result=None,
     )
 
-    with pytest.raises(NativeEngineRejected, match="PLAYBOOK_STATE_CONFLICT"):
+    with pytest.raises(NativeEngineRejected, match="PLAYBOOK_ACTION_OUTCOME_UNKNOWN"):
         NativePlaybookDispatcher._progress_from_rows([row])
 
 

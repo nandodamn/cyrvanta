@@ -233,15 +233,14 @@ class RealActionConnector:
                     credential_handle.values,
                 )
                 status = "CREATED" if self._code == "ticket.create" else "ACCEPTED"
-        except (
-            OSError,
-            smtplib.SMTPException,
-            httpx.HTTPError,
-            ValueError,
-            KeyError,
-            IncidentReportStateConflict,
-            IncidentNotFound,
-        ):
+        except (OSError, smtplib.SMTPException, httpx.HTTPError):
+            return ActionResult(
+                False,
+                {},
+                "PLAYBOOK_ACTION_OUTCOME_UNKNOWN",
+                "External action outcome is unknown",
+            )
+        except (ValueError, KeyError, IncidentReportStateConflict, IncidentNotFound):
             return ActionResult(False, {}, "PLAYBOOK_ACTION_FAILED", "External action failed")
         return ActionResult(
             True,

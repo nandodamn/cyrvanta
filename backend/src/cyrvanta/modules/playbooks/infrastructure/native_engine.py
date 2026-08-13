@@ -17,7 +17,7 @@ from cyrvanta.modules.integrations.application.connection_service import (
     IntegrationConnectionService,
 )
 from cyrvanta.modules.integrations.infrastructure.models import IntegrationModel
-from cyrvanta.modules.playbooks.application.engine_ports import EngineContext
+from cyrvanta.modules.playbooks.application.engine_ports import ActionResult, EngineContext
 from cyrvanta.modules.playbooks.application.portable import (
     ActionStep,
     ConditionExpression,
@@ -101,9 +101,9 @@ class NativePlaybookDispatcher:
             causation_id=causation_id,
             deadline=deadline,
         )
-        outcomes, outputs = await self._load_progress(tenant_id, execution_id)
-        failed = "FAILURE" in outcomes.values()
         try:
+            outcomes, outputs = await self._load_progress(tenant_id, execution_id)
+            failed = "FAILURE" in outcomes.values()
             for step in self._topological_steps(artifact):
                 if step.id in outcomes:
                     continue
@@ -131,9 +131,7 @@ class NativePlaybookDispatcher:
                 context,
                 execution_id,
                 workflow_code,
-                status=ExecutionStatus.TIMED_OUT.value
-                if exc.error_code == "PLAYBOOK_DEADLINE_EXCEEDED"
-                else ExecutionStatus.FAILED.value,
+                status=self._rejection_execution_status(exc.error_code),
                 error_code=exc.error_code,
             )
             return False
@@ -199,7 +197,9 @@ class NativePlaybookDispatcher:
                 outcomes[row.step_id] = "FAILURE"
             elif row.status == "SKIPPED":
                 outcomes[row.step_id] = "SKIPPED"
-            elif row.status in {"CANCELLED", "UNKNOWN"}:
+            elif row.status == "UNKNOWN":
+                raise NativeEngineRejected("PLAYBOOK_ACTION_OUTCOME_UNKNOWN")
+            elif row.status == "CANCELLED":
                 raise NativeEngineRejected("PLAYBOOK_STATE_CONFLICT")
         return outcomes, outputs
 
@@ -519,7 +519,7 @@ class NativePlaybookDispatcher:
             credential,
         )
         completed_at = datetime.now(UTC)
-        status = "SUCCEEDED" if result.succeeded else "FAILED"
+        status = self._action_outcome_status(result)
         late_after_cancel = False
         async with tenant_session(context.tenant_id) as session:
             step_row = await session.scalar(
@@ -599,7 +599,25 @@ class NativePlaybookDispatcher:
                 )
         if late_after_cancel:
             raise NativeEngineRejected("PLAYBOOK_CANCELLED")
+        if status == "UNKNOWN":
+            raise NativeEngineRejected("PLAYBOOK_ACTION_OUTCOME_UNKNOWN")
         return {**result.output, "succeeded": result.succeeded}
+
+    @staticmethod
+    def _action_outcome_status(result: ActionResult) -> str:
+        if result.succeeded:
+            return "SUCCEEDED"
+        if result.error_code == "PLAYBOOK_ACTION_OUTCOME_UNKNOWN":
+            return "UNKNOWN"
+        return "FAILED"
+
+    @staticmethod
+    def _rejection_execution_status(error_code: str | None) -> str:
+        if error_code == "PLAYBOOK_DEADLINE_EXCEEDED":
+            return ExecutionStatus.TIMED_OUT.value
+        if error_code == "PLAYBOOK_ACTION_OUTCOME_UNKNOWN":
+            return ExecutionStatus.UNKNOWN.value
+        return ExecutionStatus.FAILED.value
 
     @staticmethod
     def _validate_recoverable_attempt(

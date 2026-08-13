@@ -27,6 +27,9 @@ Estado: implementación preparada; validación funcional manual pendiente del op
 - Los tres playbooks de egreso autorizados comparten un snapshot real y tenant-scoped con sólo
   ID, código, título, estado, severidad, clasificación, riesgo y resumen de análisis; excluye
   telemetría, evidencia raw, metadatos adicionales, secretos y parámetros libres.
+- Un fallo de confirmación SMTP/HTTPS se persiste como `UNKNOWN`, nunca como fracaso definitivo;
+  el motor detiene el grafo y conserva esa semántica también al recuperarse de un crash, sin
+  reintentar automáticamente efectos externos no seguros.
 - La validación de conexiones está versionada: readiness y runtime exigen la versión vigente;
   conexiones heredadas sólo se promueven después de revalidación y probe real exitoso.
 - n8n sin éxito prefabricado: el workflow debe enviar el resultado real firmado por HMAC.

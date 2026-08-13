@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
-import json
 import smtplib
 import ssl
 from email.message import EmailMessage
@@ -24,6 +23,10 @@ from cyrvanta.modules.incident.application.service import (
 )
 
 from cyrvanta.modules.integrations.application.connection_service import StoredIntegrationCredential
+from cyrvanta.modules.operations.application.reporting import (
+    IncidentReportService,
+    IncidentReportStateConflict,
+)
 from cyrvanta.shared.database import tenant_session
 from cyrvanta.modules.playbooks.application.engine_ports import (
     ActionConnectorPort, ActionDescriptor, ActionResult, CredentialHandle,
@@ -160,18 +163,31 @@ class RealActionConnector:
         if not isinstance(credential_handle, StoredIntegrationCredential):
             return ActionResult(False, {}, "PLAYBOOK_CREDENTIAL_UNAVAILABLE")
         try:
+            safe_payload = await self._safe_external_payload(context, action_input)
             if self._code in {"notification.send", "incident.report.generate"}:
                 receipt = await self._send_email(
-                    action_input, configuration, idempotency_key, credential_handle.values
+                    safe_payload,
+                    configuration,
+                    idempotency_key,
+                    credential_handle.values,
+                    attach_report=self._code == "incident.report.generate",
                 )
                 status = "DELIVERED"
             else:
                 receipt = await self._post_http(
-                    context, action_input, configuration, idempotency_key,
+                    context, safe_payload, configuration, idempotency_key,
                     credential_handle.values,
                 )
                 status = "CREATED" if self._code == "ticket.create" else "ACCEPTED"
-        except (OSError, smtplib.SMTPException, httpx.HTTPError, ValueError, KeyError):
+        except (
+            OSError,
+            smtplib.SMTPException,
+            httpx.HTTPError,
+            ValueError,
+            KeyError,
+            IncidentReportStateConflict,
+            IncidentNotFound,
+        ):
             return ActionResult(False, {}, "PLAYBOOK_ACTION_FAILED", "External action failed")
         return ActionResult(
             True,
@@ -179,20 +195,60 @@ class RealActionConnector:
             safe_detail="External action completed",
         )
 
+    async def _safe_external_payload(
+        self, context: EngineContext, action_input: dict[str, object]
+    ) -> dict[str, object]:
+        inputs = action_input.get("inputs")
+        if not isinstance(inputs, dict):
+            raise ValueError("missing execution inputs")
+        incident_id = UUID(str(inputs["incident_id"]))
+        expected_version = int(inputs["incident_version"])
+        if self._code == "incident.report.generate":
+            return await IncidentReportService().snapshot(
+                context.tenant_id,
+                incident_id,
+                expected_version=expected_version,
+            )
+        incident = await IncidentService().get_incident(context.tenant_id, incident_id)
+        if incident.version != expected_version:
+            raise IncidentReportStateConflict("INCIDENT_VERSION_CONFLICT")
+        return {
+            "incident": {
+                "id": str(incident.id),
+                "code": incident.code,
+                "title": incident.title,
+                "status": incident.status,
+                "severity": incident.severity,
+                "priority": incident.priority,
+                "classification": incident.classification,
+                "version": incident.version,
+                "detected_at": incident.detected_at.isoformat(),
+            }
+        }
+
     async def _send_email(
         self, action_input: dict[str, object], configuration: dict[str, object],
-        idempotency_key: str, credential: dict[str, object],
+        idempotency_key: str, credential: dict[str, object], *, attach_report: bool,
     ) -> str:
         message = EmailMessage()
         prefix = str(configuration.get("subject_prefix", "[Cyrvanta]"))
-        title = str(action_input.get("title") or action_input.get("incident_title") or self._code)
+        incident = action_input.get("incident")
+        title = (
+            str(incident.get("title"))
+            if isinstance(incident, dict) and incident.get("title")
+            else self._code
+        )
         message["Subject"] = f"{prefix} {title}"[:240]
         message["From"] = str(credential["from_address"])
         message["To"] = str(configuration["to"])
         digest = hashlib.sha256(idempotency_key.encode()).hexdigest()
         message["Message-ID"] = f"<{digest}@cyrvanta>"
-        body = json.dumps(action_input, ensure_ascii=False, indent=2, sort_keys=True)
+        body = IncidentReportService.render_text(action_input)
         message.set_content(body[:100000])
+        if attach_report:
+            message.add_alternative(
+                IncidentReportService.render_html(action_input)[:200000], subtype="html"
+            )
         await asyncio.to_thread(self._smtp_send, credential, message)
         return hashlib.sha256(f"{idempotency_key}:{message['Message-ID']}".encode()).hexdigest()[:24]
 

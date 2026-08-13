@@ -465,16 +465,16 @@ nav a.active {
 }
 
 .overview-visuals {
-  display: grid;
-  grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.45fr);
-  gap: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  width: 100%;
 }
 
 .overview-visuals .panel {
-  min-height: 390px;
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 1rem;
 }
 
 .panel-heading {
@@ -1699,9 +1699,141 @@ nav a.active {
   background: var(--panel-raised);
   border: 1px solid var(--line-strong);
   border-radius: 6px;
-  padding: 12px 16px;
+  padding: 14px 18px;
   margin-top: 0.75rem;
   animation: fadeIn 0.2s ease;
 }
+
+/* ==========================================================================
+   Topology Node Table (Rich SOC Inventory List)
+   ========================================================================== */
+.topology-table-filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 0.75rem;
+}
+
+.topology-filter-input {
+  flex: 1 1 240px;
+  max-width: 360px;
+  padding: 7px 12px;
+  font-size: 0.85rem;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--text);
+}
+
+.topology-tier-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.topology-tier-pill {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  color: var(--text-soft);
+  padding: 4px 10px;
+  font-size: 0.78rem;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.topology-tier-pill:hover {
+  background: var(--panel-raised);
+  color: var(--text);
+}
+
+.topology-tier-pill.active {
+  background: rgba(85, 230, 193, 0.12);
+  color: var(--accent);
+  border-color: var(--accent);
+  font-weight: 700;
+}
+
+.topology-table-container {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  overflow-x: auto;
+}
+
+.topology-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 0.85rem;
+}
+
+.topology-table th {
+  background: var(--panel-raised);
+  color: var(--text-soft);
+  font-weight: 600;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+}
+
+.topology-table td {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line);
+  vertical-align: middle;
+}
+
+.topology-table tbody tr {
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.topology-table tbody tr:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.topology-table tbody tr.selected {
+  background: rgba(85, 230, 193, 0.07);
+}
+
+.topology-status-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+
+.topology-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.topology-status-dot.online {
+  background: var(--success);
+  box-shadow: 0 0 6px var(--success);
+}
+
+.topology-status-dot.warning {
+  background: var(--warning);
+  box-shadow: 0 0 6px var(--warning);
+}
+
+.topology-ip-code {
+  font-family: "Space Mono", monospace;
+  font-size: 0.8rem;
+  color: var(--cyan);
+  background: rgba(96, 201, 255, 0.08);
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid rgba(96, 201, 255, 0.2);
+}
+
 
 

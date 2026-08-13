@@ -504,6 +504,7 @@ class DecisionService:
                 raise DecisionConflict("Approval request has expired")
             if proposal.fingerprint != payload.expected_proposal_fingerprint:
                 raise DecisionConflict("Proposal fingerprint no longer matches")
+            reason = self._validated_decision_reason(payload.reason)
             if actor_user_id == proposal.requester_user_id:
                 raise DecisionConflict("Requester cannot approve the proposal")
             existing = await session.scalar(
@@ -522,7 +523,7 @@ class DecisionService:
                 approval_request_id=request.id,
                 actor_user_id=actor_user_id,
                 decision=payload.decision,
-                reason=payload.reason.strip(),
+                reason=reason,
                 proposal_fingerprint=proposal.fingerprint,
             )
             session.add(decision)
@@ -600,6 +601,13 @@ class DecisionService:
                 )
             await session.flush()
             return await self._response(session, proposal)
+
+    @staticmethod
+    def _validated_decision_reason(value: str) -> str:
+        reason = value.strip()
+        if not reason:
+            raise DecisionConflict("Approval decision reason is required")
+        return reason
 
     async def revoke(
         self,

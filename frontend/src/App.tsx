@@ -1010,6 +1010,7 @@ function IncidentDetailPage() {
   const [expandedAlertId, setExpandedAlertId] = useState<string | null>(null);
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [selectedPlaybookCode, setSelectedPlaybookCode] = useState("");
+  const [approvalReasons, setApprovalReasons] = useState<Record<string, string>>({});
   const [incidentDraft, setIncidentDraft] = useState({
     title: "",
     description: "",
@@ -1295,12 +1296,19 @@ function IncidentDetailPage() {
       requestId,
       decision,
       fingerprint,
+      reason,
     }: {
       requestId: string;
       decision: "APPROVE" | "REJECT";
       fingerprint: string;
-    }) => decideResponse(requestId, decision, fingerprint),
-    onSuccess: async () => {
+      reason: string;
+    }) => decideResponse(requestId, decision, fingerprint, reason),
+    onSuccess: async (_data, variables) => {
+      setApprovalReasons((current) => {
+        const next = { ...current };
+        delete next[variables.requestId];
+        return next;
+      });
       await queryClient.invalidateQueries({ queryKey: ["response-decisions", id] });
     },
   });
@@ -1799,7 +1807,7 @@ function IncidentDetailPage() {
                       </div>
                       <p style={{ margin: "6px 0", fontSize: "0.9rem" }}>
                         <strong>{t("approvalProgress")}:</strong> {countApproved}/{totalApprovals}
-                        {hasRequiredApprovals && <span style={{ color: "var(--accent)", marginLeft: "6px", fontWeight: 600 }}>✓ Aprobado por 4-Ojos</span>}
+                        {totalApprovals >= 2 && hasRequiredApprovals && <span style={{ color: "var(--accent)", marginLeft: "6px", fontWeight: 600 }}>✓ {t("fourEyesApproved")}</span>}
                       </p>
                       <small style={{ color: "var(--muted)", display: "block", marginTop: "6px" }}>
                         {t("policyOutcome")}: {decision.evaluation_outcome} · {decision.reason_codes.join(" · ")}
@@ -1810,16 +1818,35 @@ function IncidentDetailPage() {
                         decision.approval_status === "PENDING" &&
                         decision.status === "AWAITING_APPROVAL" &&
                         (currentUser.data?.id !== decision.requester_user_id ? (
-                          <div style={{ display: "flex", gap: "10px" }}>
+                          <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+                            <textarea
+                              aria-label={t("approvalReason")}
+                              placeholder={t("approvalReasonPlaceholder")}
+                              minLength={1}
+                              maxLength={1000}
+                              required
+                              value={approvalReasons[decision.approval_request_id!] ?? ""}
+                              onChange={(event) =>
+                                setApprovalReasons((current) => ({
+                                  ...current,
+                                  [decision.approval_request_id!]: event.target.value,
+                                }))
+                              }
+                              style={{ flexBasis: "100%", minHeight: "72px" }}
+                            />
                             <button
                               type="button"
                               style={{ flex: 1 }}
-                              disabled={approvalDecision.isPending}
+                              disabled={
+                                approvalDecision.isPending ||
+                                !(approvalReasons[decision.approval_request_id!] ?? "").trim()
+                              }
                               onClick={() =>
                                 approvalDecision.mutate({
                                   requestId: decision.approval_request_id!,
                                   decision: "APPROVE",
                                   fingerprint: decision.fingerprint,
+                                  reason: approvalReasons[decision.approval_request_id!] ?? "",
                                 })
                               }
                             >
@@ -1829,12 +1856,16 @@ function IncidentDetailPage() {
                               type="button"
                               className="ghost"
                               style={{ flex: 1 }}
-                              disabled={approvalDecision.isPending}
+                              disabled={
+                                approvalDecision.isPending ||
+                                !(approvalReasons[decision.approval_request_id!] ?? "").trim()
+                              }
                               onClick={() =>
                                 approvalDecision.mutate({
                                   requestId: decision.approval_request_id!,
                                   decision: "REJECT",
                                   fingerprint: decision.fingerprint,
+                                  reason: approvalReasons[decision.approval_request_id!] ?? "",
                                 })
                               }
                             >
@@ -2634,7 +2665,7 @@ function IncidentDetailPage() {
                         📅 {new Date(decision.created_at).toLocaleString(i18n.language)}
                       </small>
                       <small style={{ color: "var(--muted)", display: "block", marginTop: "2px" }}>
-                        {t("approvalSummary", { approved: countApproved, total: totalApprovals, evaluation: decision.evaluation_outcome })} {hasRequiredApprovals && <span style={{ color: "var(--accent)", marginLeft: "4px" }}>✓ {t("fourEyesApproved")}</span>}
+                        {t("approvalSummary", { approved: countApproved, total: totalApprovals, evaluation: decision.evaluation_outcome })} {totalApprovals >= 2 && hasRequiredApprovals && <span style={{ color: "var(--accent)", marginLeft: "4px" }}>✓ {t("fourEyesApproved")}</span>}
                       </small>
                       <div style={{ fontSize: "0.8rem", color: "var(--muted)", marginTop: "6px", display: "flex", flexDirection: "column", gap: "2px", background: "var(--panel-raised)", padding: "6px 10px", borderRadius: "4px" }}>
                         <span>
@@ -2648,22 +2679,41 @@ function IncidentDetailPage() {
                             {t("decisionRecordedBy", {
                               decision: entry.decision,
                               actor: entry.actor_user_id,
-                            })}
+                            })}{" — "}{entry.reason}
                           </span>
                         ))}
                       </div>
                       {decision.approval_request_id && decision.approval_status === "PENDING" && (
                         currentUser.data?.id !== decision.requester_user_id ? (
-                          <div style={{ display: "flex", gap: "8px", marginTop: "10px" }}>
+                          <div style={{ display: "flex", gap: "8px", marginTop: "10px", flexWrap: "wrap" }}>
+                            <textarea
+                              aria-label={t("approvalReason")}
+                              placeholder={t("approvalReasonPlaceholder")}
+                              minLength={1}
+                              maxLength={1000}
+                              required
+                              value={approvalReasons[decision.approval_request_id!] ?? ""}
+                              onChange={(event) =>
+                                setApprovalReasons((current) => ({
+                                  ...current,
+                                  [decision.approval_request_id!]: event.target.value,
+                                }))
+                              }
+                              style={{ flexBasis: "100%", minHeight: "72px" }}
+                            />
                             <button
                               type="button"
                               style={{ flex: 1, padding: "4px 8px", fontSize: "0.8rem" }}
-                              disabled={approvalDecision.isPending}
+                              disabled={
+                                approvalDecision.isPending ||
+                                !(approvalReasons[decision.approval_request_id!] ?? "").trim()
+                              }
                               onClick={() =>
                                 approvalDecision.mutate({
                                   requestId: decision.approval_request_id!,
                                   decision: "APPROVE",
                                   fingerprint: decision.fingerprint,
+                                  reason: approvalReasons[decision.approval_request_id!] ?? "",
                                 })
                               }
                             >
@@ -2673,12 +2723,16 @@ function IncidentDetailPage() {
                               type="button"
                               className="ghost"
                               style={{ flex: 1, padding: "4px 8px", fontSize: "0.8rem" }}
-                              disabled={approvalDecision.isPending}
+                              disabled={
+                                approvalDecision.isPending ||
+                                !(approvalReasons[decision.approval_request_id!] ?? "").trim()
+                              }
                               onClick={() =>
                                 approvalDecision.mutate({
                                   requestId: decision.approval_request_id!,
                                   decision: "REJECT",
                                   fingerprint: decision.fingerprint,
+                                  reason: approvalReasons[decision.approval_request_id!] ?? "",
                                 })
                               }
                             >

@@ -1110,14 +1110,12 @@ export async function decideResponse(
   approvalRequestId: string,
   decision: "APPROVE" | "REJECT",
   fingerprint: string,
+  reason: string,
 ): Promise<ResponseDecision> {
   return responseDecisionSchema.parse(
     await authorizedMutation(`/api/v1/approval-requests/${approvalRequestId}/decisions`, "POST", {
       decision,
-      reason:
-        decision === "APPROVE"
-          ? "Independent approval after reviewing the real action scope"
-          : "Independent rejection of the real action scope",
+      reason: reason.trim(),
       expected_proposal_fingerprint: fingerprint,
     }),
   );

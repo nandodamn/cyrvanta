@@ -61,7 +61,8 @@ async def bootstrap(
             text("""
                 INSERT INTO user_roles (tenant_id, user_id, role_id)
                 SELECT :tenant_id, u.id, r.id FROM users u, roles r
-                WHERE u.email = :email AND r.tenant_id = :tenant_id AND r.code = 'tenant-admin'
+                WHERE u.tenant_id = :tenant_id AND u.email = :email
+                  AND r.tenant_id = :tenant_id AND r.code = 'tenant-admin'
                 ON CONFLICT DO NOTHING
             """),
             {"tenant_id": tenant_id, "email": normalized_email},

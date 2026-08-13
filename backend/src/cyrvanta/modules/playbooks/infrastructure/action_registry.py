@@ -257,28 +257,11 @@ class RealActionConnector:
             raise ValueError("missing execution inputs")
         incident_id = UUID(str(inputs["incident_id"]))
         expected_version = int(inputs["incident_version"])
-        if self._code == "incident.report.generate":
-            return await IncidentReportService().snapshot(
-                context.tenant_id,
-                incident_id,
-                expected_version=expected_version,
-            )
-        incident = await IncidentService().get_incident(context.tenant_id, incident_id)
-        if incident.version != expected_version:
-            raise IncidentReportStateConflict("INCIDENT_VERSION_CONFLICT")
-        return {
-            "incident": {
-                "id": str(incident.id),
-                "code": incident.code,
-                "title": incident.title,
-                "status": incident.status,
-                "severity": incident.severity,
-                "priority": incident.priority,
-                "classification": incident.classification,
-                "version": incident.version,
-                "detected_at": incident.detected_at.isoformat(),
-            }
-        }
+        return await IncidentReportService().egress_snapshot(
+            context.tenant_id,
+            incident_id,
+            expected_version=expected_version,
+        )
 
     async def _send_email(
         self,

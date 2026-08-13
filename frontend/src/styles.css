@@ -1495,3 +1495,213 @@ nav a.active {
   }
 }
 
+/* ==========================================================================
+   Verified Integrations Page Refinements
+   ========================================================================== */
+.integrations-form-panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 1.25rem;
+  margin-bottom: 1.5rem;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+}
+
+.integrations-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1rem 1.25rem;
+  margin-top: 1rem;
+  align-items: start;
+}
+
+.integrations-form-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: var(--text-soft);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.integrations-form-grid input,
+.integrations-form-grid select {
+  margin-top: 2px;
+}
+
+.integrations-form-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--line);
+}
+
+.integrations-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 1.25rem;
+}
+
+.integration-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 1.25rem;
+  transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.integration-card:hover {
+  border-color: var(--line-strong);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+  transform: translateY(-2px);
+}
+
+.integration-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 0.75rem;
+}
+
+.integration-meta-list {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 6px 12px;
+  margin: 0 0 1rem 0;
+  font-size: 0.85rem;
+}
+
+.integration-meta-list dt {
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.integration-meta-list dd {
+  margin: 0;
+  color: var(--text);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.integration-actions-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--line);
+}
+
+.integration-actions-row button {
+  flex: 1 1 auto;
+  min-height: 36px;
+  padding: 6px 12px;
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+
+/* ==========================================================================
+   Security Topology Visual Graph & Panel
+   ========================================================================== */
+.topology-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.topology-metrics-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 10px 14px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  margin-bottom: 0.75rem;
+}
+
+.topology-metric-pill {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8rem;
+  color: var(--text-soft);
+}
+
+.topology-metric-pill strong {
+  color: var(--text);
+}
+
+.topology-view-toggle {
+  display: flex;
+  gap: 6px;
+  background: var(--surface);
+  padding: 4px;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+}
+
+.topology-tab-btn {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--muted);
+  padding: 5px 12px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  border-radius: 4px;
+  min-height: 32px;
+  cursor: pointer;
+}
+
+.topology-tab-btn.active {
+  background: var(--panel-raised);
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.topology-graph-container {
+  position: relative;
+  background: radial-gradient(circle at 50% 50%, rgba(85, 230, 193, 0.03) 0, transparent 70%), var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 1rem;
+  min-height: 420px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.topology-svg-canvas {
+  width: 100%;
+  height: 380px;
+}
+
+.topology-node-badge {
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.topology-node-badge:hover {
+  filter: brightness(1.2);
+}
+
+.topology-detail-card {
+  background: var(--panel-raised);
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  padding: 12px 16px;
+  margin-top: 0.75rem;
+  animation: fadeIn 0.2s ease;
+}
+
+

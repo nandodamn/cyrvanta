@@ -5,7 +5,7 @@ import os
 
 from alembic import op
 
-revision = "0022_decision_expiration_scheduler"
+revision = "0022_decision_expiration"
 down_revision = "0021_alert_triage"
 branch_labels = None
 depends_on = None

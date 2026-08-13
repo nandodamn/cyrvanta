@@ -109,11 +109,11 @@ export function VerifiedIntegrationsPage() {
         </div>
       </div>
 
-      <section className="panel" style={{ marginBottom: "1rem" }}>
-        <h2>{t("integrationConnections.configureReal")}</h2>
-        <form onSubmit={submit} className="form-grid">
+      <section className="integrations-form-panel">
+        <h2 style={{ margin: "0 0 0.5rem" }}>{t("integrationConnections.configureReal")}</h2>
+        <form onSubmit={submit} className="integrations-form-grid">
           <label>
-            {t("integrationConnections.type")}
+            <span>{t("integrationConnections.type")}</span>
             <select
               value={connectorType}
               onChange={(event) => {
@@ -125,10 +125,11 @@ export function VerifiedIntegrationsPage() {
             </select>
           </label>
           <label>
-            {t("integrationConnections.name")}
+            <span>{t("integrationConnections.name")}</span>
             <input
               required
               maxLength={200}
+              placeholder="e.g. Wazuh SIEM Production"
               value={name}
               onChange={(event) => setName(event.target.value)}
             />
@@ -137,13 +138,14 @@ export function VerifiedIntegrationsPage() {
             const secret = ["password", "api_key", "bearer_token"].includes(field);
             return (
               <label key={field}>
-                {field}
+                <span>{field.replace(/_/g, " ").toUpperCase()}</span>
                 <input
                   required={["host", "port", "from_address", "base_url"].includes(field)
                     || (connectorType === "N8N" && field === "api_key")
                     || (connectorType === "WAZUH" && ["username", "password"].includes(field))}
                   type={secret ? "password" : field === "port" ? "number" : "text"}
                   autoComplete={secret ? "new-password" : "off"}
+                  placeholder={field === "base_url" ? "https://..." : field}
                   value={fields[field] ?? ""}
                   onChange={(event) =>
                     setFields((current) => ({ ...current, [field]: event.target.value }))}
@@ -151,10 +153,7 @@ export function VerifiedIntegrationsPage() {
               </label>
             );
           })}
-          <div>
-            <button type="submit" disabled={configure.isPending || !name.trim()}>
-              {editingId ? t("integrationConnections.replaceSave") : t("integrationConnections.saveWriteOnly")}
-            </button>
+          <div className="integrations-form-actions">
             {editingId && (
               <button
                 type="button"
@@ -168,9 +167,12 @@ export function VerifiedIntegrationsPage() {
                 {t("integrationConnections.cancelReplace")}
               </button>
             )}
+            <button type="submit" disabled={configure.isPending || !name.trim()}>
+              {editingId ? t("integrationConnections.replaceSave") : t("integrationConnections.saveWriteOnly")}
+            </button>
           </div>
         </form>
-        {configure.isError && <p className="error" role="alert">{t("integrationConnections.saveError")}</p>}
+        {configure.isError && <p className="error" role="alert" style={{ marginTop: "0.75rem" }}>{t("integrationConnections.saveError")}</p>}
       </section>
 
       {connections.isLoading && <p className="muted" role="status">{t("loading")}</p>}
@@ -179,71 +181,70 @@ export function VerifiedIntegrationsPage() {
         <p className="muted">{t("integrationConnections.none")}</p>
       )}
 
-      <section
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 280px), 1fr))",
-          gap: "1rem",
-        }}
-      >
+      <section className="integrations-cards-grid">
         {items.map((item) => (
-          <article className="panel" key={item.id}>
-            <div style={{ display: "flex", justifyContent: "space-between", gap: "0.75rem" }}>
-              <strong>{item.name}</strong>
-              <span className={item.status === "active" ? "status success" : "status warning"}>
-                {item.status}
-              </span>
+          <article className="integration-card" key={item.id}>
+            <div>
+              <div className="integration-card-header">
+                <strong style={{ fontSize: "1rem" }}>{item.name}</strong>
+                <span className={item.status === "active" ? "status success" : "status warning"}>
+                  {item.status}
+                </span>
+              </div>
+              <dl className="integration-meta-list">
+                <dt>{t("integrationConnections.type")}:</dt>
+                <dd><span className="status" style={{ fontSize: "0.75rem" }}>{item.connector_type}</span></dd>
+                <dt>{t("integrationConnections.credentials")}:</dt>
+                <dd>{item.configured ? `🔒 ${t("integrationConnections.stored")}` : `⚠️ ${t("integrationConnections.pending")}`}</dd>
+                <dt>{t("integrationConnections.lastVerification")}:</dt>
+                <dd>{item.last_health_check_at
+                  ? new Date(item.last_health_check_at).toLocaleString()
+                  : t("integrationConnections.never")}</dd>
+              </dl>
+              {item.last_error_code && <p className="error" style={{ fontSize: "0.8rem", marginBottom: "0.75rem" }}>{item.last_error_code}</p>}
             </div>
-            <dl>
-              <dt className="muted">{t("integrationConnections.type")}</dt>
-              <dd>{item.connector_type}</dd>
-              <dt className="muted">{t("integrationConnections.credentials")}</dt>
-              <dd>{item.configured ? t("integrationConnections.stored") : t("integrationConnections.pending")}</dd>
-              <dt className="muted">{t("integrationConnections.lastVerification")}</dt>
-              <dd>{item.last_health_check_at
-                ? new Date(item.last_health_check_at).toLocaleString()
-                : t("integrationConnections.never")}</dd>
-            </dl>
-            <button
-              type="button"
-              className="ghost"
-              disabled={probe.isPending || item.status === "disabled"}
-              onClick={() => probe.mutate(item.id)}
-            >
-              {t("integrationConnections.testReal")}
-            </button>
-            <button
-              type="button"
-              className="ghost"
-              onClick={() => {
-                setEditingId(item.id);
-                setConnectorType(item.connector_type);
-                setName(item.name);
-                setFields({});
-                globalThis.scrollTo({ top: 0, behavior: "smooth" });
-              }}
-            >
-              {t("integrationConnections.replaceConfiguration")}
-            </button>
-            <button
-              type="button"
-              className="ghost"
-              disabled={configure.isPending}
-              onClick={() => configure.mutate({
-                connectionId: item.id,
-                payload: {
-                  connector_type: item.connector_type,
-                  name: item.name,
-                  configuration: {},
-                  enabled: item.status === "disabled",
-                },
-              })}
-            >
-              {item.status === "disabled"
-                ? t("integrationConnections.enableConnection")
-                : t("integrationConnections.disableConnection")}
-            </button>
-            {item.last_error_code && <p className="error">{item.last_error_code}</p>}
+
+            <div className="integration-actions-row">
+              <button
+                type="button"
+                className="ghost"
+                disabled={probe.isPending || item.status === "disabled"}
+                onClick={() => probe.mutate(item.id)}
+              >
+                ⚡ {t("integrationConnections.testReal")}
+              </button>
+              <button
+                type="button"
+                className="ghost"
+                onClick={() => {
+                  setEditingId(item.id);
+                  setConnectorType(item.connector_type);
+                  setName(item.name);
+                  setFields({});
+                  globalThis.scrollTo({ top: 0, behavior: "smooth" });
+                }}
+              >
+                ✏️ {t("integrationConnections.replaceConfiguration")}
+              </button>
+              <button
+                type="button"
+                className="ghost"
+                disabled={configure.isPending}
+                onClick={() => configure.mutate({
+                  connectionId: item.id,
+                  payload: {
+                    connector_type: item.connector_type,
+                    name: item.name,
+                    configuration: {},
+                    enabled: item.status === "disabled",
+                  },
+                })}
+              >
+                {item.status === "disabled"
+                  ? `✓ ${t("integrationConnections.enableConnection")}`
+                  : `⊘ ${t("integrationConnections.disableConnection")}`}
+              </button>
+            </div>
           </article>
         ))}
       </section>

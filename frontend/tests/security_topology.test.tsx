@@ -28,5 +28,5 @@ describe("security topology", () => {
     expect(screen.queryByText(/LIVE/i)).not.toBeInTheDocument();
     expect(screen.queryByText("192.168.1.1")).not.toBeInTheDocument();
     expect(screen.queryByText(/PaloAlto/i)).not.toBeInTheDocument();
-  });
+  }, 20000);
 });

@@ -682,6 +682,19 @@ export async function createUser(input: {
   return adminUserSchema.parse(await authorizedMutation("/api/v1/users", "POST", input));
 }
 
+export async function updateUser(
+  userId: string,
+  input: { display_name?: string; is_active?: boolean },
+): Promise<AdminUser> {
+  return adminUserSchema.parse(
+    await authorizedMutation(`/api/v1/users/${userId}`, "PATCH", input),
+  );
+}
+
+export async function replaceUserPassword(userId: string, password: string): Promise<void> {
+  await authorizedMutation(`/api/v1/users/${userId}/password`, "POST", { password });
+}
+
 export async function createRole(input: { code: string; name: string }): Promise<Role> {
   return roleSchema.parse(await authorizedMutation("/api/v1/roles", "POST", input));
 }

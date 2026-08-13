@@ -44,12 +44,14 @@ import {
   recalculateIncidentRisk,
   replaceDirectoryGroupMappings,
   replaceRolePermissions,
+  replaceUserPassword,
   replaceUserRoles,
   saveDirectoryConfiguration,
   testDirectoryConfiguration,
   transitionIncident,
   unlinkUserDirectoryIdentity,
   updateAlertTriage,
+  updateUser,
 } from "./api";
 import { OperationalPulse } from "./OperationalPulse";
 import { SecurityTopologyPanel } from "./SecurityTopologyPanel";
@@ -2149,6 +2151,7 @@ function Administration() {
     queryFn: () => getAuditEvents({ pageSize: 5 }),
   });
   const visibleUsers = users.data?.slice(0, userControls.pageSize) ?? [];
+  const selectedAdminUser = userOptions.data?.find((user) => user.id === selectedUser);
   const directory = useQuery({
     queryKey: ["directory-configuration"],
     queryFn: getDirectoryConfiguration,
@@ -2176,6 +2179,34 @@ function Administration() {
         queryClient.invalidateQueries({ queryKey: ["users"] }),
         queryClient.invalidateQueries({ queryKey: ["audit-events"] }),
       ]);
+    },
+    onError: () => setFormError(t("adminMutationError")),
+  });
+  const userAccountMutation = useMutation({
+    mutationFn: ({
+      userId,
+      displayName,
+      isActive,
+    }: {
+      userId: string;
+      displayName: string;
+      isActive: boolean;
+    }) => updateUser(userId, { display_name: displayName, is_active: isActive }),
+    onSuccess: async () => {
+      setFormError("");
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["users"] }),
+        queryClient.invalidateQueries({ queryKey: ["audit-events"] }),
+      ]);
+    },
+    onError: () => setFormError(t("adminMutationError")),
+  });
+  const userPasswordMutation = useMutation({
+    mutationFn: ({ userId, password }: { userId: string; password: string }) =>
+      replaceUserPassword(userId, password),
+    onSuccess: async () => {
+      setFormError("");
+      await queryClient.invalidateQueries({ queryKey: ["audit-events"] });
     },
     onError: () => setFormError(t("adminMutationError")),
   });
@@ -2493,6 +2524,107 @@ function Administration() {
                     />
                   </label>
                   <button disabled={userMutation.isPending}>{t("create")}</button>
+                </form>
+
+                <form
+                  key={`account-${selectedAdminUser?.id}-${selectedAdminUser?.display_name}-${selectedAdminUser?.is_active}`}
+                  className="panel compact-panel"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    if (!selectedAdminUser) {
+                      setFormError(t("selectedAccountRequired"));
+                      return;
+                    }
+                    const data = new FormData(event.currentTarget);
+                    userAccountMutation.mutate({
+                      userId: selectedAdminUser.id,
+                      displayName: String(data.get("display_name")).trim(),
+                      isActive: data.get("is_active") === "on",
+                    });
+                  }}
+                >
+                  <div>
+                    <p className="eyebrow">{t("identity")}</p>
+                    <h2>{t("manageUser")}</h2>
+                  </div>
+                  <select
+                    value={selectedUser}
+                    onChange={(event) => {
+                      setSelectedUser(event.target.value);
+                      setDirectoryIdentityMessage("");
+                    }}
+                  >
+                    <option value="">{t("selectUser")}</option>
+                    {userOptions.data?.map((user) => (
+                      <option key={user.id} value={user.id}>{user.display_name}</option>
+                    ))}
+                  </select>
+                  <label>
+                    {t("displayName")}
+                    <input
+                      name="display_name"
+                      required
+                      minLength={1}
+                      maxLength={200}
+                      defaultValue={selectedAdminUser?.display_name ?? ""}
+                      disabled={!selectedAdminUser}
+                    />
+                  </label>
+                  <label className="check-row">
+                    <input
+                      type="checkbox"
+                      name="is_active"
+                      defaultChecked={selectedAdminUser?.is_active ?? false}
+                      disabled={!selectedAdminUser}
+                    />
+                    {t("accountActive")}
+                  </label>
+                  <button disabled={!selectedAdminUser || userAccountMutation.isPending}>
+                    {t("save")}
+                  </button>
+                </form>
+
+                <form
+                  className="panel compact-panel"
+                  autoComplete="off"
+                  onSubmit={async (event) => {
+                    event.preventDefault();
+                    if (!selectedAdminUser) {
+                      setFormError(t("selectedAccountRequired"));
+                      return;
+                    }
+                    const form = event.currentTarget;
+                    const password = String(new FormData(form).get("password"));
+                    try {
+                      await userPasswordMutation.mutateAsync({
+                        userId: selectedAdminUser.id,
+                        password,
+                      });
+                      form.reset();
+                    } catch {
+                      // The mutation keeps the form available and exposes a localized error.
+                    }
+                  }}
+                >
+                  <div>
+                    <p className="eyebrow">{selectedAdminUser?.email ?? t("selectUser")}</p>
+                    <h2>{t("replacePassword")}</h2>
+                  </div>
+                  <label>
+                    {t("newPassword")}
+                    <input
+                      name="password"
+                      type="password"
+                      autoComplete="new-password"
+                      required
+                      minLength={12}
+                      maxLength={256}
+                      disabled={!selectedAdminUser}
+                    />
+                  </label>
+                  <button disabled={!selectedAdminUser || userPasswordMutation.isPending}>
+                    {t("replacePassword")}
+                  </button>
                 </form>
 
                 <form

@@ -9,10 +9,12 @@ import { z } from "zod";
 import {
   Alert,
   addIncidentTimelineEntry,
+  assessClaim,
   activateDirectoryConfiguration,
   assignIncident,
   createRole,
   createIncident,
+  createHumanClaim,
   createUser,
   createResponseProposal,
   decideResponse,
@@ -1018,6 +1020,22 @@ function IncidentDetailPage() {
   });
   const [assigneeUserId, setAssigneeUserId] = useState("");
   const [timelineComment, setTimelineComment] = useState("");
+  const [claimDraft, setClaimDraft] = useState({
+    claimType: "INFERENCE" as "FACT" | "DERIVED_FACT" | "INFERENCE" | "HYPOTHESIS" | "RECOMMENDATION",
+    statement: "",
+    confidence: 0.5,
+    explanation: "",
+    validationCriteria: "",
+    missingEvidence: "",
+    methodCode: "",
+    methodVersion: "",
+    evidenceKey: "",
+  });
+  const [claimAssessment, setClaimAssessment] = useState({
+    claimId: "",
+    outcome: "VALIDATED" as "VALIDATED" | "REJECTED" | "INSUFFICIENT_EVIDENCE" | "RETRACTED",
+    explanation: "",
+  });
   const [transitionTarget, setTransitionTarget] = useState("");
   const [closeReason, setCloseReason] = useState<
     "false_positive" | "duplicate" | "accepted_risk" | "resolved" | "other"
@@ -1050,6 +1068,31 @@ function IncidentDetailPage() {
     queryFn: () => getResponseDecisions(id),
     retry: false,
   });
+  const claimEvidenceOptions = [
+    { key: `INCIDENT:${id}`, type: "INCIDENT" as const, id, label: incident.data?.code ?? id },
+    ...(linkedAlerts.data ?? []).map((alert) => ({
+      key: `ALERT_REFERENCE:${alert.id}`,
+      type: "ALERT_REFERENCE" as const,
+      id: alert.id,
+      label: `${alert.external_id} · ${alert.title}`,
+    })),
+    ...(timeline.data ?? []).map((entry) => ({
+      key: `INCIDENT_TIMELINE_ENTRY:${entry.id}`,
+      type: "INCIDENT_TIMELINE_ENTRY" as const,
+      id: entry.id,
+      label: `${entry.entry_type} · ${entry.summary}`,
+    })),
+    ...(claims.data ?? []).map((claim) => ({
+      key: `CLAIM:${claim.id}`,
+      type: "CLAIM" as const,
+      id: claim.id,
+      label: `${claim.claim_type} · ${claim.statement}`,
+    })),
+  ].filter((option) => claimDraft.claimType !== "FACT" || ["ALERT_REFERENCE", "INCIDENT_TIMELINE_ENTRY"].includes(option.type));
+  const selectedClaimEvidence = claimEvidenceOptions.find(
+    (option) => option.key === claimDraft.evidenceKey,
+  ) ?? claimEvidenceOptions[0];
+
   const playbookDefinitions = useQuery({
     queryKey: ["playbook-definitions"],
     queryFn: getPlaybookDefinitions,
@@ -1128,6 +1171,57 @@ function IncidentDetailPage() {
       ]);
     },
   });
+  const createClaim = useMutation({
+    mutationFn: () => {
+      if (!selectedClaimEvidence) throw new Error("CLAIM_EVIDENCE_REQUIRED");
+      const nonDeterministic = ["INFERENCE", "HYPOTHESIS", "RECOMMENDATION"].includes(
+        claimDraft.claimType,
+      );
+      return createHumanClaim(id, {
+        claim_type: claimDraft.claimType,
+        statement: claimDraft.statement.trim(),
+        language_code: i18n.language.startsWith("es") ? "es" : "en",
+        confidence: nonDeterministic ? claimDraft.confidence : null,
+        explanation: nonDeterministic ? claimDraft.explanation.trim() : null,
+        validation_criteria: claimDraft.claimType === "HYPOTHESIS"
+          ? claimDraft.validationCriteria.trim()
+          : null,
+        missing_evidence: claimDraft.claimType === "HYPOTHESIS"
+          ? [claimDraft.missingEvidence.trim()]
+          : [],
+        method_code: claimDraft.claimType === "DERIVED_FACT" ? claimDraft.methodCode.trim() : null,
+        method_version: claimDraft.claimType === "DERIVED_FACT" ? claimDraft.methodVersion.trim() : null,
+        evidence: [{
+          evidence_type: selectedClaimEvidence.type,
+          evidence_id: selectedClaimEvidence.id,
+          relationship: "SUPPORTS",
+        }],
+      });
+    },
+    onSuccess: async () => {
+      setClaimDraft((current) => ({
+        ...current,
+        statement: "",
+        explanation: "",
+        validationCriteria: "",
+        missingEvidence: "",
+        evidenceKey: "",
+      }));
+      await queryClient.invalidateQueries({ queryKey: ["claims", id] });
+    },
+  });
+  const assess = useMutation({
+    mutationFn: () => assessClaim(
+      claimAssessment.claimId,
+      claimAssessment.outcome,
+      claimAssessment.explanation.trim(),
+    ),
+    onSuccess: async () => {
+      setClaimAssessment({ claimId: "", outcome: "VALIDATED", explanation: "" });
+      await queryClient.invalidateQueries({ queryKey: ["claims", id] });
+    },
+  });
+
   const analysis = useMutation({
     mutationFn: () => analyzeIncident(id),
     onSuccess: async () => {
@@ -2147,6 +2241,112 @@ function IncidentDetailPage() {
               <h2>{t("knowledgeClaims")}</h2>
               <p>{t("knowledgeClaimsIntro")}</p>
             </div>
+            <details style={{ marginTop: "1rem" }}>
+              <summary>{t("createClaim")}</summary>
+              <form
+                className="form-grid"
+                style={{ marginTop: "1rem" }}
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  createClaim.mutate();
+                }}
+              >
+                <label>
+                  {t("claimType")}
+                  <select
+                    value={claimDraft.claimType}
+                    onChange={(event) => setClaimDraft({
+                      ...claimDraft,
+                      claimType: event.target.value as typeof claimDraft.claimType,
+                      evidenceKey: "",
+                    })}
+                  >
+                    {(["FACT", "DERIVED_FACT", "INFERENCE", "HYPOTHESIS", "RECOMMENDATION"] as const).map(
+                      (type) => <option key={type} value={type}>{t(`claimTypes.${type}`)}</option>,
+                    )}
+                  </select>
+                </label>
+                <label>
+                  {t("claimEvidence")}
+                  <select
+                    required
+                    value={selectedClaimEvidence?.key ?? ""}
+                    onChange={(event) => setClaimDraft({ ...claimDraft, evidenceKey: event.target.value })}
+                  >
+                    {claimEvidenceOptions.length === 0 && <option value="">{t("noDirectEvidence")}</option>}
+                    {claimEvidenceOptions.map((option) => (
+                      <option key={option.key} value={option.key}>{option.type} · {option.label}</option>
+                    ))}
+                  </select>
+                </label>
+                <label style={{ gridColumn: "1 / -1" }}>
+                  {t("claimStatement")}
+                  <textarea
+                    required
+                    minLength={1}
+                    maxLength={2000}
+                    rows={3}
+                    value={claimDraft.statement}
+                    onChange={(event) => setClaimDraft({ ...claimDraft, statement: event.target.value })}
+                  />
+                </label>
+                {["INFERENCE", "HYPOTHESIS", "RECOMMENDATION"].includes(claimDraft.claimType) && (
+                  <>
+                    <label>
+                      {t("confidence")}
+                      <input
+                        type="number"
+                        required
+                        min={0}
+                        max={1}
+                        step={0.01}
+                        value={claimDraft.confidence}
+                        onChange={(event) => setClaimDraft({ ...claimDraft, confidence: Number(event.target.value) })}
+                      />
+                    </label>
+                    <label style={{ gridColumn: "1 / -1" }}>
+                      {t("claimExplanation")}
+                      <textarea
+                        required
+                        minLength={1}
+                        maxLength={4000}
+                        rows={3}
+                        value={claimDraft.explanation}
+                        onChange={(event) => setClaimDraft({ ...claimDraft, explanation: event.target.value })}
+                      />
+                    </label>
+                  </>
+                )}
+                {claimDraft.claimType === "DERIVED_FACT" && (
+                  <>
+                    <label>
+                      {t("methodCode")}
+                      <input required maxLength={120} value={claimDraft.methodCode} onChange={(event) => setClaimDraft({ ...claimDraft, methodCode: event.target.value })} />
+                    </label>
+                    <label>
+                      {t("methodVersion")}
+                      <input required maxLength={80} value={claimDraft.methodVersion} onChange={(event) => setClaimDraft({ ...claimDraft, methodVersion: event.target.value })} />
+                    </label>
+                  </>
+                )}
+                {claimDraft.claimType === "HYPOTHESIS" && (
+                  <>
+                    <label style={{ gridColumn: "1 / -1" }}>
+                      {t("validationCriteria")}
+                      <textarea required minLength={1} maxLength={2000} rows={2} value={claimDraft.validationCriteria} onChange={(event) => setClaimDraft({ ...claimDraft, validationCriteria: event.target.value })} />
+                    </label>
+                    <label>
+                      {t("missingEvidenceCode")}
+                      <input required pattern="[a-z][a-z0-9_.-]{0,79}" value={claimDraft.missingEvidence} onChange={(event) => setClaimDraft({ ...claimDraft, missingEvidence: event.target.value })} />
+                    </label>
+                  </>
+                )}
+                <button type="submit" disabled={createClaim.isPending || !selectedClaimEvidence}>
+                  {t("createClaim")}
+                </button>
+                {createClaim.isError && <p className="form-error" role="alert">{t("actionError")}</p>}
+              </form>
+            </details>
             <div
               style={{
                 display: "grid",
@@ -2179,6 +2379,78 @@ function IncidentDetailPage() {
                       <small style={{ color: "var(--muted)" }}>
                         {t("confidence")}: {Math.round(claim.confidence * 100)}%
                       </small>
+                    )}
+                    {claimAssessment.claimId === claim.id ? (
+                      <form
+                        style={{ marginTop: "0.75rem", display: "grid", gap: "0.5rem" }}
+                        onSubmit={(event) => {
+                          event.preventDefault();
+                          assess.mutate();
+                        }}
+                      >
+                        {claim.origin_type === "HUMAN" && claim.origin_actor_user_id === currentUser.data?.id ? (
+                          <input type="hidden" value="RETRACTED" />
+                        ) : (
+                          <label>
+                            {t("assessmentOutcome")}
+                            <select
+                              value={claimAssessment.outcome}
+                              onChange={(event) => setClaimAssessment({
+                                ...claimAssessment,
+                                outcome: event.target.value as typeof claimAssessment.outcome,
+                              })}
+                            >
+                              {(["VALIDATED", "REJECTED", "INSUFFICIENT_EVIDENCE"] as const).map(
+                                (outcome) => <option key={outcome} value={outcome}>{t(`claimStates.${outcome}`)}</option>,
+                              )}
+                            </select>
+                          </label>
+                        )}
+                        <label>
+                          {t("assessmentExplanation")}
+                          <textarea
+                            required
+                            minLength={1}
+                            maxLength={4000}
+                            rows={2}
+                            value={claimAssessment.explanation}
+                            onChange={(event) => setClaimAssessment({
+                              ...claimAssessment,
+                              explanation: event.target.value,
+                            })}
+                          />
+                        </label>
+                        <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+                          <button type="submit" disabled={assess.isPending}>{t("recordAssessment")}</button>
+                          <button
+                            type="button"
+                            className="ghost"
+                            onClick={() => setClaimAssessment({ claimId: "", outcome: "VALIDATED", explanation: "" })}
+                          >
+                            {t("cancel")}
+                          </button>
+                        </div>
+                        {assess.isError && <p className="form-error" role="alert">{t("actionError")}</p>}
+                      </form>
+                    ) : (
+                      <button
+                        type="button"
+                        className="ghost"
+                        style={{ marginTop: "0.75rem" }}
+                        onClick={() => {
+                          const ownHumanClaim = claim.origin_type === "HUMAN"
+                            && claim.origin_actor_user_id === currentUser.data?.id;
+                          setClaimAssessment({
+                            claimId: claim.id,
+                            outcome: ownHumanClaim ? "RETRACTED" : "VALIDATED",
+                            explanation: "",
+                          });
+                        }}
+                      >
+                        {claim.origin_type === "HUMAN" && claim.origin_actor_user_id === currentUser.data?.id
+                          ? t("retractClaim")
+                          : t("assessClaim")}
+                      </button>
                     )}
                   </article>
                 );

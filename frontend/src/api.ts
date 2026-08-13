@@ -845,6 +845,39 @@ export async function addIncidentTimelineEntry(
 export async function getClaims(id: string): Promise<Claim[]> {
   return z.array(claimSchema).parse(await authorized(`/api/v1/incidents/${id}/claims?limit=25`));
 }
+export async function createHumanClaim(
+  incidentId: string,
+  input: {
+    claim_type: "FACT" | "DERIVED_FACT" | "INFERENCE" | "HYPOTHESIS" | "RECOMMENDATION";
+    statement: string;
+    language_code: "es" | "en" | "und";
+    confidence: number | null;
+    explanation: string | null;
+    validation_criteria: string | null;
+    missing_evidence: string[];
+    method_code: string | null;
+    method_version: string | null;
+    evidence: Array<{
+      evidence_type: "ALERT_REFERENCE" | "INCIDENT" | "INCIDENT_TIMELINE_ENTRY" | "CLAIM";
+      evidence_id: string;
+      relationship: "SUPPORTS" | "REFUTES" | "CONTEXT";
+    }>;
+  },
+): Promise<Claim> {
+  return claimSchema.parse(
+    await authorizedMutation(`/api/v1/incidents/${incidentId}/claims`, "POST", input),
+  );
+}
+export async function assessClaim(
+  claimId: string,
+  outcome: "VALIDATED" | "REJECTED" | "INSUFFICIENT_EVIDENCE" | "RETRACTED",
+  explanation: string,
+): Promise<void> {
+  await authorizedMutation(`/api/v1/claims/${claimId}/assessments`, "POST", {
+    outcome,
+    explanation,
+  });
+}
 export async function getCorrelations(id: string): Promise<Correlation[]> {
   return z
     .array(correlationSchema)

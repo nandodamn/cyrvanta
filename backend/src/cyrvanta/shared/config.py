@@ -1,6 +1,10 @@
+import base64
+import binascii
 from functools import lru_cache
+from typing import Self
+from urllib.parse import urlsplit
 
-from pydantic import Field
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -66,6 +70,34 @@ class Settings(BaseSettings):
     directory_demo_enabled: bool = False
     directory_demo_username: str = "ldap-demo"
     directory_demo_password: str = ""
+
+    @model_validator(mode="after")
+    def validate_production_security(self) -> Self:
+        if self.environment.casefold() != "production":
+            return self
+        unsafe_markers = ("change-me", "replace-", "test-secret")
+        protected_values = (self.database_url, self.rabbitmq_url, self.jwt_secret)
+        if any(
+            marker in value.casefold() for value in protected_values for marker in unsafe_markers
+        ):
+            raise ValueError("Production credentials contain an unsafe placeholder")
+        if "guest:guest@" in self.rabbitmq_url.casefold():
+            raise ValueError("Production RabbitMQ credentials cannot use the guest default")
+        if not self.secure_session_cookie:
+            raise ValueError("Production session cookies must be secure")
+        if not self.allowed_origins or "*" in self.allowed_origins:
+            raise ValueError("Production CORS origins must be explicit")
+        if urlsplit(self.frontend_url).scheme != "https" or any(
+            urlsplit(origin).scheme != "https" for origin in self.allowed_origins
+        ):
+            raise ValueError("Production browser URLs must use HTTPS")
+        try:
+            decoded_key = base64.urlsafe_b64decode(self.integration_encryption_key.encode())
+        except (ValueError, binascii.Error) as exc:
+            raise ValueError("Production integration encryption key is invalid") from exc
+        if len(decoded_key) != 32:
+            raise ValueError("Production integration encryption key is invalid")
+        return self
 
     @property
     def allowed_workflow_ids(self) -> set[str]:

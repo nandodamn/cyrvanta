@@ -1,11 +1,13 @@
+import base64
+
+import pytest
+from pydantic import ValidationError
+
 from cyrvanta.shared.config import Settings
 
 
 def test_external_integrations_use_secure_defaults() -> None:
-    defaults = {
-        name: field.default
-        for name, field in Settings.model_fields.items()
-    }
+    defaults = {name: field.default for name, field in Settings.model_fields.items()}
 
     assert defaults["opensearch_mode"] == "simulated"
     assert defaults["wazuh_mode"] == "simulated"
@@ -28,3 +30,43 @@ def test_default_n8n_allowlist_contains_only_approved_workflows() -> None:
         "request-dual-approval",
         "incident-report-email",
     }
+
+
+def production_settings(**overrides: object) -> Settings:
+    values: dict[str, object] = {
+        "environment": "production",
+        "frontend_url": "https://cyrvanta.example",
+        "cors_origins": "https://cyrvanta.example",
+        "database_url": "postgresql+asyncpg://app:strong-password@postgres:5432/cyrvanta",
+        "rabbitmq_url": "amqp://app:strong-password@rabbitmq:5672/",
+        "jwt_secret": "a-production-jwt-secret-with-more-than-32-characters",
+        "integration_encryption_key": base64.urlsafe_b64encode(b"x" * 32).decode(),
+        "session_cookie_secure": True,
+    }
+    return Settings(**(values | overrides))
+
+
+def test_valid_production_security_configuration_is_accepted() -> None:
+    settings = production_settings()
+
+    assert settings.secure_session_cookie is True
+
+
+@pytest.mark.parametrize(
+    "override",
+    [
+        {"database_url": "postgresql+asyncpg://app:change-me@postgres/cyrvanta"},
+        {"rabbitmq_url": "amqp://guest:guest@rabbitmq:5672/"},
+        {"jwt_secret": "replace-with-at-least-32-random-characters"},
+        {"session_cookie_secure": False},
+        {"cors_origins": "*"},
+        {"cors_origins": "http://cyrvanta.example"},
+        {"frontend_url": "http://cyrvanta.example"},
+        {"integration_encryption_key": "A" * 44},
+    ],
+)
+def test_production_rejects_unsafe_security_configuration(
+    override: dict[str, object],
+) -> None:
+    with pytest.raises(ValidationError):
+        production_settings(**override)

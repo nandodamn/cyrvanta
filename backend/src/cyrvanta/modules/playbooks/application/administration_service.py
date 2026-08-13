@@ -649,6 +649,14 @@ class PlaybookAdministrationService:
         results: list[dict[str, object]] = []
         async with tenant_session(tenant_id) as session:
             version = await self._locked_version(session, tenant_id, version_id)
+            approval_mode = await session.scalar(
+                select(PlaybookDefinitionModel.approval_mode).where(
+                    PlaybookDefinitionModel.tenant_id == tenant_id,
+                    PlaybookDefinitionModel.id == version.definition_id,
+                )
+            )
+            if approval_mode not in {"AUTOMATIC", "SINGLE", "FOUR_EYES"}:
+                raise PlaybookAdministrationConflict("PLAYBOOK_INVALID")
             try:
                 artifact = self._artifact(version)
                 for step in artifact.steps:
@@ -704,7 +712,7 @@ class PlaybookAdministrationService:
                             "connector_type": binding.connector_type
                             if binding is not None
                             else None,
-                            "requires_approval": descriptor.impact in {"HIGH", "CRITICAL"},
+                            "requires_approval": approval_mode != "AUTOMATIC",
                             "simulation_supported": False,
                             "verification_supported": True,
                             "blocking": not ready,

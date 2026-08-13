@@ -322,7 +322,7 @@ const playbookDefinitionSchema = z.object({
   engine_type: z.enum(["NATIVE", "N8N"]).nullable(),
   binding_status: z.string().nullable(),
   binding_active: z.boolean(),
-  execution_mode: z.literal("LIVE").nullable(),
+  execution_mode: z.enum(["SIMULATED", "LIVE"]).nullable(),
   impact: z.string().nullable(),
   required_parameters: z.array(z.string()),
   credential_aliases: z.array(z.string()),

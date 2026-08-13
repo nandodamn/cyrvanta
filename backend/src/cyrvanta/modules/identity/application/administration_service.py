@@ -417,6 +417,7 @@ class AdministrationService:
         )
 
     async def _revoke_refresh_tokens(self, user_id: UUID) -> None:
+        await self.redis.incr(f"user_refresh_generation:{user_id}")
         index_key = f"user_refresh:{user_id}"
         digests = await self.redis.smembers(index_key)  # type: ignore[misc]
         if digests:

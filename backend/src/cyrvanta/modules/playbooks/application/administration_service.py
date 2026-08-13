@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from datetime import UTC, datetime
 from typing import Literal, cast
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -387,22 +387,31 @@ class PlaybookAdministrationService:
                 ):
                     definition.approval_mode = desired_approval_mode
 
-            live_version = await session.scalar(
-                select(PlaybookVersionModel).where(
-                    PlaybookVersionModel.tenant_id == tenant_id,
-                    PlaybookVersionModel.definition_id == definition.id,
-                    PlaybookVersionModel.classification == "LIVE",
-                )
+            existing_versions = list(
+                (
+                    await session.scalars(
+                        select(PlaybookVersionModel)
+                        .where(
+                            PlaybookVersionModel.tenant_id == tenant_id,
+                            PlaybookVersionModel.definition_id == definition.id,
+                        )
+                        .order_by(PlaybookVersionModel.created_at.desc())
+                    )
+                ).all()
             )
-            if live_version is not None:
+            current_input_schema = resolve_schema("security/incident-notification-input-v1")
+            current_result_schema = resolve_schema("security/incident-notification-result-v1")
+            if any(
+                version.classification == "LIVE"
+                and version.status in {"DRAFT", "APPROVED"}
+                and version.input_schema == current_input_schema
+                and version.result_schema == current_result_schema
+                for version in existing_versions
+            ):
                 continue
-            any_version = await session.scalar(
-                select(PlaybookVersionModel.id).where(
-                    PlaybookVersionModel.tenant_id == tenant_id,
-                    PlaybookVersionModel.definition_id == definition.id,
-                )
+            version_number = self._next_patch_version(
+                [version.version for version in existing_versions]
             )
-            version_number = "2.0.0" if any_version is not None else "1.0.0"
             artifact = PortablePlaybookV1.model_validate(
                 {
                     "schema_version": "1.0",
@@ -435,23 +444,37 @@ class PlaybookAdministrationService:
                 }
             )
             digest = portable_playbook_sha256(artifact)
-            session.add(
-                PlaybookVersionModel(
-                    tenant_id=tenant_id,
-                    definition_id=definition.id,
-                    version=version_number,
-                    impact="MODERATE",
-                    classification="LIVE",
-                    status="DRAFT",
-                    approved_at=None,
-                    workflow_code=code,
-                    artifact_sha256=digest,
-                    portable_artifact=artifact.model_dump(mode="json", exclude_none=True),
-                    portable_schema_version="1.0",
-                    input_schema=resolve_schema("security/incident-notification-input-v1"),
-                    result_schema=resolve_schema("security/incident-notification-result-v1"),
-                    timeout_seconds=60,
-                )
+            seeded_version = PlaybookVersionModel(
+                tenant_id=tenant_id,
+                definition_id=definition.id,
+                version=version_number,
+                impact="MODERATE",
+                classification="LIVE",
+                status="DRAFT",
+                approved_at=None,
+                workflow_code=code,
+                artifact_sha256=digest,
+                portable_artifact=artifact.model_dump(mode="json", exclude_none=True),
+                portable_schema_version="1.0",
+                input_schema=current_input_schema,
+                result_schema=current_result_schema,
+                timeout_seconds=60,
+            )
+            session.add(seeded_version)
+            await session.flush()
+            self._audit(
+                session,
+                tenant_id,
+                None,
+                uuid4(),
+                "playbook.version.catalog_seeded",
+                "playbook_version",
+                seeded_version.id,
+                {
+                    "workflow_code": code,
+                    "version": version_number,
+                    "reason": "schema_upgrade" if existing_versions else "initial_seed",
+                },
             )
         await session.flush()
 
@@ -1556,6 +1579,21 @@ class PlaybookAdministrationService:
                 cls._reject_sensitive_configuration(nested)
 
     @staticmethod
+    def _next_patch_version(existing: list[str]) -> str:
+        parsed: list[tuple[int, int, int]] = []
+        for value in existing:
+            match = re.fullmatch(
+                r"(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(?:-[0-9A-Za-z.-]+)?",
+                value,
+            )
+            if match is not None:
+                parsed.append(tuple(int(part) for part in match.groups()))
+        if not parsed:
+            return "1.0.0"
+        major, minor, patch = max(parsed)
+        return f"{major}.{minor}.{patch + 1}"
+
+    @staticmethod
     def _digest(value: object) -> str:
         import hashlib
         import json
@@ -1568,7 +1606,7 @@ class PlaybookAdministrationService:
     def _audit(
         session: AsyncSession,
         tenant_id: UUID,
-        actor_user_id: UUID,
+        actor_user_id: UUID | None,
         correlation_id: UUID,
         action: str,
         resource_type: str,

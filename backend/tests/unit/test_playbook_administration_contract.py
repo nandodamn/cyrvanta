@@ -1,3 +1,4 @@
+import inspect
 import json
 from pathlib import Path
 
@@ -164,3 +165,20 @@ def test_toggle_binding_payload_and_definition_metadata() -> None:
     assert definition.rollback_target_code == "simulate-user-unblock"
     assert definition.rollback_guidance_i18n.es == "Desbloquea al usuario."
     assert definition.automation_policy_i18n.en == "Mandatory approval."
+
+
+def test_catalog_schema_upgrade_creates_one_audited_immutable_successor() -> None:
+    assert PlaybookAdministrationService._next_patch_version([]) == "1.0.0"
+    assert PlaybookAdministrationService._next_patch_version(["1.0.0"]) == "1.0.1"
+    assert (
+        PlaybookAdministrationService._next_patch_version(["1.9.9", "2.0.0", "2.0.0-rc.1"])
+        == "2.0.1"
+    )
+
+    source = inspect.getsource(PlaybookAdministrationService._ensure_essential_definitions_seeded)
+    assert "version.input_schema == current_input_schema" in source
+    assert "version.result_schema == current_result_schema" in source
+    assert 'version.classification == "LIVE"' in source
+    assert 'version.status in {"DRAFT", "APPROVED"}' in source
+    assert '"playbook.version.catalog_seeded"' in source
+    assert '"schema_upgrade" if existing_versions else "initial_seed"' in source

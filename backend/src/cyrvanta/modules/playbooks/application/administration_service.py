@@ -701,6 +701,15 @@ class PlaybookAdministrationService:
                 latest_version = seeded_version
 
             if latest_version is not None:
+                # A playbook is only armed when its actions can genuinely run.
+                # Marking the binding active regardless would present an
+                # unconfigured playbook as an available response and only fail
+                # once a real incident tried to use it.
+                actions_ready = latest_version.portable_artifact is not None and (
+                    await self._native_actions_ready(
+                        session, tenant_id, self._artifact(latest_version)
+                    )
+                )
                 engine_binding = await session.scalar(
                     select(AutomationEngineBindingModel).where(
                         AutomationEngineBindingModel.tenant_id == tenant_id,
@@ -717,19 +726,28 @@ class PlaybookAdministrationService:
                         webhook_path=None,
                         key_id=None,
                         desired_digest=latest_version.artifact_sha256,
-                        observed_digest=latest_version.artifact_sha256,
-                        sync_status="SYNCHRONIZED",
-                        active=True,
-                        last_verified_at=datetime.now(UTC),
+                        observed_digest=(
+                            latest_version.artifact_sha256 if actions_ready else None
+                        ),
+                        sync_status="SYNCHRONIZED" if actions_ready else "PENDING",
+                        active=actions_ready,
+                        last_verified_at=datetime.now(UTC) if actions_ready else None,
                     )
                     session.add(engine_binding)
-                else:
-                    if not engine_binding.active or engine_binding.sync_status != "SYNCHRONIZED":
-                        engine_binding.active = True
-                        engine_binding.sync_status = "SYNCHRONIZED"
-                        engine_binding.desired_digest = latest_version.artifact_sha256
-                        engine_binding.observed_digest = latest_version.artifact_sha256
-                        engine_binding.last_verified_at = datetime.now(UTC)
+                elif engine_binding.engine_type == "NATIVE":
+                    # Readiness must degrade as well as improve: a connector that
+                    # stops being usable disarms the playbook that depends on it.
+                    engine_binding.active = actions_ready
+                    engine_binding.sync_status = (
+                        "SYNCHRONIZED" if actions_ready else "PENDING"
+                    )
+                    engine_binding.desired_digest = latest_version.artifact_sha256
+                    engine_binding.observed_digest = (
+                        latest_version.artifact_sha256 if actions_ready else None
+                    )
+                    engine_binding.last_verified_at = (
+                        datetime.now(UTC) if actions_ready else None
+                    )
 
         await session.flush()
 
@@ -1623,13 +1641,15 @@ class PlaybookAdministrationService:
         actions_ready = artifact is not None and not version_errors and not action_blockers
         if version.status != "APPROVED":
             blocking_reasons.append("PLAYBOOK_NOT_PUBLISHED")
-        if binding is None:
-            blocking_reasons.append("PLAYBOOK_BINDING_UNAVAILABLE")
-        elif (
+        binding_unavailable = binding is None or (
             not binding.active
             or binding.sync_status != "SYNCHRONIZED"
             or binding.observed_digest != binding.desired_digest
-        ):
+        )
+        # An inactive binding caused by unconfigured actions is a consequence,
+        # not an independent cause: reporting both would send the operator to
+        # the engine when the real gap is the connector.
+        if binding_unavailable and not action_blockers:
             blocking_reasons.append("PLAYBOOK_BINDING_UNAVAILABLE")
         if not actions_ready:
             blocking_reasons.append("PLAYBOOK_CONFIGURATION_REQUIRED")

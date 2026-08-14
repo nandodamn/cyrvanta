@@ -489,6 +489,9 @@ const resources = {
       rollbackOnExecution:
         "La reversión se aplica sobre una ejecución concreta de este playbook, no como un procedimiento aparte: ejecuta la acción «{{action}}» contra los mismos objetivos que este playbook contuvo.",
       policyNotSpecified: "No hay una política publicada para esta versión.",
+      playbookDisabled: "Deshabilitado",
+      cannotActivateIncomplete:
+        "No se puede activar hasta completar la configuración pendiente.",
       blockingReasonsTitle: "Falta completar para poder ejecutarlo:",
       blockingReasons: {
         PLAYBOOK_CONFIGURATION_REQUIRED:
@@ -1087,6 +1090,9 @@ const resources = {
       rollbackOnExecution:
         "Rollback applies to a specific execution of this playbook, not as a separate procedure: it runs the «{{action}}» action against the same targets this playbook contained.",
       policyNotSpecified: "No automation policy is published for this version.",
+      playbookDisabled: "Disabled",
+      cannotActivateIncomplete:
+        "Cannot be activated until the pending configuration is completed.",
       blockingReasonsTitle: "Complete these before it can run:",
       blockingReasons: {
         PLAYBOOK_CONFIGURATION_REQUIRED: "Configuration incomplete: see the detail below.",

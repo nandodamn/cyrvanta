@@ -212,14 +212,25 @@ export function PlaybookLibraryPage() {
           {filteredItems.map((playbook) => {
             const currentMode = playbook.approval_mode ?? "AUTOMATIC";
             const isPublished = playbook.publication_status === "PUBLISHED";
+            // An incompletely configured playbook is not an available capability:
+            // it cannot be activated (nor engine-switched, which also activates),
+            // and the card is muted so the state is obvious in the listing.
+            const isReady = playbook.readiness_status === "READY";
+            const needsConfiguration = !isReady;
             return (
-              <article key={playbook.id}>
+              <article
+                key={playbook.id}
+                className={needsConfiguration ? "playbook-card-disabled" : undefined}
+                aria-disabled={needsConfiguration || undefined}
+              >
                 <div className="playbook-heading" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "12px", flexWrap: "wrap", marginBottom: "0.75rem" }}>
                   <div>
                     <div style={{ display: "flex", gap: "6px", alignItems: "center", flexWrap: "wrap", marginBottom: "6px" }}>
-                      <span className={`demo-badge ${playbook.readiness_status === "READY" ? "active" : ""}`}>
-                        {playbook.readiness_status}
-                      </span>
+                      {needsConfiguration ? (
+                        <span className="playbook-disabled-badge">🚫 {t("playbookDisabled")}</span>
+                      ) : (
+                        <span className="demo-badge active">{playbook.readiness_status}</span>
+                      )}
                       <span
                         className="demo-badge"
                         style={{
@@ -337,8 +348,13 @@ export function PlaybookLibraryPage() {
                       disabled={
                         toggleMutation.isPending
                         || !isPublished
-                        || (!playbook.binding_active
-                          && playbook.blocking_reasons.includes("PLAYBOOK_CONFIGURATION_REQUIRED"))
+                        // Never allow turning ON a playbook that cannot actually run.
+                        || (!playbook.binding_active && needsConfiguration)
+                      }
+                      title={
+                        !playbook.binding_active && needsConfiguration
+                          ? t("cannotActivateIncomplete")
+                          : undefined
                       }
                       onClick={() =>
                         toggleMutation.mutate({
@@ -364,9 +380,11 @@ export function PlaybookLibraryPage() {
                       disabled={
                         toggleMutation.isPending
                         || !isPublished
-                        || (!playbook.binding_active
-                          && playbook.blocking_reasons.includes("PLAYBOOK_CONFIGURATION_REQUIRED"))
+                        // Switching engines activates the playbook, so it is
+                        // blocked for the same reason as activation.
+                        || needsConfiguration
                       }
+                      title={needsConfiguration ? t("cannotActivateIncomplete") : undefined}
                       onClick={() =>
                         toggleMutation.mutate({
                           id: playbook.id,

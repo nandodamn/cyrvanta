@@ -48,22 +48,33 @@ def test_permission_dependency_is_deny_by_default() -> None:
 
 
 def test_operations_use_explicit_permissions() -> None:
+    """Both permissions minted by 0005 must still gate a real endpoint.
+
+    They are enforced in different modules: analysis stayed in `operations`,
+    while executing an approved response moved to `playbooks` when versioned
+    execution landed (0016 re-grants `response.execute` next to
+    `playbook.release`). Asserting both against the operations router would
+    only prove the test is stale, not that the permission is unenforced.
+    """
+    modules = Path(__file__).parents[2] / "src" / "cyrvanta" / "modules"
     migration = (
         Path(__file__).parents[2] / "alembic" / "versions" / "0005_operations_permissions.py"
     ).read_text(encoding="utf-8")
-    router = (
-        Path(__file__).parents[2]
-        / "src"
-        / "cyrvanta"
-        / "modules"
-        / "operations"
-        / "presentation"
-        / "router.py"
+    operations_router = (
+        modules / "operations" / "presentation" / "router.py"
+    ).read_text(encoding="utf-8")
+    playbooks_router = (
+        modules / "playbooks" / "presentation" / "router.py"
     ).read_text(encoding="utf-8")
     assert "analysis.request" in migration
     assert "response.execute" in migration
-    assert 'require_permission("analysis.request")' in router
-    assert 'require_permission("response.execute")' in router
+    assert 'require_permission("analysis.request")' in operations_router
+    assert 'require_permission("response.execute")' in playbooks_router
+    # The execution endpoints are the ones that must consume it -- a declared
+    # dependency nothing depends on would pass a substring check while leaving
+    # execution unguarded.
+    assert "ExecutionRunner" in playbooks_router
+    assert playbooks_router.count("context: ExecutionRunner") >= 1
 
 
 def test_event_delivery_migration_forces_rls_and_restricts_dispatch() -> None:

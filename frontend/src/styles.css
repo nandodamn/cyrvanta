@@ -832,6 +832,10 @@ details > .admin-list {
 }
 
 .admin-list-selectable > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
   border-radius: 6px;
   padding: 10px 8px 8px;
   margin: 0 -8px;
@@ -841,6 +845,11 @@ details > .admin-list {
 
 .admin-list-selectable > div:hover {
   background: var(--panel-raised);
+}
+
+.admin-list-selectable > div:hover .admin-list-row-chevron {
+  color: var(--text);
+  transform: translateX(2px);
 }
 
 .admin-list-selectable > div.selected {
@@ -853,8 +862,30 @@ details > .admin-list {
   color: var(--accent);
 }
 
-/* Users sub-tab: creation + directory on the left, the selected user's
-   account/password/roles/directory identity grouped together on the right. */
+.admin-list-selectable > div.selected .admin-list-row-chevron {
+  color: var(--accent);
+}
+
+.admin-list-row-info {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.admin-list-row-chevron {
+  flex-shrink: 0;
+  color: var(--muted);
+  transition: color 0.15s ease, transform 0.15s ease;
+}
+
+.admin-list-hint {
+  margin: 2px 0 4px;
+  font-size: 0.8rem;
+}
+
+/* Users sub-tab: the "create user" action lives inside the same card as the
+   list it populates, and the selected user's account/password/roles/directory
+   identity are grouped together on the right. */
 .admin-users-layout {
   display: grid;
   grid-template-columns: minmax(300px, 380px) minmax(0, 1fr);
@@ -868,10 +899,84 @@ details > .admin-list {
   gap: 18px;
 }
 
+.admin-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 4px;
+}
+
+.admin-panel-header h2 {
+  margin: 0;
+}
+
+.admin-inline-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  border-radius: 6px;
+  border: 1px solid rgba(13, 209, 155, 0.35);
+  background: rgba(13, 209, 155, 0.1);
+  color: var(--accent);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.admin-inline-toggle:hover {
+  background: rgba(13, 209, 155, 0.18);
+}
+
+.admin-inline-toggle.active {
+  background: var(--panel-raised);
+  border-color: var(--line);
+  color: var(--text-soft);
+}
+
+.admin-inline-toggle-icon {
+  transition: transform 0.15s ease;
+}
+
+.admin-inline-toggle.active .admin-inline-toggle-icon {
+  transform: rotate(45deg);
+}
+
+.admin-inline-create-form {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  margin: 4px 0 14px;
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  background: var(--panel-raised);
+  animation: admin-inline-form-in 0.15s ease;
+}
+
+@keyframes admin-inline-form-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 .admin-user-detail {
   display: flex;
   flex-direction: column;
   gap: 1.25rem;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.admin-user-detail.has-selection {
+  border-color: rgba(13, 209, 155, 0.35);
+  box-shadow: 0 0 0 1px rgba(13, 209, 155, 0.12);
 }
 
 .admin-user-detail-header {
@@ -884,6 +989,25 @@ details > .admin-list {
 
 .admin-user-detail-header select {
   min-width: 220px;
+}
+
+.admin-user-detail-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 2.5rem 1rem;
+  color: var(--muted);
+  text-align: center;
+}
+
+.admin-user-detail-empty svg {
+  opacity: 0.6;
+}
+
+.admin-user-detail-empty p {
+  max-width: 32ch;
 }
 
 .admin-user-detail-grid {
@@ -914,6 +1038,10 @@ details > .admin-list {
 @media (max-width: 640px) {
   .admin-user-detail-grid {
     grid-template-columns: 1fr;
+  }
+
+  .admin-panel-header {
+    flex-wrap: wrap;
   }
 }
 

@@ -1,6 +1,6 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { FormEvent, lazy, Suspense, useEffect, useState } from "react";
+import { FormEvent, lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { useTranslation } from "react-i18next";
 import { NavLink, Navigate, Outlet, Route, Routes, useNavigate, useParams } from "react-router-dom";
@@ -413,15 +413,17 @@ function ListControls({
   state,
   visibleCount,
   hasNext,
+  compact = false,
 }: {
   state: ReturnType<typeof useListControls>;
   visibleCount: number;
   hasNext: boolean;
+  compact?: boolean;
 }) {
   const { t } = useTranslation();
   return (
     <form
-      className="list-controls"
+      className={`list-controls${compact ? " list-controls-compact" : ""}`}
       role="search"
       style={{
         display: "flex",
@@ -429,9 +431,9 @@ function ListControls({
         flexWrap: "wrap",
         gap: "10px",
         justifyContent: "space-between",
-        marginBottom: "1rem",
-        paddingBottom: "0.75rem",
-        borderBottom: "1px solid var(--line)",
+        marginBottom: compact ? "8px" : "1rem",
+        paddingBottom: compact ? "0" : "0.75rem",
+        borderBottom: compact ? "none" : "1px solid var(--line)",
       }}
       onSubmit={(event) => {
         event.preventDefault();
@@ -455,7 +457,14 @@ function ListControls({
         </button>
       </div>
 
-      <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: compact ? "8px" : "12px",
+          flexWrap: compact ? "nowrap" : "wrap",
+        }}
+      >
         <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
           <span style={{ fontSize: "0.8rem", color: "var(--muted)", whiteSpace: "nowrap" }}>{t("itemsPerPage")}:</span>
           <select
@@ -472,28 +481,61 @@ function ListControls({
         </div>
 
         <span className="list-result-count" style={{ fontSize: "0.8rem", color: "var(--muted)", whiteSpace: "nowrap" }}>
-          {t("visibleResults", { count: visibleCount, page: state.page + 1 })}
+          {compact
+            ? t("visibleResultsCompact", { count: visibleCount })
+            : t("visibleResults", { count: visibleCount, page: state.page + 1 })}
         </span>
 
-        <div className="pager" style={{ display: "flex", gap: "4px" }}>
-          <button
-            type="button"
-            className="ghost"
-            style={{ width: "auto", minWidth: "unset", height: "auto", padding: "4px 10px", fontSize: "0.75rem", whiteSpace: "nowrap" }}
-            disabled={state.page === 0}
-            onClick={() => state.setPage(Math.max(0, state.page - 1))}
-          >
-            {t("previous")}
-          </button>
-          <button
-            type="button"
-            className="ghost"
-            style={{ width: "auto", minWidth: "unset", height: "auto", padding: "4px 10px", fontSize: "0.75rem", whiteSpace: "nowrap" }}
-            disabled={!hasNext}
-            onClick={() => state.setPage(state.page + 1)}
-          >
-            {t("next")}
-          </button>
+        <div className="pager" style={{ display: "flex", gap: "4px", flexShrink: 0 }}>
+          {compact ? (
+            <>
+              <button
+                type="button"
+                className="ghost"
+                aria-label={t("previous")}
+                style={{ width: "26px", minWidth: "unset", height: "26px", padding: 0, display: "flex", alignItems: "center", justifyContent: "center" }}
+                disabled={state.page === 0}
+                onClick={() => state.setPage(Math.max(0, state.page - 1))}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="15 18 9 12 15 6" />
+                </svg>
+              </button>
+              <button
+                type="button"
+                className="ghost"
+                aria-label={t("next")}
+                style={{ width: "26px", minWidth: "unset", height: "26px", padding: 0, display: "flex", alignItems: "center", justifyContent: "center" }}
+                disabled={!hasNext}
+                onClick={() => state.setPage(state.page + 1)}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="9 18 15 12 9 6" />
+                </svg>
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                type="button"
+                className="ghost"
+                style={{ width: "auto", minWidth: "unset", height: "auto", padding: "4px 10px", fontSize: "0.75rem", whiteSpace: "nowrap" }}
+                disabled={state.page === 0}
+                onClick={() => state.setPage(Math.max(0, state.page - 1))}
+              >
+                {t("previous")}
+              </button>
+              <button
+                type="button"
+                className="ghost"
+                style={{ width: "auto", minWidth: "unset", height: "auto", padding: "4px 10px", fontSize: "0.75rem", whiteSpace: "nowrap" }}
+                disabled={!hasNext}
+                onClick={() => state.setPage(state.page + 1)}
+              >
+                {t("next")}
+              </button>
+            </>
+          )}
         </div>
       </div>
     </form>
@@ -1140,8 +1182,8 @@ function IncidentDetailPage() {
       && Boolean(item.latest_version),
   );
   const incidentAttackCodes = useMemo(
-    () => new Set((enrichment.data?.attack_mappings ?? []).map((m) => m.external_id)),
-    [enrichment.data?.attack_mappings],
+    () => new Set((enrichment.data?.mappings ?? []).map((m) => m.external_id)),
+    [enrichment.data?.mappings],
   );
 
   const sortedPlaybooks = useMemo(() => {
@@ -2928,6 +2970,7 @@ function Administration() {
   const [directoryIdentityMessage, setDirectoryIdentityMessage] = useState("");
   const [selectedUser, setSelectedUser] = useState("");
   const [selectedRole, setSelectedRole] = useState("");
+  const [showCreateUser, setShowCreateUser] = useState(false);
   const [directoryMappingDrafts, setDirectoryMappingDrafts] = useState<Array<{
     external_group: string;
     role_id: string;
@@ -3160,6 +3203,7 @@ function Administration() {
         password: String(data.get("password")),
       });
       form.reset();
+      setShowCreateUser(false);
     } catch {
       // The mutation exposes the localized error and the form remains available for correction.
     }
@@ -3313,42 +3357,72 @@ function Administration() {
           {/* SUB-TAB 2: USERS */}
           {activeSubTab === "users" && (
             <div className="admin-users-layout">
-              {/* Left column: creating a user and finding one in the list are the same
-                  task (add, then immediately locate/select) so they live side by side. */}
+              {/* Left column: creating a user happens inline, inside the same card as the
+                  list it will populate, and every row previews that it opens the panel
+                  on the right. */}
               <div className="admin-users-directory">
-                <form className="panel compact-panel" autoComplete="off" onSubmit={submitUser}>
+                <section className="panel admin-panel admin-users-panel">
                   <div>
-                    <p className="eyebrow">{t("identity")}</p>
-                    <h2>{t("createUser")}</h2>
-                  </div>
-                  <label>
-                    {t("displayName")}
-                    <input name="display_name" required minLength={1} maxLength={200} />
-                  </label>
-                  <label>
-                    {t("email")}
-                    <input name="email" type="email" autoComplete="off" required />
-                  </label>
-                  <label>
-                    {t("temporaryPassword")}
-                    <input
-                      name="password"
-                      type="password"
-                      autoComplete="new-password"
-                      required
-                      minLength={12}
-                    />
-                  </label>
-                  <button disabled={userMutation.isPending}>{t("create")}</button>
-                </form>
+                    <div className="admin-panel-header">
+                      <h2>{t("users")}</h2>
+                      <button
+                        type="button"
+                        className={`admin-inline-toggle${showCreateUser ? " active" : ""}`}
+                        aria-expanded={showCreateUser}
+                        onClick={() => setShowCreateUser((value) => !value)}
+                      >
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="admin-inline-toggle-icon">
+                          <line x1="12" y1="5" x2="12" y2="19" />
+                          <line x1="5" y1="12" x2="19" y2="12" />
+                        </svg>
+                        {showCreateUser ? t("cancel") : t("createUser")}
+                      </button>
+                    </div>
 
-                <section className="panel admin-panel">
-                  <div>
-                    <h2>{t("users")}</h2>
+                    {showCreateUser && (
+                      <form
+                        className="admin-inline-create-form"
+                        autoComplete="off"
+                        onSubmit={submitUser}
+                      >
+                        <label>
+                          {t("displayName")}
+                          <input name="display_name" required minLength={1} maxLength={200} />
+                        </label>
+                        <label>
+                          {t("email")}
+                          <input name="email" type="email" autoComplete="off" required />
+                        </label>
+                        <label>
+                          {t("temporaryPassword")}
+                          <input
+                            name="password"
+                            type="password"
+                            autoComplete="new-password"
+                            required
+                            minLength={12}
+                          />
+                        </label>
+                        <div className="form-actions">
+                          <button disabled={userMutation.isPending}>{t("create")}</button>
+                          <button
+                            type="button"
+                            className="ghost"
+                            onClick={() => setShowCreateUser(false)}
+                          >
+                            {t("cancel")}
+                          </button>
+                        </div>
+                      </form>
+                    )}
+
+                    <p className="muted admin-list-hint">{t("selectUserHint")}</p>
+
                     <ListControls
                       state={userControls}
                       visibleCount={visibleUsers.length}
                       hasNext={(users.data?.length ?? 0) > userControls.pageSize}
+                      compact
                     />
                     <div className="admin-list admin-list-selectable">
                       {visibleUsers.map((user) => (
@@ -3369,9 +3443,14 @@ function Administration() {
                             }
                           }}
                         >
-                          <strong>{user.display_name}</strong>
-                          <span>{user.email}</span>
-                          <small>{user.is_active ? t("active") : t("inactive")}</small>
+                          <div className="admin-list-row-info">
+                            <strong>{user.display_name}</strong>
+                            <span>{user.email}</span>
+                            <small>{user.is_active ? t("active") : t("inactive")}</small>
+                          </div>
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="admin-list-row-chevron">
+                            <polyline points="9 18 15 12 9 6" />
+                          </svg>
                         </div>
                       ))}
                     </div>
@@ -3380,8 +3459,10 @@ function Administration() {
               </div>
 
               {/* Right column: everything that acts on one selected user — account,
-                  password, roles, directory identity — grouped under one heading. */}
-              <section className="panel admin-user-detail">
+                  password, roles, directory identity — grouped under one heading.
+                  Highlighted whenever a row on the left is selected, to make the
+                  click -> panel relationship visible. */}
+              <section className={`panel admin-user-detail${selectedUser ? " has-selection" : ""}`}>
                 <div className="admin-user-detail-header">
                   <div>
                     <p className="eyebrow">{t("identity")}</p>
@@ -3402,7 +3483,14 @@ function Administration() {
                   </select>
                 </div>
 
-                {!selectedUser && <p className="muted">{t("selectedAccountRequired")}</p>}
+                {!selectedUser && (
+                  <div className="admin-user-detail-empty">
+                    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="15 18 9 12 15 6" />
+                    </svg>
+                    <p className="muted">{t("selectedAccountRequired")}</p>
+                  </div>
+                )}
 
                 {selectedUser && (
                   <div className="admin-user-detail-grid">

@@ -3312,8 +3312,10 @@ function Administration() {
 
           {/* SUB-TAB 2: USERS */}
           {activeSubTab === "users" && (
-            <>
-              <section className="admin-forms" style={{ marginTop: 0 }}>
+            <div className="admin-users-layout">
+              {/* Left column: creating a user and finding one in the list are the same
+                  task (add, then immediately locate/select) so they live side by side. */}
+              <div className="admin-users-directory">
                 <form className="panel compact-panel" autoComplete="off" onSubmit={submitUser}>
                   <div>
                     <p className="eyebrow">{t("identity")}</p>
@@ -3340,26 +3342,51 @@ function Administration() {
                   <button disabled={userMutation.isPending}>{t("create")}</button>
                 </form>
 
-                <form
-                  key={`account-${selectedAdminUser?.id}-${selectedAdminUser?.display_name}-${selectedAdminUser?.is_active}`}
-                  className="panel compact-panel"
-                  onSubmit={(event) => {
-                    event.preventDefault();
-                    if (!selectedAdminUser) {
-                      setFormError(t("selectedAccountRequired"));
-                      return;
-                    }
-                    const data = new FormData(event.currentTarget);
-                    userAccountMutation.mutate({
-                      userId: selectedAdminUser.id,
-                      displayName: String(data.get("display_name")).trim(),
-                      isActive: data.get("is_active") === "on",
-                    });
-                  }}
-                >
+                <section className="panel admin-panel">
+                  <div>
+                    <h2>{t("users")}</h2>
+                    <ListControls
+                      state={userControls}
+                      visibleCount={visibleUsers.length}
+                      hasNext={(users.data?.length ?? 0) > userControls.pageSize}
+                    />
+                    <div className="admin-list admin-list-selectable">
+                      {visibleUsers.map((user) => (
+                        <div
+                          key={user.id}
+                          className={`admin-list-row${selectedUser === user.id ? " selected" : ""}`}
+                          role="button"
+                          tabIndex={0}
+                          onClick={() => {
+                            setSelectedUser(user.id);
+                            setDirectoryIdentityMessage("");
+                          }}
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter" || event.key === " ") {
+                              event.preventDefault();
+                              setSelectedUser(user.id);
+                              setDirectoryIdentityMessage("");
+                            }
+                          }}
+                        >
+                          <strong>{user.display_name}</strong>
+                          <span>{user.email}</span>
+                          <small>{user.is_active ? t("active") : t("inactive")}</small>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </section>
+              </div>
+
+              {/* Right column: everything that acts on one selected user — account,
+                  password, roles, directory identity — grouped under one heading. */}
+              <section className="panel admin-user-detail">
+                <div className="admin-user-detail-header">
                   <div>
                     <p className="eyebrow">{t("identity")}</p>
-                    <h2>{t("manageUser")}</h2>
+                    <h2>{selectedAdminUser?.display_name ?? t("manageUser")}</h2>
+                    {selectedAdminUser && <p className="muted">{selectedAdminUser.email}</p>}
                   </div>
                   <select
                     value={selectedUser}
@@ -3373,188 +3400,161 @@ function Administration() {
                       <option key={user.id} value={user.id}>{user.display_name}</option>
                     ))}
                   </select>
-                  <label>
-                    {t("displayName")}
-                    <input
-                      name="display_name"
-                      required
-                      minLength={1}
-                      maxLength={200}
-                      defaultValue={selectedAdminUser?.display_name ?? ""}
-                      disabled={!selectedAdminUser}
-                    />
-                  </label>
-                  <label className="check-row">
-                    <input
-                      type="checkbox"
-                      name="is_active"
-                      defaultChecked={selectedAdminUser?.is_active ?? false}
-                      disabled={!selectedAdminUser}
-                    />
-                    {t("accountActive")}
-                  </label>
-                  <button disabled={!selectedAdminUser || userAccountMutation.isPending}>
-                    {t("save")}
-                  </button>
-                </form>
-
-                <form
-                  className="panel compact-panel"
-                  autoComplete="off"
-                  onSubmit={async (event) => {
-                    event.preventDefault();
-                    if (!selectedAdminUser) {
-                      setFormError(t("selectedAccountRequired"));
-                      return;
-                    }
-                    const form = event.currentTarget;
-                    const password = String(new FormData(form).get("password"));
-                    try {
-                      await userPasswordMutation.mutateAsync({
-                        userId: selectedAdminUser.id,
-                        password,
-                      });
-                      form.reset();
-                    } catch {
-                      // The mutation keeps the form available and exposes a localized error.
-                    }
-                  }}
-                >
-                  <div>
-                    <p className="eyebrow">{selectedAdminUser?.email ?? t("selectUser")}</p>
-                    <h2>{t("replacePassword")}</h2>
-                  </div>
-                  <label>
-                    {t("newPassword")}
-                    <input
-                      name="password"
-                      type="password"
-                      autoComplete="new-password"
-                      required
-                      minLength={12}
-                      maxLength={256}
-                      disabled={!selectedAdminUser}
-                    />
-                  </label>
-                  <button disabled={!selectedAdminUser || userPasswordMutation.isPending}>
-                    {t("replacePassword")}
-                  </button>
-                </form>
-
-                <form
-                  key={`user-${selectedUser}-${userRoles.data?.join("-")}`}
-                  className="panel compact-panel"
-                  onSubmit={submitUserRoles}
-                >
-                  <div>
-                    <p className="eyebrow">RBAC</p>
-                    <h2>{t("assignRoles")}</h2>
-                  </div>
-                  <select value={selectedUser} onChange={(event) => {
-                      setSelectedUser(event.target.value);
-                      setDirectoryIdentityMessage("");
-                    }}>
-                    <option value="">{t("selectUser")}</option>
-                    {userOptions.data?.map((user) => (
-                      <option key={user.id} value={user.id}>
-                        {user.display_name}
-                      </option>
-                    ))}
-                  </select>
-                  {roles.data?.map((role) => (
-                    <label className="check-row" key={role.id}>
-                      <input
-                        type="checkbox"
-                        name="role_ids"
-                        value={role.id}
-                        defaultChecked={userRoles.data?.includes(role.id)}
-                        disabled={!selectedUser}
-                      />
-                      {role.name}
-                    </label>
-                  ))}
-                  <button disabled={!selectedUser || userRolesMutation.isPending}>{t("save")}</button>
-                </form>
-
-                <form
-                  className="panel compact-panel"
-                  autoComplete="off"
-                  onSubmit={(event) => {
-                    event.preventDefault();
-                    const data = new FormData(event.currentTarget);
-                    directoryIdentityLinkMutation.mutate({
-                      userId: selectedUser,
-                      externalSubject: String(data.get("external_subject")).trim(),
-                      normalizedUsername: String(data.get("normalized_username")).trim(),
-                    });
-                  }}
-                >
-                  <div>
-                    <p className="eyebrow">LDAP / Active Directory</p>
-                    <h2>{t("directoryIdentityLink")}</h2>
-                    <p className="muted">{t("directoryIdentityLinkHelp")}</p>
-                  </div>
-                  <label>
-                    {t("externalSubject")}
-                    <input
-                      name="external_subject"
-                      required
-                      maxLength={1000}
-                      disabled={!selectedUser}
-                    />
-                  </label>
-                  <label>
-                    {t("normalizedUsername")}
-                    <input
-                      name="normalized_username"
-                      required
-                      maxLength={256}
-                      disabled={!selectedUser}
-                    />
-                  </label>
-                  <div className="form-actions">
-                    <button
-                      type="submit"
-                      disabled={!selectedUser || directoryIdentityLinkMutation.isPending}
-                    >
-                      {t("linkIdentity")}
-                    </button>
-                    <button
-                      className="ghost"
-                      type="button"
-                      disabled={!selectedUser || directoryIdentityUnlinkMutation.isPending}
-                      onClick={() => directoryIdentityUnlinkMutation.mutate(selectedUser)}
-                    >
-                      {t("unlinkIdentity")}
-                    </button>
-                  </div>
-                  {directoryIdentityMessage && (
-                    <p className="status-message" role="status">
-                      {directoryIdentityMessage}
-                    </p>
-                  )}
-                </form>              </section>
-
-              <section className="panel admin-panel">
-                <div>
-                  <h2>{t("users")}</h2>
-                  <ListControls
-                    state={userControls}
-                    visibleCount={visibleUsers.length}
-                    hasNext={(users.data?.length ?? 0) > userControls.pageSize}
-                  />
-                  <div className="admin-list">
-                    {visibleUsers.map((user) => (
-                      <div key={user.id}>
-                        <strong>{user.display_name}</strong>
-                        <span>{user.email}</span>
-                        <small>{user.is_active ? t("active") : t("inactive")}</small>
-                      </div>
-                    ))}
-                  </div>
                 </div>
+
+                {!selectedUser && <p className="muted">{t("selectedAccountRequired")}</p>}
+
+                {selectedUser && (
+                  <div className="admin-user-detail-grid">
+                    <form
+                      key={`account-${selectedAdminUser?.id}-${selectedAdminUser?.display_name}-${selectedAdminUser?.is_active}`}
+                      className="admin-user-detail-section"
+                      onSubmit={(event) => {
+                        event.preventDefault();
+                        if (!selectedAdminUser) {
+                          setFormError(t("selectedAccountRequired"));
+                          return;
+                        }
+                        const data = new FormData(event.currentTarget);
+                        userAccountMutation.mutate({
+                          userId: selectedAdminUser.id,
+                          displayName: String(data.get("display_name")).trim(),
+                          isActive: data.get("is_active") === "on",
+                        });
+                      }}
+                    >
+                      <h3>{t("manageUser")}</h3>
+                      <label>
+                        {t("displayName")}
+                        <input
+                          name="display_name"
+                          required
+                          minLength={1}
+                          maxLength={200}
+                          defaultValue={selectedAdminUser?.display_name ?? ""}
+                          disabled={!selectedAdminUser}
+                        />
+                      </label>
+                      <label className="check-row">
+                        <input
+                          type="checkbox"
+                          name="is_active"
+                          defaultChecked={selectedAdminUser?.is_active ?? false}
+                          disabled={!selectedAdminUser}
+                        />
+                        {t("accountActive")}
+                      </label>
+                      <button disabled={!selectedAdminUser || userAccountMutation.isPending}>
+                        {t("save")}
+                      </button>
+                    </form>
+
+                    <form
+                      className="admin-user-detail-section"
+                      autoComplete="off"
+                      onSubmit={async (event) => {
+                        event.preventDefault();
+                        if (!selectedAdminUser) {
+                          setFormError(t("selectedAccountRequired"));
+                          return;
+                        }
+                        const form = event.currentTarget;
+                        const password = String(new FormData(form).get("password"));
+                        try {
+                          await userPasswordMutation.mutateAsync({
+                            userId: selectedAdminUser.id,
+                            password,
+                          });
+                          form.reset();
+                        } catch {
+                          // The mutation keeps the form available and exposes a localized error.
+                        }
+                      }}
+                    >
+                      <h3>{t("replacePassword")}</h3>
+                      <label>
+                        {t("newPassword")}
+                        <input
+                          name="password"
+                          type="password"
+                          autoComplete="new-password"
+                          required
+                          minLength={12}
+                          maxLength={256}
+                          disabled={!selectedAdminUser}
+                        />
+                      </label>
+                      <button disabled={!selectedAdminUser || userPasswordMutation.isPending}>
+                        {t("replacePassword")}
+                      </button>
+                    </form>
+
+                    <form
+                      key={`user-${selectedUser}-${userRoles.data?.join("-")}`}
+                      className="admin-user-detail-section"
+                      onSubmit={submitUserRoles}
+                    >
+                      <h3>{t("assignRoles")}</h3>
+                      {roles.data?.map((role) => (
+                        <label className="check-row" key={role.id}>
+                          <input
+                            type="checkbox"
+                            name="role_ids"
+                            value={role.id}
+                            defaultChecked={userRoles.data?.includes(role.id)}
+                          />
+                          {role.name}
+                        </label>
+                      ))}
+                      <button disabled={userRolesMutation.isPending}>{t("save")}</button>
+                    </form>
+
+                    <form
+                      className="admin-user-detail-section"
+                      autoComplete="off"
+                      onSubmit={(event) => {
+                        event.preventDefault();
+                        const data = new FormData(event.currentTarget);
+                        directoryIdentityLinkMutation.mutate({
+                          userId: selectedUser,
+                          externalSubject: String(data.get("external_subject")).trim(),
+                          normalizedUsername: String(data.get("normalized_username")).trim(),
+                        });
+                      }}
+                    >
+                      <h3>{t("directoryIdentityLink")}</h3>
+                      <p className="muted">{t("directoryIdentityLinkHelp")}</p>
+                      <label>
+                        {t("externalSubject")}
+                        <input name="external_subject" required maxLength={1000} />
+                      </label>
+                      <label>
+                        {t("normalizedUsername")}
+                        <input name="normalized_username" required maxLength={256} />
+                      </label>
+                      <div className="form-actions">
+                        <button type="submit" disabled={directoryIdentityLinkMutation.isPending}>
+                          {t("linkIdentity")}
+                        </button>
+                        <button
+                          className="ghost"
+                          type="button"
+                          disabled={directoryIdentityUnlinkMutation.isPending}
+                          onClick={() => directoryIdentityUnlinkMutation.mutate(selectedUser)}
+                        >
+                          {t("unlinkIdentity")}
+                        </button>
+                      </div>
+                      {directoryIdentityMessage && (
+                        <p className="status-message" role="status">
+                          {directoryIdentityMessage}
+                        </p>
+                      )}
+                    </form>
+                  </div>
+                )}
               </section>
-            </>
+            </div>
           )}
 
           {/* SUB-TAB 3: RBAC ROLES & PERMISSIONS */}

@@ -43,7 +43,7 @@ describe("operational pulse", () => {
       window_start: "2026-07-31T12:00:00Z",
       window_end: "2026-08-01T12:00:00Z",
       updated_at: "2026-08-01T12:00:00Z",
-      source_mode: "SIMULATED",
+      source_mode: "LIVE",
       totals: { alerts: 3, incidents: 1 },
       series: Array.from({ length: 12 }, (_, index) => ({
         bucket_start: new Date(Date.UTC(2026, 6, 31, 12 + index * 2)).toISOString(),
@@ -55,7 +55,7 @@ describe("operational pulse", () => {
 
     renderPulse();
 
-    expect(await screen.findByText(/simulad[oa]|simulated/i)).toBeVisible();
+    expect(await screen.findByText(/real|live/i)).toBeVisible();
     expect(screen.getAllByRole("listitem")).toHaveLength(12);
     expect(screen.getByText(/última actualización|last updated/i)).toBeVisible();
     expect(screen.getByText("3")).toBeVisible();

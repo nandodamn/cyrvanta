@@ -17,7 +17,7 @@ import {
   createIncident,
   createHumanClaim,
   createUser,
-  createResponseProposal,
+  proposePlaybookAction,
   decideResponse,
   analyzeIncident,
   directoryLogin,
@@ -49,6 +49,7 @@ import {
   linkUserDirectoryIdentity,
   login,
   recalculateIncidentRisk,
+  relateClaim,
   replaceDirectoryGroupMappings,
   replaceRolePermissions,
   replaceUserPassword,
@@ -66,6 +67,9 @@ import { SecurityTopologyPanel } from "./SecurityTopologyPanel";
 import { useAuth } from "./AuthContext";
 
 
+const ApiKeysPage = lazy(() =>
+  import("./ApiKeysPage").then((module) => ({ default: module.ApiKeysPage })),
+);
 const GovernedMemoryPage = lazy(() =>
   import("./GovernedMemoryPage").then((module) => ({ default: module.GovernedMemoryPage })),
 );
@@ -881,11 +885,10 @@ function IncidentsPage() {
       <div className="page-title">
         <h1>{t("incidents")}</h1>
       </div>
-      <details className="panel" style={{ marginBottom: "1rem" }}>
+      <details className="panel" style={{ marginBottom: "1.25rem" }}>
         <summary>{t("createRealIncident")}</summary>
         <form
           className="form-grid"
-          style={{ marginTop: "1rem" }}
           onSubmit={async (event) => {
             event.preventDefault();
             const form = event.currentTarget;
@@ -906,15 +909,27 @@ function IncidentsPage() {
           }}
         >
           <label>
-            {t("title")}
-            <input name="title" required minLength={3} maxLength={300} />
+            <span>{t("title")}</span>
+            <input
+              name="title"
+              required
+              minLength={3}
+              maxLength={300}
+              placeholder={i18n.language.startsWith("es") ? "Ej. Intrusión y ejecución de script malicioso" : "e.g. Host intrusion and malicious script"}
+            />
           </label>
           <label>
-            {t("classification")}
-            <input name="classification" required minLength={2} maxLength={120} />
+            <span>{t("classification")}</span>
+            <input
+              name="classification"
+              required
+              minLength={2}
+              maxLength={120}
+              placeholder={i18n.language.startsWith("es") ? "Ej. Malware / Ransomware" : "e.g. Malware / Ransomware"}
+            />
           </label>
           <label>
-            {t("severity")}
+            <span>{t("severity")}</span>
             <select name="severity" defaultValue="medium">
               {(["informational", "low", "medium", "high", "critical"] as const).map(
                 (value) => (
@@ -926,7 +941,7 @@ function IncidentsPage() {
             </select>
           </label>
           <label>
-            {t("priority")}
+            <span>{t("priority")}</span>
             <select name="priority" defaultValue="3">
               {[1, 2, 3, 4, 5].map((value) => (
                 <option key={value} value={value}>{value}</option>
@@ -934,15 +949,24 @@ function IncidentsPage() {
             </select>
           </label>
           <label style={{ gridColumn: "1 / -1" }}>
-            {t("description")}
-            <textarea name="description" required minLength={3} maxLength={5000} rows={5} />
+            <span>{t("description")}</span>
+            <textarea
+              name="description"
+              required
+              minLength={3}
+              maxLength={5000}
+              rows={4}
+              placeholder={i18n.language.startsWith("es") ? "Detalle los hallazgos técnicos, vectores observados o sistemas afectados..." : "Detail technical findings, observed vectors or affected systems..."}
+            />
           </label>
-          <button type="submit" disabled={createMutation.isPending}>
-            {t("createRealIncident")}
-          </button>
-          {createMutation.isError && (
-            <p className="form-error" role="alert">{t("incidentCreateError")}</p>
-          )}
+          <div className="form-grid-actions">
+            <button type="submit" className="primary" disabled={createMutation.isPending}>
+              ➕ {t("createRealIncident")}
+            </button>
+            {createMutation.isError && (
+              <p className="form-error" role="alert" style={{ margin: 0 }}>{t("incidentCreateError")}</p>
+            )}
+          </div>
         </form>
       </details>
       <PageState
@@ -1115,9 +1139,24 @@ function IncidentDetailPage() {
       && item.binding_active
       && Boolean(item.latest_version),
   );
-  const selectedPlaybook = executablePlaybooks.find(
+  const incidentAttackCodes = useMemo(
+    () => new Set((enrichment.data?.attack_mappings ?? []).map((m) => m.external_id)),
+    [enrichment.data?.attack_mappings],
+  );
+
+  const sortedPlaybooks = useMemo(() => {
+    return [...executablePlaybooks].sort((a, b) => {
+      const aRec = a.mitre_codes.some((c) => incidentAttackCodes.has(c));
+      const bRec = b.mitre_codes.some((c) => incidentAttackCodes.has(c));
+      if (aRec && !bRec) return -1;
+      if (!aRec && bRec) return 1;
+      return 0;
+    });
+  }, [executablePlaybooks, incidentAttackCodes]);
+
+  const selectedPlaybook = sortedPlaybooks.find(
     (item) => item.code === selectedPlaybookCode,
-  ) ?? executablePlaybooks[0];
+  ) ?? sortedPlaybooks[0];
   const playbookExecutions = useQuery({
     queryKey: ["playbook-executions", id],
     queryFn: () => getPlaybookExecutions(id),
@@ -1276,7 +1315,7 @@ function IncidentDetailPage() {
   const responseProposal = useMutation({
     mutationFn: () => {
       if (!selectedPlaybook) throw new Error("PLAYBOOK_NOT_READY");
-      return createResponseProposal(id, selectedPlaybook);
+      return proposePlaybookAction(id, selectedPlaybook);
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["response-decisions", id] });
@@ -1687,19 +1726,26 @@ function IncidentDetailPage() {
                       <span className="muted">{t("selectReadyPlaybook")}</span>
                       <select
                         value={selectedPlaybook?.code ?? ""}
-                        disabled={executablePlaybooks.length === 0 || hasExistingProposal}
+                        disabled={sortedPlaybooks.length === 0 || hasExistingProposal}
                         onChange={(event) => setSelectedPlaybookCode(event.target.value)}
                       >
-                        {executablePlaybooks.length === 0 && (
+                        {sortedPlaybooks.length === 0 && (
                           <option value="">{t("noReadyPlaybooks")}</option>
                         )}
-                        {executablePlaybooks.map((item) => (
-                          <option key={item.id} value={item.code}>
-                            {i18n.language.startsWith("es")
-                              ? item.title_i18n.es
-                              : item.title_i18n.en} · {item.latest_version}
-                          </option>
-                        ))}
+                        {sortedPlaybooks.map((item) => {
+                          const isRecommended = item.mitre_codes.some((code) =>
+                            incidentAttackCodes.has(code),
+                          );
+                          const title = i18n.language.startsWith("es")
+                            ? item.title_i18n.es
+                            : item.title_i18n.en;
+                          return (
+                            <option key={item.id} value={item.code}>
+                              {isRecommended ? "⭐ [RECOMENDADO] " : ""}
+                              {title} · v{item.latest_version}
+                            </option>
+                          );
+                        })}
                       </select>
                     </label>
                     <button

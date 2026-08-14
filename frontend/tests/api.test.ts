@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
-  createDemoResponseProposal,
+  proposePlaybookAction,
   getClaims,
   getCorrelations,
   getIncidents,
@@ -120,7 +120,7 @@ describe("bounded list requests", () => {
               explanation: "Evidence-bounded test",
               validation_criteria: null,
               missing_evidence: [],
-              is_simulated: true,
+              is_simulated: false,
               state: "PROPOSED",
               evidence: [
                 {
@@ -176,7 +176,7 @@ describe("bounded list requests", () => {
               threshold: 85,
               result_type: "MATCHED",
               explanation: "deterministic",
-              is_simulated: true,
+              is_simulated: false,
               window_start: "2026-07-28T12:00:00Z",
               window_end: "2026-07-28T12:10:00Z",
               claim_id: "00000000-0000-0000-0000-000000000022",
@@ -231,20 +231,20 @@ describe("bounded list requests", () => {
             id: proposalId,
             incident_id: incidentId,
             requester_user_id: requesterId,
-            action_type: "simulate-user-block",
+            action_type: "notify-critical-incident",
             impact: "MODERATE",
             requested_mode: "HUMAN_APPROVAL",
-            workflow_id: "cyrvanta-demo-response",
-            workflow_version: "provisional-demo-1",
-            targets: ["synthetic-demo-user"],
-            parameters: { execution_mode: "demo" },
+            workflow_id: "notify-critical-incident",
+            workflow_version: "1.0.0",
+            targets: [incidentId],
+            parameters: {},
             evidence_refs: [],
             incident_version: 1,
-            is_simulated: true,
+            is_simulated: false,
             fingerprint: "a".repeat(64),
             status: "AWAITING_APPROVAL",
             evaluation_outcome: "APPROVAL_REQUIRED",
-            reason_codes: ["SYNTHETIC_APPROVAL_REQUIRED"],
+            reason_codes: ["HUMAN_APPROVAL_REQUIRED"],
             approval_request_id: approvalId,
             required_approvals: 1,
             approval_status: "PENDING",
@@ -259,10 +259,17 @@ describe("bounded list requests", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     await login("tenant-demo", "demo@example.invalid", "not-a-real-password", false);
-    const proposal = await createDemoResponseProposal(incidentId);
+    const proposal = await proposePlaybookAction(incidentId, {
+      code: "notify-critical-incident",
+      latest_version: "1.0.0",
+      impact: "MODERATE",
+      approval_mode: "SINGLE",
+    });
 
     expect(proposal.status).toBe("AWAITING_APPROVAL");
     const request = fetchMock.mock.calls[1][1] as RequestInit;
-    expect(new Headers(request.headers).get("Idempotency-Key")).toBe(`demo-proposal-${incidentId}`);
+    expect(new Headers(request.headers).get("Idempotency-Key")).toBe(
+      `response-proposal-${incidentId}-notify-critical-incident-1.0.0`,
+    );
   });
 });

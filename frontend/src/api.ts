@@ -1051,7 +1051,7 @@ export async function getResponseDecisions(incidentId: string): Promise<Response
   ).items;
 }
 
-export async function createResponseProposal(
+export async function proposePlaybookAction(
   incidentId: string,
   playbook: Pick<PlaybookDefinition, "code" | "latest_version" | "impact" | "approval_mode">,
 ): Promise<ResponseDecision> {
@@ -1078,6 +1078,40 @@ export async function createResponseProposal(
           workflow_version: playbook.latest_version,
           targets: [incidentId],
           parameters: {},
+          evidence_refs: [],
+        }),
+      }),
+    ),
+  );
+}
+
+export async function createDemoResponseProposal(
+  incidentId: string,
+  playbook: Pick<PlaybookDefinition, "code" | "latest_version" | "impact" | "approval_mode">,
+): Promise<ResponseDecision> {
+  if (!playbook.latest_version) throw new Error("PLAYBOOK_NOT_PUBLISHED");
+  return responseDecisionSchema.parse(
+    await checked(
+      await authenticatedFetch("/api/v1/response-proposals", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Idempotency-Key": `demo-proposal-${incidentId}-${playbook.code}-${playbook.latest_version}`,
+        },
+        body: JSON.stringify({
+          incident_id: incidentId,
+          action_type: playbook.code,
+          impact: playbook.impact === "MEDIUM" ? "MODERATE" : (playbook.impact ?? "MODERATE"),
+          requested_mode:
+            playbook.approval_mode === "FOUR_EYES"
+              ? "DUAL_APPROVAL"
+              : playbook.approval_mode === "SINGLE"
+                ? "HUMAN_APPROVAL"
+                : "AUTOMATIC",
+          workflow_id: playbook.code,
+          workflow_version: playbook.latest_version,
+          targets: [incidentId],
+          parameters: { execution_mode: "demo" },
           evidence_refs: [],
         }),
       }),
@@ -1230,17 +1264,31 @@ export interface TopologyNodeAlert {
   observed_at: string;
 }
 
+export interface TopologyNodeService {
+  name: string;
+  port?: number | null;
+  protocol?: string;
+  ip_address?: string | null;
+  status: "ONLINE" | "WARNING" | "OFFLINE";
+  active_alerts_count?: number;
+}
+
 export interface TopologyNode {
   id: string;
   name: string;
-  type: "FIREWALL" | "SERVER" | "DATABASE" | "SIEM" | "GATEWAY" | "ENDPOINT";
+  type: "FIREWALL" | "SERVER" | "DATABASE" | "SIEM" | "GATEWAY" | "ENDPOINT" | "EDR" | "WORKSTATION";
+  category: "CYRVANTA_CORE" | "SECURITY_FEED" | "MONITORED_ASSET";
   ip_address: string;
+  ip_addresses?: string[];
+  services?: TopologyNodeService[];
   subnet: string;
   status: "ONLINE" | "WARNING" | "OFFLINE";
   latency_ms: number;
   last_ping: string;
   active_alerts_count: number;
   active_alerts?: TopologyNodeAlert[];
+  os_info?: string | null;
+  monitored_by?: string[];
   role_description_es: string;
   role_description_en: string;
 }

@@ -109,6 +109,25 @@ function MemoryCard({ item }: { item: MemoryCandidate }) {
           {statement}
         </p>
 
+        {item.is_synthetic ? (
+          <div
+            style={{
+              margin: "8px 0",
+              padding: "8px 12px",
+              background: "rgba(220, 38, 38, 0.1)",
+              border: "1px solid rgba(220, 38, 38, 0.3)",
+              borderRadius: "6px",
+              fontSize: "0.8rem",
+            }}
+          >
+            <p style={{ margin: 0, fontWeight: 600, color: "var(--danger)" }}>
+              {i18n.language.startsWith("es")
+                ? "Contexto sintético (activación prohibida)"
+                : "Synthetic context (activation prohibited)"}
+            </p>
+          </div>
+        ) : null}
+
         <dl
           className="memory-facts"
           style={{

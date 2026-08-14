@@ -63,6 +63,31 @@ export function SecurityTopologyPanel() {
     return matchesSearch && matchesCategory;
   });
 
+  // The canvas grows with the busiest zone instead of clipping it. A security
+  // map that silently drops nodes is worse than a taller one: the operator has
+  // no way to tell "nothing else is connected" from "the rest did not fit".
+  const FEED_PITCH = 72;
+  const CORE_PITCH = 72;
+  const ASSET_PITCH = 95;
+  const FEED_HEIGHT = 60;
+  const CORE_HEIGHT = 60;
+  const ASSET_HEIGHT = 82;
+  const ZONE_TOP = 15;
+  const FIRST_NODE_Y = 65;
+  const CANVAS_PADDING = 15;
+
+  const zoneBottom = (count: number, pitch: number, nodeHeight: number) =>
+    count === 0 ? FIRST_NODE_Y : FIRST_NODE_Y + (count - 1) * pitch + nodeHeight;
+
+  const contentBottom = Math.max(
+    zoneBottom(feedsNodes.length, FEED_PITCH, FEED_HEIGHT),
+    zoneBottom(coreNodes.length, CORE_PITCH, CORE_HEIGHT),
+    zoneBottom(assetNodes.length, ASSET_PITCH, ASSET_HEIGHT),
+    350, // never shrink below the original canvas
+  );
+  const canvasHeight = contentBottom + CANVAS_PADDING;
+  const zoneHeight = canvasHeight - ZONE_TOP - CANVAS_PADDING;
+
   const getCategoryLabel = (cat?: string) => {
     if (cat === "SECURITY_FEED") return t("topologyFilterFeeds");
     if (cat === "CYRVANTA_CORE") return t("topologyFilterCore");
@@ -143,7 +168,7 @@ export function SecurityTopologyPanel() {
           {/* VISUAL GRAPH VIEW (3 Operational Zones) */}
           {viewMode === "graph" && (
             <div className="topology-graph-container">
-              <svg className="topology-svg-canvas" viewBox="0 0 1020 380">
+              <svg className="topology-svg-canvas" viewBox={`0 0 1020 ${canvasHeight}`}>
                 <defs>
                   <linearGradient id="edgeNormal" x1="0%" y1="0%" x2="100%" y2="0%">
                     <stop offset="0%" stopColor="var(--accent)" stopOpacity="0.5" />
@@ -166,7 +191,7 @@ export function SecurityTopologyPanel() {
                 {/* 3 Operational Zones */}
                 <g opacity="0.7">
                   {/* Zone 1: Security Feeds & Sensors (Left) */}
-                  <rect x="15" y="15" width="280" height="350" rx="8" fill="rgba(255, 170, 0, 0.02)" stroke="var(--warning)" strokeDasharray="4 4" strokeOpacity="0.4" />
+                  <rect x="15" y="15" width="280" height={zoneHeight} rx="8" fill="rgba(255, 170, 0, 0.02)" stroke="var(--warning)" strokeDasharray="4 4" strokeOpacity="0.4" />
                   <text x="25" y="36" fill="var(--warning)" fontSize="11" fontWeight="700" letterSpacing="0.06em">
                     📡 {i18n.language.startsWith("es") ? "1. FUENTES DE SEGURIDAD & SENSORES" : "1. SECURITY FEEDS & SENSORS"}
                   </text>
@@ -175,7 +200,7 @@ export function SecurityTopologyPanel() {
                   </text>
 
                   {/* Zone 2: Cyrvanta SOC Core Platform (Middle) */}
-                  <rect x="320" y="15" width="340" height="350" rx="8" fill="rgba(85, 230, 193, 0.03)" stroke="var(--accent)" strokeDasharray="4 4" strokeOpacity="0.5" />
+                  <rect x="320" y="15" width="340" height={zoneHeight} rx="8" fill="rgba(85, 230, 193, 0.03)" stroke="var(--accent)" strokeDasharray="4 4" strokeOpacity="0.5" />
                   <text x="330" y="36" fill="var(--accent)" fontSize="11" fontWeight="700" letterSpacing="0.06em">
                     🛡️ {i18n.language.startsWith("es") ? "2. PLATAFORMA CYRVANTA (NÚCLEO SOC)" : "2. CYRVANTA SECOPS PLATFORM"}
                   </text>
@@ -184,7 +209,7 @@ export function SecurityTopologyPanel() {
                   </text>
 
                   {/* Zone 3: Monitored Tenant Network & Assets (Right) */}
-                  <rect x="685" y="15" width="320" height="350" rx="8" fill="rgba(96, 201, 255, 0.02)" stroke="var(--cyan)" strokeDasharray="4 4" strokeOpacity="0.4" />
+                  <rect x="685" y="15" width="320" height={zoneHeight} rx="8" fill="rgba(96, 201, 255, 0.02)" stroke="var(--cyan)" strokeDasharray="4 4" strokeOpacity="0.4" />
                   <text x="695" y="36" fill="var(--cyan)" fontSize="11" fontWeight="700" letterSpacing="0.06em">
                     🏢 {i18n.language.startsWith("es") ? "3. RED Y ACTIVOS PROTEGIDOS" : "3. PROTECTED TENANT ASSETS"}
                   </text>
@@ -209,7 +234,7 @@ export function SecurityTopologyPanel() {
                 </g>
 
                 {/* ZONE 1: Security Feed Nodes (Left) */}
-                {feedsNodes.slice(0, 4).map((n, i) => (
+                {feedsNodes.map((n, i) => (
                   <g
                     key={n.id}
                     className="topology-node-badge"
@@ -244,7 +269,7 @@ export function SecurityTopologyPanel() {
                 ))}
 
                 {/* ZONE 2: Cyrvanta Core Nodes (Middle) */}
-                {coreNodes.slice(0, 4).map((n, i) => (
+                {coreNodes.map((n, i) => (
                   <g
                     key={n.id}
                     className="topology-node-badge"
@@ -283,7 +308,6 @@ export function SecurityTopologyPanel() {
                     Only assets the platform actually sees are drawn; when none
                     report, the zone stays empty rather than showing example hosts. */}
                 {assetNodes
-                  .slice(0, 3)
                   .map((n: any, i) => {
                     const isWarn = n.status === "WARNING" || (n.active_alerts_count && n.active_alerts_count > 0);
                     const ipsText = n.ip_addresses && n.ip_addresses.length > 1

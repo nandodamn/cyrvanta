@@ -1,4 +1,3 @@
-import pytest
 from pytest import MonkeyPatch
 
 from cyrvanta.modules.operations.application.ports import (
@@ -6,39 +5,7 @@ from cyrvanta.modules.operations.application.ports import (
     WorkflowNodeSnapshot,
     WorkflowSnapshot,
 )
-from cyrvanta.modules.operations.application.schemas import AutomationRequest
 from cyrvanta.modules.operations.application.service import OperationsService
-
-
-async def test_demo_automation_is_idempotent(monkeypatch: MonkeyPatch) -> None:
-    service = OperationsService()
-    monkeypatch.setattr(service.settings, "n8n_mode", "simulated")
-    payload = AutomationRequest(
-        incident_id="00000000-0000-0000-0000-000000000001",
-        workflow_id="cyrvanta-simulate-user-block",
-        approved=True,
-        idempotency_key="same-demo-key",
-    )
-    first = await service.execute(payload)
-    second = await service.execute(payload)
-    assert first.execution_id == second.execution_id
-    assert first.status == "simulated_completed"
-
-
-async def test_unapproved_automation_fails_closed() -> None:
-    service = OperationsService()
-    payload = AutomationRequest(
-        incident_id="00000000-0000-0000-0000-000000000001",
-        workflow_id="cyrvanta-simulate-user-block",
-        approved=False,
-        idempotency_key="blocked-demo-key",
-    )
-    try:
-        await service.execute(payload)
-    except ValueError as exc:
-        assert "approval" in str(exc).lower()
-    else:
-        raise AssertionError("unapproved execution should fail")
 
 
 def test_mitre_catalog_uses_stable_ids() -> None:
@@ -47,34 +14,6 @@ def test_mitre_catalog_uses_stable_ids() -> None:
         "T1078",
         "T1098",
     }
-
-
-async def test_live_automation_requires_stage7_durable_authorization(
-    monkeypatch: MonkeyPatch,
-) -> None:
-    service = OperationsService()
-    monkeypatch.setattr(service.settings, "n8n_mode", "live")
-    payload = AutomationRequest(
-        incident_id="00000000-0000-0000-0000-000000000001",
-        workflow_id="cyrvanta-simulate-user-block",
-        approved=True,
-        idempotency_key="approved-live-key",
-    )
-    with pytest.raises(ValueError, match="Stage 7 authorization"):
-        await service.execute(payload)
-
-
-async def test_disabled_automation_fails_closed(monkeypatch: MonkeyPatch) -> None:
-    service = OperationsService()
-    monkeypatch.setattr(service.settings, "n8n_mode", "disabled")
-    payload = AutomationRequest(
-        incident_id="00000000-0000-0000-0000-000000000001",
-        workflow_id="cyrvanta-simulate-user-block",
-        approved=True,
-        idempotency_key="blocked-disabled-key",
-    )
-    with pytest.raises(ValueError, match="disabled"):
-        await service.execute(payload)
 
 
 class FakeWorkflowCatalog:

@@ -136,11 +136,13 @@ con miembros, factores y versión, sin LLM como autoridad.
 **Resultado:** ATT&CK versionado, riesgo determinista y explicación basada en
 evidencia.
 
-**Estado de especificación:** DRAFT PARA REVISIÓN el 2026-07-28. Ver
+**Estado de especificación:** APROBADO E IMPLEMENTADO el 2026-07-28. Ver
 `docs/specifications/PHASE_19_MITRE_RISK_EXPLAINABILITY.md`.
 
-**Estado de implementación:** BLOQUEADA hasta aprobación humana del contrato y
-sus decisiones materiales.
+**Estado de implementación:** COMPLETADA. Código real en
+`backend/src/cyrvanta/modules/risk/` (cálculo determinista) y
+`backend/src/cyrvanta/modules/threat_knowledge/` (catálogo MITRE STIX, mappings,
+enriquecimiento/explicación de incidentes), con router montado en `main.py`.
 
 **Trabajo:**
 
@@ -156,6 +158,14 @@ y factor se rastrea a evidencia.
 ## Etapa 6 — decisión segura y aprobación
 
 **Resultado:** evaluación determinista y aprobaciones persistentes.
+
+**Estado de especificación:** APROBADO E IMPLEMENTADO — validado localmente el
+2026-07-29. Ver `docs/specifications/PHASE_20_SAFE_DECISION_APPROVAL.md`.
+
+**Estado de implementación:** código real en `backend/src/cyrvanta/modules/decision/`,
+router montado en `main.py`. El spec deja el **modo `live`** de ejecución de la
+decisión bloqueado como puerta independiente, separada de la aprobación del
+contrato — ver "Próxima decisión humana" más abajo.
 
 **Trabajo:**
 
@@ -175,6 +185,35 @@ cualquier cambio de inputs invalida la autorización.
 **Entrada obligatoria registrada:**
 `docs/requirements/N8N_WORKFLOWS_AS_CODE_REQUIREMENTS.md`.
 
+**Estado de especificación:** tres specs cubren esta etapa, todos aprobados:
+`docs/specifications/PHASE_21_N8N_WORKFLOWS_EXECUTION.md` (APROBADO PARA
+IMPLEMENTACIÓN, 2026-07-29), `PHASE_21A_CYRVANTA_PLAYBOOK_ENGINE.md` (motor
+nativo, APROBADO PARA IMPLEMENTACIÓN, ratificado 2026-08-01) y
+`PHASE_21B_REAL_NATIVE_ACTIONS.md` (acciones nativas reales, APROBADO POR
+ALCANCE REAL-ONLY, 2026-08-13).
+
+**Estado de implementación:**
+- **Motor nativo (21-A/21-B): COMPLETADO y en uso real.** 21 playbooks
+  (`ESSENTIAL_NATIVE_PLAYBOOKS` en
+  `backend/src/cyrvanta/modules/playbooks/application/administration_service.py`)
+  con acciones reales verificadas contra Postgres y Wazuh Active Response en
+  `playbooks/infrastructure/action_registry.py`: transición de estado,
+  notificación SMTP, ticket ITSM, webhook allowlisted, bloqueo/reactivación de
+  cuenta, aislamiento/restauración de host, con 5 playbooks rollback
+  auditados. Cubierto por tests de integración reales
+  (`tests/unit/test_account_containment_actions.py`,
+  `tests/unit/test_host_isolation_actions.py`).
+- **Motor n8n (21): infraestructura presente, workflows sin conector real.**
+  `HybridPlaybookDispatcher` (`playbooks/infrastructure/hybrid_dispatcher.py`)
+  soporta ambos motores por binding, pero `n8n_enabled=False` por defecto y los
+  5 workflows en `infrastructure/n8n/workflows/*.json` son shells: un webhook
+  conectado directo a un nodo que siempre responde 503
+  `workflow_inactive_pending_connector` (excepto `cyrvanta-simulate-user-block`,
+  que reporta un resultado sintético). No hay lógica real de notificación,
+  ticket o email dentro de esos workflows — activar este camino requiere que el
+  cliente aporte credenciales reales de SMTP/Slack/ITSM. Para demos, el camino
+  recomendado es el motor nativo (ya real).
+
 **Trabajo:**
 
 - Playbooks versionados y parámetros tipados.
@@ -189,6 +228,15 @@ callback y resultado; el replay no duplica la acción.
 ## Etapa 8 — feedback y memoria gobernada
 
 **Resultado:** outcomes y observaciones útiles sin aprendizaje autónomo.
+
+**Estado de especificación:** APROBADO PARA IMPLEMENTACIÓN — base local
+validada, ratificado 2026-08-01. Ver
+`docs/specifications/PHASE_22_GOVERNED_FEEDBACK_MEMORY.md`.
+
+**Estado de implementación:** COMPLETADA. Código real en
+`backend/src/cyrvanta/modules/governed_memory/application/service.py` (~1085
+líneas: feedback, candidatos de memoria, revisión, activación/desactivación,
+evaluación de contexto), router montado en `main.py`.
 
 **Trabajo:**
 
@@ -205,6 +253,12 @@ resultado queda explicada.
 
 **Resultado:** proyección navegable de evidencia a resultado.
 
+**Estado de especificación:** NO INICIADA. No existe spec `PHASE_*` para esta
+etapa (la numeración de specs va de `PHASE_15` a `PHASE_25` sin cubrir el
+Decision Graph) ni módulo `decision_graph`/`graph` bajo
+`backend/src/cyrvanta/modules/`. Es la única etapa del roadmap original sin
+ningún trabajo de especificación registrado todavía.
+
 **Trabajo:**
 
 - Nodos/relaciones como referencias a agregados autoritativos.
@@ -219,6 +273,22 @@ resultado queda explicada.
 ## Etapa 10 — hardening y demo integral
 
 **Resultado:** flujo demostrable, observable y regresionable.
+
+**Estado de especificación:** cubierta parcialmente por
+`docs/specifications/PHASE_24_REAL_RUNTIME_NO_SIMULATION.md` (APROBADO,
+2026-08-13 — ninguna capacidad se presenta como `READY` sin respaldo real) y
+`docs/specifications/PHASE_24_IMPLEMENTATION_HANDOFF.md` ("implementación
+preparada; validación funcional manual pendiente del operador"). El trabajo de
+UI relacionado está en
+`docs/specifications/PHASE_23_OPERATIONAL_PULSE_RESPONSIVE_UI.md` (APROBADO,
+ratificado 2026-08-01, implementado en `frontend/src/OperationalPulse.tsx`).
+
+**Estado de implementación:** PARCIAL. Lo cubierto: el principio "sin
+simulación" está aplicado de forma real en el motor nativo de playbooks (ver
+Etapa 7) y en la UI de pulso operativo. Lo que sigue pendiente y sin spec
+dedicado: E2E automatizado multi-fuente, carga con volúmenes aprobados,
+escaneo de dependencias/secretos/contenedores (SAST), y runbooks de
+backup/restore — nada de esto tiene código ni documento propio todavía.
 
 **Trabajo:**
 
@@ -257,9 +327,27 @@ API/eventos, permisos, auditoría, RLS, i18n, observabilidad, pruebas y rollback
 - Ninguna IA autoriza o ejecuta.
 - No se agregan proveedores o servicios innecesarios.
 
-## Próxima decisión humana
+## Estado real vs. este documento
 
-Revisar y aprobar o enmendar
-`docs/specifications/PHASE_19_MITRE_RISK_EXPLAINABILITY.md`. Las puertas
-independientes de retención por tenant y polling periódico Wazuh continúan
-abiertas.
+**Nota (2026-08-13):** este roadmap había quedado desactualizado — describía la
+Etapa 5 como bloqueada y no mencionaba las Etapas 6-10, mientras que los specs
+individuales en `docs/specifications/` ya estaban aprobados e implementados
+para las Etapas 5 a 8. La fuente de verdad de estado es siempre el spec
+individual de cada fase (`docs/specifications/PHASE_*.md`), no este documento.
+Esta sección se actualizó para reconciliar ambos.
+
+## Puertas abiertas (aprobadas por instrucción humana el 2026-08-13)
+
+- **PHASE_25 (ingesta automática de Wazuh):** estaba en DRAFT, sin autorizar
+  implementación. Aprobada para implementación — pendiente de desarrollo
+  (agregar polling al `scheduler.py` existente).
+- **PHASE_20 / PHASE_21 (modo `live` de decisión y de n8n):** ambos specs
+  dejan el modo `live` bloqueado como puerta separada de su aprobación de
+  contrato. Aprobados para avanzar — n8n requiere además que el cliente
+  aporte credenciales reales de un SMTP/Slack/ITSM propio, ya que los
+  workflows de `infrastructure/n8n/` son shells sin conector real.
+- **Etapa 9 (Cyrvanta Decision Graph):** sin spec, sin implementación. No hay
+  todavía una decisión humana pendiente porque no se llegó a redactar el
+  contrato — es el próximo hueco real del roadmap original.
+- **Etapa 10 (hardening):** retención por tenant, E2E automatizado, SAST y
+  runbooks de backup/restore siguen sin spec ni implementación.

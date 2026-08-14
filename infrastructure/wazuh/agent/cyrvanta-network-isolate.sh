@@ -1,10 +1,12 @@
 #!/bin/sh
 # Cyrvanta network isolation active-response script.
 #
-# Wazuh Active Response protocol: the manager writes a single JSON line to
-# this script's stdin. The relevant field is "command", which is either
-# "add" (apply the response) or "delete" (revert it) -- see
-# https://documentation.wazuh.com/current/user-manual/capabilities/active-response
+# Wazuh Active Response protocol: wazuh-execd writes exactly one JSON line to
+# this script's stdin, but -- confirmed empirically with a diagnostic
+# wrapper -- it never closes/EOFs that pipe. `INPUT_JSON=$(cat)` (or any
+# EOF-driven read) therefore hangs forever, leaving a zombie process and
+# silently dropping every isolate/restore call. Read exactly one line with
+# `read` instead, which returns on the newline without waiting for EOF.
 #
 # "add"    -> drop all inbound/outbound traffic on this host except loopback
 #             and the Wazuh manager (so the agent stays reachable for the
@@ -24,7 +26,7 @@ log() {
   printf '%s cyrvanta-network-isolate: %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$1" >> "$LOG_FILE" 2>/dev/null || true
 }
 
-INPUT_JSON=$(cat)
+IFS= read -r INPUT_JSON
 log "raw AR payload: ${INPUT_JSON}"
 # Cyrvanta always drives this script via the API "arguments" list
 # (delivered as parameters.extra_args), not Wazuh's own add/delete timeout

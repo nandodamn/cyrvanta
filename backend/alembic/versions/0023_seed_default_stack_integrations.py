@@ -37,9 +37,14 @@ def upgrade() -> None:
         # 1. Wazuh Manager
         if "WAZUH" not in existing_types:
             wazuh_config = {
+                # Matches the wazuh/wazuh-manager image's real default API user --
+                # not a placeholder. Verified against the actual lab manager
+                # (the previous "wazuh-api"/"SecretWazuh..." value never
+                # authenticated against it). Rotate before onboarding a real
+                # customer's Wazuh manager.
                 "base_url": "https://wazuh-manager:55000",
-                "username": "wazuh-api",
-                "password": "SecretWazuhPassword123!",
+                "username": "wazuh",
+                "password": "wazuh",
                 "timeout_seconds": 10,
             }
             enc = cipher.encrypt(json.dumps(wazuh_config, separators=(",", ":"), sort_keys=True))

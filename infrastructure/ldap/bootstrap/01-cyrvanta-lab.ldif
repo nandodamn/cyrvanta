@@ -1,0 +1,23 @@
+# Cyrvanta lab LDAP seed data.
+# Imported once, on first boot, by osixia/openldap's bootstrap mechanism.
+# Base DN: dc=cyrvanta-lab,dc=local (set via LDAP_DOMAIN in docker-compose.yml)
+
+dn: ou=people,dc=cyrvanta-lab,dc=local
+objectClass: organizationalUnit
+ou: people
+
+dn: uid=jdoe,ou=people,dc=cyrvanta-lab,dc=local
+objectClass: inetOrgPerson
+objectClass: posixAccount
+objectClass: shadowAccount
+uid: jdoe
+cn: Jane Doe
+sn: Doe
+givenName: Jane
+mail: jdoe@cyrvanta-lab.local
+displayName: Jane Doe
+uidNumber: 10001
+gidNumber: 10001
+homeDirectory: /home/jdoe
+loginShell: /bin/bash
+userPassword: {SSHA}0Gb18gsDSLTqAL8ukIYs/a8wfzI5Ww+Ksmw2AQ==

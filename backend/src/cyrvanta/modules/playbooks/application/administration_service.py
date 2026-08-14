@@ -554,20 +554,24 @@ class PlaybookAdministrationService:
             ).all()
         )
         for definition in retired:
+            # Every version, including those already RETIRED: status alone does
+            # not stop a dispatch, and an earlier retirement left the binding
+            # armed, so a retired playbook stayed reachable through it.
             versions = list(
                 (
                     await session.scalars(
                         select(PlaybookVersionModel).where(
                             PlaybookVersionModel.tenant_id == tenant_id,
                             PlaybookVersionModel.definition_id == definition.id,
-                            PlaybookVersionModel.status != "RETIRED",
                         )
                     )
                 ).all()
             )
             for version in versions:
-                version.status = "RETIRED"
-                version.approved_at = None
+                if version.status != "RETIRED":
+                    version.status = "RETIRED"
+                    version.approved_at = None
+                await self._disarm_version_bindings(session, tenant_id, version.id)
             if versions:
                 await session.flush()
 
@@ -594,10 +598,16 @@ class PlaybookAdministrationService:
                 session.add(definition)
                 await session.flush()
             else:
-                if not definition.description_es:
-                    definition.description_es = cast(str, pb["description_es"])
-                if not definition.description_en:
-                    definition.description_en = cast(str, pb["description_en"])
+                # The catalog owns the text of its own playbooks, so it is
+                # refreshed rather than only backfilled when blank. These entries
+                # are seeded and remapped by the product: a tenant that already
+                # had one would otherwise keep reading a summary describing steps
+                # the playbook no longer runs, which is the very claim the
+                # remapped version was written to correct.
+                definition.name_es = cast(str, pb["title_es"])
+                definition.name_en = cast(str, pb["title_en"])
+                definition.description_es = cast(str, pb["description_es"])
+                definition.description_en = cast(str, pb["description_en"])
                 if not self._approval_satisfies_minimum(
                     definition.approval_mode or "AUTOMATIC", desired_approval_mode
                 ):
@@ -829,30 +839,19 @@ class PlaybookAdministrationService:
         weaker procedure remains the one a tenant can actually run, while the
         replacement waits on the integrations it now needs.
 
-        Only LIVE catalog versions are retired. SYNTHETIC ones belong to the
-        demo catalog, are never seeded from here, and are not superseded by it.
-        Rows are kept so executions remain immutable history.
+        This includes SYNTHETIC versions of a catalog playbook: a demo artifact
+        left armed on a real entry means running it reports a simulated success
+        while nothing happens. Demo playbooks of their own (simulate-user-block)
+        have their own definitions and never reach this list. Rows are kept so
+        executions remain immutable history.
         """
         for version in superseded:
-            if version.classification != "LIVE" or version.status == "RETIRED":
+            if version.status == "RETIRED":
+                await self._disarm_version_bindings(session, tenant_id, version.id)
                 continue
             version.status = "RETIRED"
             version.approved_at = None
-            bindings = list(
-                (
-                    await session.scalars(
-                        select(AutomationEngineBindingModel).where(
-                            AutomationEngineBindingModel.tenant_id == tenant_id,
-                            AutomationEngineBindingModel.playbook_version_id == version.id,
-                        )
-                    )
-                ).all()
-            )
-            for binding in bindings:
-                binding.active = False
-                binding.sync_status = "PENDING"
-                binding.observed_digest = None
-                binding.last_verified_at = None
+            await self._disarm_version_bindings(session, tenant_id, version.id)
             self._audit(
                 session,
                 tenant_id,
@@ -864,6 +863,27 @@ class PlaybookAdministrationService:
                 {"workflow_code": code, "version": version.version},
             )
         await session.flush()
+
+    async def _disarm_version_bindings(
+        self, session: AsyncSession, tenant_id: UUID, version_id: UUID
+    ) -> None:
+        """Leave no engine binding able to dispatch this version."""
+        bindings = list(
+            (
+                await session.scalars(
+                    select(AutomationEngineBindingModel).where(
+                        AutomationEngineBindingModel.tenant_id == tenant_id,
+                        AutomationEngineBindingModel.playbook_version_id == version_id,
+                        AutomationEngineBindingModel.active.is_(True),
+                    )
+                )
+            ).all()
+        )
+        for binding in bindings:
+            binding.active = False
+            binding.sync_status = "PENDING"
+            binding.observed_digest = None
+            binding.last_verified_at = None
 
     async def get_definition(self, tenant_id: UUID, definition_id: UUID) -> DefinitionResponse:
         async with tenant_session(tenant_id) as session:

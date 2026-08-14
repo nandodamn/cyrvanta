@@ -102,6 +102,47 @@ async def test_multi_step_playbook_chains_its_steps_on_success() -> None:
     )
 
 
+async def test_catalog_text_is_refreshed_for_existing_tenants() -> None:
+    """A stale description outlives the procedure it described.
+
+    Seeding used to fill the description only when blank, so a tenant that
+    already had the playbook kept the old summary after a remap -- still
+    advertising steps the playbook no longer runs.
+    """
+    tenant_id = await _existing_tenant_id()
+    service = PlaybookAdministrationService()
+    await service.list_definitions(tenant_id, limit=100, offset=0)
+
+    async with tenant_session(tenant_id) as session:
+        definition = await session.scalar(
+            select(PlaybookDefinitionModel).where(
+                PlaybookDefinitionModel.tenant_id == tenant_id,
+                PlaybookDefinitionModel.code == "contain-and-document-incident",
+            )
+        )
+        assert definition is not None
+        definition.description_es = "Texto viejo que ya no describe el procedimiento."
+        definition.name_es = "Nombre viejo"
+
+    await service.list_definitions(tenant_id, limit=100, offset=0)
+
+    catalog = next(
+        item
+        for item in ESSENTIAL_NATIVE_PLAYBOOKS
+        if item["code"] == "contain-and-document-incident"
+    )
+    async with tenant_session(tenant_id) as session:
+        refreshed = await session.scalar(
+            select(PlaybookDefinitionModel).where(
+                PlaybookDefinitionModel.tenant_id == tenant_id,
+                PlaybookDefinitionModel.code == "contain-and-document-incident",
+            )
+        )
+    assert refreshed is not None
+    assert refreshed.description_es == catalog["description_es"]
+    assert refreshed.name_es == catalog["title_es"]
+
+
 async def test_remapped_playbook_leaves_no_armed_predecessor() -> None:
     """Seeding a replacement must also disarm the version it replaces.
 
@@ -205,6 +246,13 @@ async def test_retired_playbooks_are_neither_listed_nor_left_approved() -> None:
 
     assert RETIRED_PLAYBOOK_CODES.isdisjoint({item.code for item in result.items})
     async with tenant_session(tenant_id) as session:
+        retired_versions = select(PlaybookVersionModel.id).join(
+            PlaybookDefinitionModel,
+            PlaybookDefinitionModel.id == PlaybookVersionModel.definition_id,
+        ).where(
+            PlaybookVersionModel.tenant_id == tenant_id,
+            PlaybookDefinitionModel.code.in_(RETIRED_PLAYBOOK_CODES),
+        )
         live = await session.scalars(
             select(PlaybookVersionModel.status)
             .join(
@@ -217,3 +265,45 @@ async def test_retired_playbooks_are_neither_listed_nor_left_approved() -> None:
             )
         )
         assert set(live.all()) <= {"RETIRED"}
+        # Status alone does not stop a dispatch -- the binding is what arms it.
+        armed = await session.scalar(
+            select(AutomationEngineBindingModel.id).where(
+                AutomationEngineBindingModel.tenant_id == tenant_id,
+                AutomationEngineBindingModel.playbook_version_id.in_(retired_versions),
+                AutomationEngineBindingModel.active.is_(True),
+            )
+        )
+        assert armed is None
+
+
+async def test_catalog_playbooks_never_keep_a_synthetic_version_armed() -> None:
+    """A demo artifact armed on a real playbook fakes the response.
+
+    Running it would report a simulated success while nothing happened, which
+    is the failure mode the catalog rework exists to remove. Demo playbooks of
+    their own keep their own definitions and are untouched.
+    """
+    tenant_id = await _existing_tenant_id()
+    service = PlaybookAdministrationService()
+    await service.list_definitions(tenant_id, limit=100, offset=0)
+
+    catalog_codes = [str(item["code"]) for item in ESSENTIAL_NATIVE_PLAYBOOKS]
+    async with tenant_session(tenant_id) as session:
+        armed_synthetic = await session.scalar(
+            select(PlaybookVersionModel.id)
+            .join(
+                PlaybookDefinitionModel,
+                PlaybookDefinitionModel.id == PlaybookVersionModel.definition_id,
+            )
+            .join(
+                AutomationEngineBindingModel,
+                AutomationEngineBindingModel.playbook_version_id == PlaybookVersionModel.id,
+            )
+            .where(
+                PlaybookVersionModel.tenant_id == tenant_id,
+                PlaybookVersionModel.classification == "SYNTHETIC",
+                PlaybookDefinitionModel.code.in_(catalog_codes),
+                AutomationEngineBindingModel.active.is_(True),
+            )
+        )
+    assert armed_synthetic is None

@@ -3598,7 +3598,7 @@ function Administration() {
                     </form>
 
                     <form
-                      className="admin-user-detail-section"
+                      className="admin-user-detail-section admin-user-detail-section-wide"
                       autoComplete="off"
                       onSubmit={(event) => {
                         event.preventDefault();
@@ -3612,14 +3612,16 @@ function Administration() {
                     >
                       <h3>{t("directoryIdentityLink")}</h3>
                       <p className="muted">{t("directoryIdentityLinkHelp")}</p>
-                      <label>
-                        {t("externalSubject")}
-                        <input name="external_subject" required maxLength={1000} />
-                      </label>
-                      <label>
-                        {t("normalizedUsername")}
-                        <input name="normalized_username" required maxLength={256} />
-                      </label>
+                      <div className="admin-user-detail-field-row">
+                        <label>
+                          {t("externalSubject")}
+                          <input name="external_subject" required maxLength={1000} />
+                        </label>
+                        <label>
+                          {t("normalizedUsername")}
+                          <input name="normalized_username" required maxLength={256} />
+                        </label>
+                      </div>
                       <div className="form-actions">
                         <button type="submit" disabled={directoryIdentityLinkMutation.isPending}>
                           {t("linkIdentity")}

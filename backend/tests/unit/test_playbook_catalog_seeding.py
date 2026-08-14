@@ -1,12 +1,18 @@
 from uuid import UUID
 
-from sqlalchemy import text
+from sqlalchemy import select, text
 
 from cyrvanta.modules.playbooks.application.administration_service import (
     ESSENTIAL_NATIVE_PLAYBOOKS,
+    RETIRED_PLAYBOOK_CODES,
     PlaybookAdministrationService,
+    catalog_step_actions,
 )
-from cyrvanta.shared.database import SessionFactory
+from cyrvanta.modules.playbooks.infrastructure.models import (
+    PlaybookDefinitionModel,
+    PlaybookVersionModel,
+)
+from cyrvanta.shared.database import SessionFactory, tenant_session
 
 
 async def _existing_tenant_id() -> UUID:
@@ -37,3 +43,84 @@ async def test_list_definitions_seeds_the_full_essential_catalog() -> None:
     # Calling it again must be idempotent (no duplicate versions/definitions).
     second = await service.list_definitions(tenant_id, limit=100, offset=0)
     assert second.total == result.total
+
+
+async def _seeded_artifact(tenant_id: UUID, code: str) -> dict:
+    async with tenant_session(tenant_id) as session:
+        definition = await session.scalar(
+            select(PlaybookDefinitionModel).where(
+                PlaybookDefinitionModel.tenant_id == tenant_id,
+                PlaybookDefinitionModel.code == code,
+            )
+        )
+        assert definition is not None
+        version = await session.scalar(
+            select(PlaybookVersionModel)
+            .where(
+                PlaybookVersionModel.tenant_id == tenant_id,
+                PlaybookVersionModel.definition_id == definition.id,
+                PlaybookVersionModel.status == "APPROVED",
+            )
+            .order_by(PlaybookVersionModel.created_at.desc())
+        )
+        assert version is not None
+        return version.portable_artifact or {}
+
+
+async def test_multi_step_playbook_chains_its_steps_on_success() -> None:
+    """A failed containment must not be followed by the rest of the procedure.
+
+    contain-and-document-incident isolates, reports, then marks the incident
+    contained. Chaining on ALWAYS (or emitting no edges at all, which leaves
+    every step unconditioned) would let the report and the "contained" status
+    run even when the isolation step failed, reporting a containment that
+    never happened.
+    """
+    tenant_id = await _existing_tenant_id()
+    service = PlaybookAdministrationService()
+    await service.list_definitions(tenant_id, limit=100, offset=0)
+
+    artifact = await _seeded_artifact(tenant_id, "contain-and-document-incident")
+
+    actions = [step["action"] for step in artifact["steps"] if step["type"] == "ACTION"]
+    assert actions == list(catalog_step_actions("contain-and-document-incident"))
+    assert actions[0] == "host.isolate"
+
+    edges = artifact["edges"]
+    assert len(edges) == len(actions) - 1
+    assert {edge["outcome"] for edge in edges} == {"SUCCESS"}
+    # Every step after the first must be reachable only from its predecessor.
+    for position, edge in enumerate(edges, start=1):
+        assert edge["from_step"] == f"step-{position}"
+        assert edge["to_step"] == f"step-{position + 1}"
+    # The overall deadline has to cover every step, not just one.
+    assert artifact["timeouts"]["overall_seconds"] >= (
+        artifact["timeouts"]["action_seconds"] * len(actions)
+    )
+
+
+async def test_retired_playbooks_are_neither_listed_nor_left_approved() -> None:
+    """Retiring a catalog code must also disarm versions already seeded.
+
+    Dropping the code from the catalog alone would leave existing tenants with
+    an APPROVED version they could still dispatch.
+    """
+    tenant_id = await _existing_tenant_id()
+    service = PlaybookAdministrationService()
+
+    result = await service.list_definitions(tenant_id, limit=100, offset=0)
+
+    assert RETIRED_PLAYBOOK_CODES.isdisjoint({item.code for item in result.items})
+    async with tenant_session(tenant_id) as session:
+        live = await session.scalars(
+            select(PlaybookVersionModel.status)
+            .join(
+                PlaybookDefinitionModel,
+                PlaybookDefinitionModel.id == PlaybookVersionModel.definition_id,
+            )
+            .where(
+                PlaybookVersionModel.tenant_id == tenant_id,
+                PlaybookDefinitionModel.code.in_(RETIRED_PLAYBOOK_CODES),
+            )
+        )
+        assert set(live.all()) <= {"RETIRED"}

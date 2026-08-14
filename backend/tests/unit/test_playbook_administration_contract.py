@@ -184,5 +184,7 @@ def test_catalog_schema_upgrade_creates_one_audited_immutable_successor() -> Non
     assert '"schema_upgrade" if existing_versions else "initial_seed"' in source
     # A remapped action must also supersede the tenant's seeded version, or an
     # existing tenant would keep running the previous action while reporting READY.
-    assert "expected_action = ESSENTIAL_NATIVE_ACTIONS[code]" in source
-    assert "return actions == {expected_action}" in source
+    # Comparing ordered tuples also supersedes a version whose steps were
+    # reordered, which is a different procedure even with the same actions.
+    assert "expected_actions = catalog_step_actions(code)" in source
+    assert "return actions == expected_actions" in source

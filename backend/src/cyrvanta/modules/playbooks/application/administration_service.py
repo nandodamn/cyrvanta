@@ -219,12 +219,14 @@ ESSENTIAL_NATIVE_PLAYBOOKS: list[dict[str, object]] = [
         "title_es": "Contención de host y documentación inicial",
         "title_en": "Host Containment & Initial Documentation",
         "description_es": (
-            "Procedimiento estándar: transiciona el estado a contenido, aisla el endpoint "
-            "y redacta el resumen ejecutivo del incidente."
+            "Procedimiento estándar en tres pasos: aísla el endpoint de la red, genera el "
+            "informe del incidente y recién entonces transiciona el estado a contenido. "
+            "Si el aislamiento falla, los pasos siguientes no se ejecutan."
         ),
         "description_en": (
-            "Standard procedure: transitions incident status to contained, isolates endpoint, "
-            "and generates the initial executive summary."
+            "Three-step standard procedure: isolates the endpoint from the network, generates "
+            "the incident report, and only then transitions the status to contained. "
+            "If isolation fails, the remaining steps do not run."
         ),
         "mitre_codes": ["T1204", "T1486"],
     },
@@ -288,6 +290,7 @@ PLAYBOOK_ROLLBACK_ACTIONS: dict[str, str] = {
     "compromised-endpoint": "host.restore",
     "lateral-movement": "host.restore",
     "ransomware-destructive": "host.restore",
+    "contain-and-document-incident": "host.restore",
 }
 
 # Catalog codes retired by the rollback refactor. Seeding retires any lingering
@@ -314,7 +317,7 @@ PLAYBOOK_MITRE_COVERAGE: dict[str, list[str]] = {
 
 ESSENTIAL_NATIVE_ACTIONS: dict[str, str] = {
     # ── Transición de estado del incidente (acciones existentes) ────────────────
-    "contain-and-document-incident": "incident.status.transition",
+    "contain-and-document-incident": "host.isolate",
     "automated-enrichment":          "incident.status.transition",
     # ── Notificaciones SMTP (acción existente, mapeo corregido) ─────────────────
     "notify-critical-incident":      "notification.send",
@@ -336,6 +339,25 @@ ESSENTIAL_NATIVE_ACTIONS: dict[str, str] = {
     "lateral-movement":              "host.isolate",
     "ransomware-destructive":        "host.isolate",
 }
+
+# Playbooks that run several registered actions in order. Steps are chained on
+# SUCCESS, so a failed containment leaves the remaining steps SKIPPED instead of
+# documenting and closing an incident that was never contained.
+#
+# ESSENTIAL_NATIVE_ACTIONS still names the first action of each sequence: it is
+# the effect readiness and rollback are anchored to.
+ESSENTIAL_NATIVE_STEP_ACTIONS: dict[str, tuple[str, ...]] = {
+    "contain-and-document-incident": (
+        "host.isolate",
+        "incident.report.generate",
+        "incident.status.transition",
+    ),
+}
+
+
+def catalog_step_actions(code: str) -> tuple[str, ...]:
+    """Ordered actions a seeded playbook runs, single-action ones included."""
+    return ESSENTIAL_NATIVE_STEP_ACTIONS.get(code) or (ESSENTIAL_NATIVE_ACTIONS[code],)
 
 
 IMPLEMENTED_REAL_PLAYBOOKS = {
@@ -579,15 +601,17 @@ class PlaybookAdministrationService:
             )
             current_input_schema = resolve_schema("security/incident-notification-input-v1")
             current_result_schema = resolve_schema("security/incident-notification-result-v1")
-            expected_action = ESSENTIAL_NATIVE_ACTIONS[code]
+            expected_actions = catalog_step_actions(code)
 
             def matches_current_catalog(version: PlaybookVersionModel) -> bool:
-                """A seeded version is current only if it still runs the catalog's action.
+                """A seeded version is current only if it still runs the catalog's actions.
 
                 Schema equality alone is not enough: when a playbook is remapped to
                 a different action (e.g. compromised-endpoint -> host.isolate), an
                 existing tenant would otherwise keep an older version that quietly
-                performs the previous action while reporting itself READY.
+                performs the previous action while reporting itself READY. Order
+                matters too -- documenting before containing is a different
+                procedure from containing before documenting.
                 """
                 if version.classification != "LIVE":
                     return False
@@ -598,12 +622,12 @@ class PlaybookAdministrationService:
                 if version.result_schema != current_result_schema:
                     return False
                 steps = (version.portable_artifact or {}).get("steps") or []
-                actions = {
+                actions = tuple(
                     step.get("action")
                     for step in steps
                     if isinstance(step, dict) and step.get("type") == "ACTION"
-                }
-                return actions == {expected_action}
+                )
+                return actions == expected_actions
 
             latest_version = None
             if any(matches_current_catalog(version) for version in existing_versions):
@@ -635,16 +659,27 @@ class PlaybookAdministrationService:
                         "result_schema_ref": "security/incident-notification-result-v1",
                         "steps": [
                             {
-                                "id": "step-1",
+                                "id": f"step-{position}",
                                 "type": "ACTION",
-                                "action": ESSENTIAL_NATIVE_ACTIONS[code],
+                                "action": action,
                                 "action_version": "1.0.0",
                                 "parameters": {},
                             }
+                            for position, action in enumerate(expected_actions, start=1)
                         ],
-                        "edges": [],
+                        # SUCCESS, never ALWAYS: a step whose predecessor failed is
+                        # left unselected, so a failed containment cannot be followed
+                        # by a report and a "contained" status it never earned.
+                        "edges": [
+                            {
+                                "from_step": f"step-{position}",
+                                "to_step": f"step-{position + 1}",
+                                "outcome": "SUCCESS",
+                            }
+                            for position in range(1, len(expected_actions))
+                        ],
                         "timeouts": {
-                            "overall_seconds": 60,
+                            "overall_seconds": 30 * len(expected_actions) + 30,
                             "action_seconds": 30,
                             "max_attempts": 1,
                         },
@@ -665,7 +700,7 @@ class PlaybookAdministrationService:
                     portable_schema_version="1.0",
                     input_schema=current_input_schema,
                     result_schema=current_result_schema,
-                    timeout_seconds=60,
+                    timeout_seconds=artifact.timeouts.overall_seconds,
                     validated_sha256=digest,
                     validated_at=datetime.now(UTC),
                     validated_by_user_id=tenant_user_id,

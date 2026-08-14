@@ -598,6 +598,84 @@ class ClaimService:
         )
         return model.id
 
+    async def record_threat_intel_lookup(
+        self,
+        session: AsyncSession,
+        *,
+        tenant_id: UUID,
+        incident_id: UUID,
+        verdict: str,
+        score: int | None,
+        source: str | None,
+        input_fingerprint: str,
+        correlation_id: UUID,
+        causation_id: UUID | None,
+    ) -> UUID:
+        """Record what an external threat intelligence source reported.
+
+        The statement is composed from validated fields, never from provider
+        text: the response is untrusted input, and echoing it verbatim would
+        put third-party prose into the incident record as if Cyrvanta had
+        asserted it. It is a DERIVED_FACT about what the source returned, not
+        a claim that the verdict is true.
+        """
+        await self._incident(session, incident_id)
+        idempotency_key = sha256(
+            f"{tenant_id}|{incident_id}|threat-intel|{input_fingerprint}".encode()
+        ).hexdigest()
+        existing = await session.scalar(
+            select(ClaimModel.id).where(
+                ClaimModel.incident_id == incident_id,
+                ClaimModel.idempotency_key == idempotency_key,
+            )
+        )
+        if isinstance(existing, UUID):
+            return existing
+        attribution = f"Source {source} " if source else "The configured source "
+        measured = f" with score {score}" if score is not None else ""
+        claim = Claim(
+            claim_id=uuid4(),
+            tenant_id=tenant_id,
+            incident_id=incident_id,
+            claim_type=ClaimType.DERIVED_FACT,
+            statement=f"{attribution}returned reputation verdict {verdict}{measured}.",
+            language_code="und",
+            confidence=None,
+            origin_type=ClaimOriginType.SYSTEM,
+            origin_actor_user_id=None,
+            origin_code="threat_intel.lookup",
+            origin_version="1.0.0",
+            provider=None,
+            model=None,
+            prompt_template_version=None,
+            output_schema_version=None,
+            input_fingerprint=input_fingerprint,
+            explanation=(
+                "Reported by an external threat intelligence source configured by the "
+                "tenant; it is not a Cyrvanta assessment and authorizes no action."
+            ),
+            validation_criteria=None,
+            missing_evidence=(),
+            is_simulated=False,
+            correlation_id=correlation_id,
+            causation_id=causation_id,
+            created_at=datetime.now(UTC),
+            idempotency_key=idempotency_key,
+        )
+        model = await self._insert_claim(
+            session,
+            claim,
+            [
+                EvidenceInput(
+                    evidence_type="INCIDENT",
+                    evidence_id=incident_id,
+                    relationship="CONTEXT",
+                )
+            ],
+            actor_user_id=None,
+        )
+        return model.id
+
     async def _insert_claim(
         self,
         session: AsyncSession,

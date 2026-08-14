@@ -179,15 +179,19 @@ ESSENTIAL_NATIVE_PLAYBOOKS: list[dict[str, object]] = [
     },
     {
         "code": "automated-enrichment",
-        "title_es": "Enriquecimiento automático de contexto de incidente",
-        "title_en": "Automated Incident Context Enrichment",
+        "title_es": "Enriquecimiento por Threat Intel externo",
+        "title_en": "External Threat Intelligence Enrichment",
         "description_es": (
-            "Playbook transversal: recopila información de activos, propietarios, vulnerabilidades, "
-            "reputación Threat Intel y correlaciones MITRE."
+            "Consulta la reputación del incidente contra la fuente de Threat Intel "
+            "configurada por el tenant y registra el veredicto devuelto como contexto "
+            "del incidente. No es una evaluación de Cyrvanta y no autoriza ninguna "
+            "acción. Requiere esa integración activa y verificada."
         ),
         "description_en": (
-            "Transversal playbook: gathers asset data, owners, vulnerabilities, "
-            "Threat Intel reputation, and MITRE correlations."
+            "Queries the incident reputation against the tenant's configured threat "
+            "intelligence source and files the returned verdict as incident context. "
+            "It is not a Cyrvanta assessment and authorizes no action. Requires that "
+            "integration to be active and verified."
         ),
         "mitre_codes": ["T1082", "T1087"],
     },
@@ -325,7 +329,8 @@ PLAYBOOK_MITRE_COVERAGE: dict[str, list[str]] = {
 ESSENTIAL_NATIVE_ACTIONS: dict[str, str] = {
     # ── Transición de estado del incidente (acciones existentes) ────────────────
     "contain-and-document-incident": "host.isolate",
-    "automated-enrichment":          "incident.status.transition",
+    # ── Enriquecimiento por Threat Intel externo ────────────────────────────────
+    "automated-enrichment":          "threat_intel.lookup",
     # ── Notificaciones SMTP (acción existente, mapeo corregido) ─────────────────
     "notify-critical-incident":      "notification.send",
     "escalation-notification":       "notification.send",

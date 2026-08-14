@@ -12,6 +12,11 @@ from uuid import UUID, uuid4
 import httpx
 from sqlalchemy import select
 
+from cyrvanta.modules.claims.application.service import (
+    ClaimConflict,
+    ClaimNotFound,
+    ClaimService,
+)
 from cyrvanta.modules.identity.infrastructure.models import AuditEventModel, UserModel
 from cyrvanta.modules.incident.application.schemas import IncidentTransition
 from cyrvanta.modules.incident.application.service import (
@@ -58,6 +63,7 @@ REAL_ACTIONS = (
     "incident.status.transition",
     "mail_security.invoke_allowlisted",
     "notification.send",
+    "threat_intel.lookup",
     "ticket.create",
     "webhook.invoke_allowlisted",
 )
@@ -90,9 +96,14 @@ _HTTP_ACTIONS = frozenset({
     "evidence_vault.invoke_allowlisted",
     "firewall.invoke_allowlisted",
     "mail_security.invoke_allowlisted",
+    "threat_intel.lookup",
     "ticket.create",
     "webhook.invoke_allowlisted",
 })
+
+# Reputation verdicts a threat intelligence source may return. The response is
+# untrusted input, so anything outside this set is rejected rather than stored.
+_THREAT_INTEL_VERDICTS = frozenset({"malicious", "suspicious", "benign", "unknown"})
 
 
 class ActionUnavailableError(LookupError):
@@ -291,6 +302,10 @@ class RealActionConnector:
             )
         if not isinstance(credential_handle, StoredIntegrationCredential):
             return ActionResult(False, {}, "PLAYBOOK_CREDENTIAL_UNAVAILABLE")
+        if self._code == "threat_intel.lookup":
+            return await self._execute_threat_intel_lookup(
+                context, action_input, configuration, idempotency_key, credential_handle
+            )
         try:
             safe_payload = await self._safe_external_payload(context, action_input)
             if self._code in {"notification.send", "incident.report.generate"}:
@@ -814,6 +829,107 @@ class RealActionConnector:
                 client.login(str(credential["username"]), str(credential["password"]))
             client.send_message(message)
 
+    async def _execute_threat_intel_lookup(
+        self,
+        context: EngineContext,
+        action_input: dict[str, object],
+        configuration: dict[str, object],
+        idempotency_key: str,
+        credential_handle: StoredIntegrationCredential,
+    ) -> ActionResult:
+        """Ask the tenant's threat intelligence source about this incident.
+
+        Unlike the other HTTP actions this one keeps the response, so the
+        response is untrusted input rather than a fire-and-forget receipt: it is
+        parsed against a fixed contract and anything unexpected fails the action
+        instead of being written into the incident record.
+        """
+        try:
+            safe_payload = await self._safe_external_payload(context, action_input)
+            inputs = action_input.get("inputs")
+            if not isinstance(inputs, dict):
+                return ActionResult(False, {}, "PLAYBOOK_ACTION_CONFIG_INVALID")
+            incident_id = UUID(str(inputs["incident_id"]))
+            body = await self._post_http_json(
+                context, safe_payload, configuration, idempotency_key, credential_handle.values
+            )
+        except (OSError, httpx.HTTPError):
+            return ActionResult(
+                False, {}, "PLAYBOOK_ACTION_OUTCOME_UNKNOWN", "External action outcome is unknown"
+            )
+        except (ValueError, KeyError, IncidentReportStateConflict, IncidentNotFound):
+            return ActionResult(False, {}, "PLAYBOOK_ACTION_FAILED", "External action failed")
+
+        verdict = body.get("verdict")
+        if not isinstance(verdict, str) or verdict.lower() not in _THREAT_INTEL_VERDICTS:
+            return ActionResult(
+                False, {}, "PLAYBOOK_ACTION_FAILED", "Threat intelligence response was not usable"
+            )
+        verdict = verdict.lower()
+        raw_score = body.get("score")
+        score = raw_score if isinstance(raw_score, int) and not isinstance(raw_score, bool) else None
+        if score is not None and not 0 <= score <= 100:
+            return ActionResult(
+                False, {}, "PLAYBOOK_ACTION_FAILED", "Threat intelligence response was not usable"
+            )
+        raw_source = body.get("source")
+        source = (
+            raw_source.strip()
+            if isinstance(raw_source, str)
+            and 0 < len(raw_source.strip()) <= 120
+            and not contains_control_characters(raw_source)
+            else None
+        )
+        fingerprint = hashlib.sha256(
+            f"{idempotency_key}:{verdict}:{score}:{source}".encode()
+        ).hexdigest()
+        try:
+            async with tenant_session(context.tenant_id) as session:
+                claim_id = await ClaimService().record_threat_intel_lookup(
+                    session,
+                    tenant_id=context.tenant_id,
+                    incident_id=incident_id,
+                    verdict=verdict,
+                    score=score,
+                    source=source,
+                    input_fingerprint=fingerprint,
+                    correlation_id=context.correlation_id,
+                    causation_id=context.causation_id,
+                )
+        except (ValueError, ClaimConflict, ClaimNotFound):
+            return ActionResult(False, {}, "PLAYBOOK_ACTION_FAILED", "Enrichment could not be filed")
+        return ActionResult(
+            True,
+            {
+                "effect": "applied",
+                "action_code": self._code,
+                "status": "ENRICHED",
+                "verdict": verdict,
+                "claim_id": str(claim_id),
+                "receipt": fingerprint[:24],
+            },
+            safe_detail="Threat intelligence recorded as incident context",
+        )
+
+    async def _post_http_json(
+        self,
+        context: EngineContext,
+        action_input: dict[str, object],
+        configuration: dict[str, object],
+        idempotency_key: str,
+        credential: dict[str, object],
+    ) -> dict[str, object]:
+        """POST like _post_http, but return the decoded object instead of a receipt."""
+        response = await self._post_http_response(
+            context, action_input, configuration, idempotency_key, credential
+        )
+        if len(response.content) > 64_000:
+            raise ValueError("threat intelligence response is too large")
+        body = response.json()
+        if not isinstance(body, dict):
+            raise ValueError("threat intelligence response is not an object")
+        return body
+
     async def _post_http(
         self,
         context: EngineContext,
@@ -822,6 +938,21 @@ class RealActionConnector:
         idempotency_key: str,
         credential: dict[str, object],
     ) -> str:
+        response = await self._post_http_response(
+            context, action_input, configuration, idempotency_key, credential
+        )
+        remote_id = response.headers.get("Location") or response.headers.get("X-Request-Id")
+        material = remote_id or f"{response.status_code}:{idempotency_key}"
+        return hashlib.sha256(material.encode()).hexdigest()[:24]
+
+    async def _post_http_response(
+        self,
+        context: EngineContext,
+        action_input: dict[str, object],
+        configuration: dict[str, object],
+        idempotency_key: str,
+        credential: dict[str, object],
+    ) -> httpx.Response:
         base_url = str(credential["base_url"]).rstrip("/") + "/"
         target = urljoin(base_url, str(configuration["path"]).lstrip("/"))
         if urlsplit(target).netloc != urlsplit(base_url).netloc:
@@ -839,9 +970,7 @@ class RealActionConnector:
         async with httpx.AsyncClient(timeout=timeout, follow_redirects=False) as client:
             response = await client.post(target, headers=headers, json=action_input)
             response.raise_for_status()
-        remote_id = response.headers.get("Location") or response.headers.get("X-Request-Id")
-        material = remote_id or f"{response.status_code}:{idempotency_key}"
-        return hashlib.sha256(material.encode()).hexdigest()[:24]
+        return response
 
 
 class ActionRegistry:

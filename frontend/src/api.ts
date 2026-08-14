@@ -353,6 +353,20 @@ const playbookDefinitionListSchema = z.object({
   last_verified_at: z.string().nullable(),
   created_at: z.string(),
 });
+const playbookActionSchema = z.object({
+  code: z.string(),
+  version: z.string(),
+  modes: z.array(z.string()),
+  impact: z.string(),
+  timeout_seconds: z.number(),
+  retry_safe: z.boolean(),
+  cancellable: z.boolean(),
+  egress: z.string(),
+});
+const playbookActionListSchema = z.object({
+  items: z.array(playbookActionSchema),
+  total: z.number(),
+});
 const playbookManagementSchema = z.object({
   editor_url: z.string().url(),
   local_only: z.boolean(),
@@ -436,6 +450,7 @@ export type Enrichment = z.infer<typeof enrichmentSchema>;
 export type PlaybookCatalog = z.infer<typeof playbookCatalogSchema>;
 export type PlaybookDefinition = z.infer<typeof playbookDefinitionSchema>;
 export type NativeActionBinding = z.infer<typeof nativeActionBindingSchema>;
+export type PlaybookAction = z.infer<typeof playbookActionSchema>;
 export type PlaybookManagement = z.infer<typeof playbookManagementSchema>;
 export type ResponseDecision = z.infer<typeof responseDecisionSchema>;
 export type PlaybookExecution = z.infer<typeof playbookExecutionSchema>;
@@ -1022,6 +1037,10 @@ export async function configureNativeActionBinding(input: {
   return nativeActionBindingSchema.parse(
     await authorizedMutation("/api/v1/native-action-bindings", "POST", input),
   );
+}
+
+export async function getPlaybookActions(): Promise<PlaybookAction[]> {
+  return playbookActionListSchema.parse(await authorized("/api/v1/playbook-actions")).items;
 }
 
 export async function verifyNativeActionBinding(bindingId: string): Promise<NativeActionBinding> {

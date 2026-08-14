@@ -4,13 +4,14 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   configureNativeActionBinding,
   getIntegrationConnections,
+  getPlaybookActions,
   PlaybookDefinition,
   verifyNativeActionBinding,
 } from "./api";
 
-const INTERNAL_ACTIONS = new Set(["incident.status.transition", "endpoint.isolate"]);
-const SMTP_ACTIONS = new Set(["notification.send", "incident.report.generate"]);
-const HTTP_ACTIONS = new Set(["ticket.create", "webhook.invoke_allowlisted"]);
+// Wazuh-backed actions report HTTPS egress like any other outbound call, but
+// their binding is created from the verified Wazuh connection rather than here.
+const WAZUH_ACTIONS = new Set(["host.isolate", "host.restore"]);
 
 const ACTION_METADATA: Record<string, { title: string; desc: string; icon: string }> = {
   "incident.status.transition": {
@@ -43,6 +44,53 @@ const ACTION_METADATA: Record<string, { title: string; desc: string; icon: strin
     desc: "Dispara un endpoint HTTPS autorizado para orquestaciones externas.",
     icon: "🌐",
   },
+  "host.isolate": {
+    title: "Aislamiento de Host vía Wazuh",
+    desc: "Aísla el endpoint de la red mediante Active Response de Wazuh.",
+    icon: "🔒",
+  },
+  "host.restore": {
+    title: "Restauración de Conectividad del Host",
+    desc: "Revierte el aislamiento de red aplicado previamente.",
+    icon: "🔓",
+  },
+  "account.disable": {
+    title: "Bloqueo de Cuenta",
+    desc: "Deshabilita la cuenta comprometida en el directorio de Cyrvanta.",
+    icon: "🚫",
+  },
+  "account.enable": {
+    title: "Rehabilitación de Cuenta",
+    desc: "Revierte el bloqueo aplicado previamente sobre la cuenta.",
+    icon: "✅",
+  },
+  // Cada sistema externo tiene su propio destino: la acción entrega el
+  // incidente aprobado y el sistema configurado es el que ejecuta el efecto.
+  "mail_security.invoke_allowlisted": {
+    title: "Sistema de Seguridad de Correo",
+    desc: "Entrega el incidente al sistema que purga los mensajes y bloquea URLs y dominios.",
+    icon: "📨",
+  },
+  "firewall.invoke_allowlisted": {
+    title: "Firewall / Proxy Perimetral",
+    desc: "Entrega los indicadores al firewall o proxy que aplica las reglas de bloqueo.",
+    icon: "🧱",
+  },
+  "edr.invoke_allowlisted": {
+    title: "Plataforma EDR / Antivirus",
+    desc: "Entrega el incidente al EDR que fuerza la reactivación del agente de seguridad.",
+    icon: "🛡️",
+  },
+  "evidence_vault.invoke_allowlisted": {
+    title: "Almacén de Evidencia Inmutable",
+    desc: "Entrega el snapshot aprobado al almacén que realiza el sellado de la evidencia.",
+    icon: "🗄️",
+  },
+  "threat_intel.lookup": {
+    title: "Fuente de Threat Intelligence",
+    desc: "Consulta la reputación del incidente y registra el veredicto devuelto como contexto.",
+    icon: "🔎",
+  },
 };
 
 export function PlaybookConfigurationModal({
@@ -57,13 +105,22 @@ export function PlaybookConfigurationModal({
   const [value, setValue] = useState("");
   const [connectionId, setConnectionId] = useState("");
 
-  const connectorType = INTERNAL_ACTIONS.has(action)
-    ? "INTERNAL"
-    : SMTP_ACTIONS.has(action)
-      ? "SMTP"
-      : HTTP_ACTIONS.has(action)
-        ? "HTTP_ALLOWLISTED"
-        : null;
+  // Derived from the registry instead of a local list: the modal used to keep
+  // its own copy of which actions are internal, SMTP or HTTP, so every action
+  // added to the backend silently rendered no fields and a disabled form.
+  const actions = useQuery({ queryKey: ["playbook-actions"], queryFn: getPlaybookActions });
+  const descriptor = useMemo(
+    () => (actions.data ?? []).find((item) => item.code === action),
+    [actions.data, action],
+  );
+  const isWazuhManaged = WAZUH_ACTIONS.has(action);
+  const connectorType = !descriptor || isWazuhManaged
+    ? null
+    : descriptor.egress === "NONE"
+      ? "INTERNAL"
+      : descriptor.egress === "SMTP"
+        ? "SMTP"
+        : "HTTP_ALLOWLISTED";
 
   const connections = useQuery({
     queryKey: ["integration-connections"],
@@ -230,6 +287,36 @@ export function PlaybookConfigurationModal({
             </div>
           )}
 
+          {/* Wazuh-managed actions: bound from the verified Wazuh connection */}
+          {isWazuhManaged && (
+            <div
+              style={{
+                background: "rgba(13, 209, 155, 0.08)",
+                border: "1px solid rgba(13, 209, 155, 0.25)",
+                borderRadius: "8px",
+                padding: "12px 14px",
+                fontSize: "0.85rem",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "var(--accent)", fontWeight: 600 }}>
+                <span>✓</span>
+                <span>Acción gestionada por la conexión Wazuh</span>
+              </div>
+              <p style={{ margin: "6px 0 0", color: "var(--text-soft)", fontSize: "0.8rem" }}>
+                No se configura aquí: se habilita sola cuando la conexión Wazuh está activa y
+                verificada en el menú de Integraciones.
+              </p>
+            </div>
+          )}
+
+          {/* Unknown action: never present an empty form as if it were configurable */}
+          {!isWazuhManaged && !connectorType && !actions.isLoading && (
+            <p style={{ margin: 0, fontSize: "0.8rem", color: "var(--warning)" }}>
+              ⚠️ Esta acción no está registrada en el motor nativo, por lo que no puede
+              configurarse ni ejecutarse.
+            </p>
+          )}
+
           {/* External Connector Form */}
           {connectorType && connectorType !== "INTERNAL" && (
             <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
@@ -251,7 +338,7 @@ export function PlaybookConfigurationModal({
               </label>
 
               <label style={{ fontSize: "0.85rem", fontWeight: 600 }}>
-                {connectorType === "SMTP" ? "Destinatario de Correo" : "Ruta / Endpoint URL"}
+                {connectorType === "SMTP" ? "Destinatario de Correo" : "Ruta relativa del endpoint"}
                 <input
                   required
                   type={connectorType === "SMTP" ? "email" : "text"}
@@ -260,11 +347,26 @@ export function PlaybookConfigurationModal({
                   value={value}
                   onChange={(event) => setValue(event.target.value)}
                 />
+                {connectorType !== "SMTP" && (
+                  <span
+                    style={{
+                      display: "block",
+                      marginTop: "4px",
+                      fontWeight: 400,
+                      fontSize: "0.75rem",
+                      color: "var(--text-soft)",
+                    }}
+                  >
+                    Ruta POST relativa a la URL base de la conexión elegida (debe empezar con “/”).
+                  </span>
+                )}
               </label>
 
               {candidates.length === 0 && (
                 <p style={{ margin: 0, fontSize: "0.8rem", color: "var(--warning)" }}>
-                  ⚠️ No hay ninguna conexión {connectorType} activa registrada en el menú de Integraciones.
+                  ⚠️ No hay ninguna conexión {connectorType} activa y verificada. Creála primero en
+                  Integraciones: allí se cargan la URL base y la credencial, y aquí sólo se elige
+                  cuál usar para este paso.
                 </p>
               )}
             </div>

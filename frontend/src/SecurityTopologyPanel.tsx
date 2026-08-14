@@ -10,7 +10,7 @@ export function SecurityTopologyPanel() {
   const [viewMode, setViewMode] = useState<"graph" | "list">("graph");
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [searchFilter, setSearchFilter] = useState<string>("");
-  const [tierFilter, setTierFilter] = useState<string>("ALL");
+  const [categoryFilter, setCategoryFilter] = useState<string>("ALL");
 
   const topology = useQuery({
     queryKey: ["operations", "topology"],
@@ -27,11 +27,21 @@ export function SecurityTopologyPanel() {
   const warningCount = nodes.filter((n) => n.status === "WARNING").length;
   const totalAlerts = nodes.reduce((acc, n) => acc + (n.active_alerts_count || 0), 0);
 
-  // Group nodes by architectural tier for SVG graph layout
-  const gatewayNodes = nodes.filter((n) => n.type === "GATEWAY");
-  const coreNodes = nodes.filter((n) => ["SIEM", "SERVER"].includes(n.type) && !n.id.startsWith("asset-"));
-  const dataNodes = nodes.filter((n) => n.type === "DATABASE" || n.type === "FIREWALL" || n.id.startsWith("integ-"));
-  const endpointNodes = nodes.filter((n) => n.type === "ENDPOINT" || n.id.startsWith("asset-"));
+  // Group nodes by operational zone
+  const feedsNodes = nodes.filter(
+    (n) => n.category === "SECURITY_FEED" || n.id.startsWith("integ-") || n.id.startsWith("siem-")
+  );
+  const coreNodes = nodes.filter(
+    (n) =>
+      n.category === "CYRVANTA_CORE" ||
+      ["gw-01", "db-01", "telemetry-01", "broker-01", "soar-01", "ai-01"].includes(n.id)
+  );
+  const assetNodes = nodes.filter(
+    (n) =>
+      n.category === "MONITORED_ASSET" ||
+      n.id.startsWith("asset-") ||
+      n.id.startsWith("lab-")
+  );
 
   // Filtered nodes for Table view
   const filteredNodes = nodes.filter((n) => {
@@ -39,18 +49,31 @@ export function SecurityTopologyPanel() {
       searchFilter.trim() === "" ||
       n.name.toLowerCase().includes(searchFilter.toLowerCase()) ||
       n.ip_address.includes(searchFilter) ||
+      (n.ip_addresses && n.ip_addresses.some((ip) => ip.includes(searchFilter))) ||
       n.subnet.includes(searchFilter) ||
-      n.type.toLowerCase().includes(searchFilter.toLowerCase());
+      n.type.toLowerCase().includes(searchFilter.toLowerCase()) ||
+      (n.services && n.services.some((s) => s.name.toLowerCase().includes(searchFilter.toLowerCase())));
 
-    const matchesTier =
-      tierFilter === "ALL" ||
-      (tierFilter === "GATEWAY" && n.type === "GATEWAY") ||
-      (tierFilter === "CORE" && ["SIEM", "SERVER"].includes(n.type) && !n.id.startsWith("asset-")) ||
-      (tierFilter === "DATA" && (n.type === "DATABASE" || n.id.startsWith("integ-"))) ||
-      (tierFilter === "ENDPOINTS" && (n.type === "ENDPOINT" || n.id.startsWith("asset-")));
+    const matchesCategory =
+      categoryFilter === "ALL" ||
+      (categoryFilter === "MONITORED_ASSET" && (n.category === "MONITORED_ASSET" || n.id.startsWith("asset-") || n.id.startsWith("lab-"))) ||
+      (categoryFilter === "SECURITY_FEED" && (n.category === "SECURITY_FEED" || n.id.startsWith("integ-") || n.id.startsWith("siem-"))) ||
+      (categoryFilter === "CYRVANTA_CORE" && (n.category === "CYRVANTA_CORE" || ["gw-01", "db-01", "telemetry-01", "broker-01", "soar-01", "ai-01"].includes(n.id)));
 
-    return matchesSearch && matchesTier;
+    return matchesSearch && matchesCategory;
   });
+
+  const getCategoryLabel = (cat?: string) => {
+    if (cat === "SECURITY_FEED") return t("topologyFilterFeeds");
+    if (cat === "CYRVANTA_CORE") return t("topologyFilterCore");
+    return t("topologyFilterAssets");
+  };
+
+  const getCategoryClass = (cat?: string) => {
+    if (cat === "SECURITY_FEED") return "feeds";
+    if (cat === "CYRVANTA_CORE") return "core";
+    return "assets";
+  };
 
   return (
     <article
@@ -77,7 +100,7 @@ export function SecurityTopologyPanel() {
               className={`topology-tab-btn ${viewMode === "list" ? "active" : ""}`}
               onClick={() => setViewMode("list")}
             >
-              📋 {i18n.language.startsWith("es") ? "Tabla de Nodos" : "Node Table"} ({nodes.length})
+              📋 {i18n.language.startsWith("es") ? "Tabla Consolidada" : "Node Table"} ({nodes.length})
             </button>
           </div>
         )}
@@ -108,19 +131,27 @@ export function SecurityTopologyPanel() {
               <strong style={{ color: totalAlerts > 0 ? "var(--warning)" : "var(--text-soft)" }}>{totalAlerts}</strong>
             </div>
             <div className="topology-metric-pill">
-              <span>🔗</span> {i18n.language.startsWith("es") ? "Enlaces Activos" : "Active Edges"}:
-              <strong>{edges.length}</strong>
+              <span>🏢</span> {i18n.language.startsWith("es") ? "Activos Protegidos" : "Protected Assets"}:
+              <strong>{assetNodes.length}</strong>
+            </div>
+            <div className="topology-metric-pill">
+              <span>📡</span> {i18n.language.startsWith("es") ? "Fuentes de Detección" : "Security Feeds"}:
+              <strong>{feedsNodes.length}</strong>
             </div>
           </div>
 
-          {/* VISUAL GRAPH VIEW */}
+          {/* VISUAL GRAPH VIEW (3 Operational Zones) */}
           {viewMode === "graph" && (
             <div className="topology-graph-container">
-              <svg className="topology-svg-canvas" viewBox="0 0 980 340">
+              <svg className="topology-svg-canvas" viewBox="0 0 1020 380">
                 <defs>
                   <linearGradient id="edgeNormal" x1="0%" y1="0%" x2="100%" y2="0%">
-                    <stop offset="0%" stopColor="var(--accent)" stopOpacity="0.45" />
-                    <stop offset="100%" stopColor="var(--cyan)" stopOpacity="0.45" />
+                    <stop offset="0%" stopColor="var(--accent)" stopOpacity="0.5" />
+                    <stop offset="100%" stopColor="var(--cyan)" stopOpacity="0.5" />
+                  </linearGradient>
+                  <linearGradient id="edgeFeed" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <stop offset="0%" stopColor="var(--warning)" stopOpacity="0.6" />
+                    <stop offset="100%" stopColor="var(--accent)" stopOpacity="0.6" />
                   </linearGradient>
                   <linearGradient id="edgeWarning" x1="0%" y1="0%" x2="100%" y2="0%">
                     <stop offset="0%" stopColor="var(--warning)" stopOpacity="0.85" />
@@ -132,99 +163,90 @@ export function SecurityTopologyPanel() {
                   </filter>
                 </defs>
 
-                {/* Zone Background Rectangles */}
-                <g opacity="0.6">
-                  {/* Zone 1: Perimeter */}
-                  <rect x="20" y="20" width="200" height="300" rx="8" fill="rgba(255,255,255,0.015)" stroke="var(--line)" strokeDasharray="4 4" />
-                  <text x="30" y="42" fill="var(--muted)" fontSize="11" fontWeight="700" letterSpacing="0.08em">DMZ / PERÍMETRO</text>
+                {/* 3 Operational Zones */}
+                <g opacity="0.7">
+                  {/* Zone 1: Security Feeds & Sensors (Left) */}
+                  <rect x="15" y="15" width="280" height="350" rx="8" fill="rgba(255, 170, 0, 0.02)" stroke="var(--warning)" strokeDasharray="4 4" strokeOpacity="0.4" />
+                  <text x="25" y="36" fill="var(--warning)" fontSize="11" fontWeight="700" letterSpacing="0.06em">
+                    📡 {i18n.language.startsWith("es") ? "1. FUENTES DE SEGURIDAD & SENSORES" : "1. SECURITY FEEDS & SENSORS"}
+                  </text>
+                  <text x="25" y="50" fill="var(--muted)" fontSize="9">
+                    {i18n.language.startsWith("es") ? "Ingesta de telemetría (SIEMs, EDRs, Firewalls)" : "Telemetry ingestion (SIEMs, EDRs, Firewalls)"}
+                  </text>
 
-                  {/* Zone 2: Core SecOps */}
-                  <rect x="245" y="20" width="245" height="300" rx="8" fill="rgba(85, 230, 193, 0.02)" stroke="var(--line)" strokeDasharray="4 4" />
-                  <text x="255" y="42" fill="var(--accent)" fontSize="11" fontWeight="700" letterSpacing="0.08em">NÚCLEO SECOPS & SIEM</text>
+                  {/* Zone 2: Cyrvanta SOC Core Platform (Middle) */}
+                  <rect x="320" y="15" width="340" height="350" rx="8" fill="rgba(85, 230, 193, 0.03)" stroke="var(--accent)" strokeDasharray="4 4" strokeOpacity="0.5" />
+                  <text x="330" y="36" fill="var(--accent)" fontSize="11" fontWeight="700" letterSpacing="0.06em">
+                    🛡️ {i18n.language.startsWith("es") ? "2. PLATAFORMA CYRVANTA (NÚCLEO SOC)" : "2. CYRVANTA SECOPS PLATFORM"}
+                  </text>
+                  <text x="330" y="50" fill="var(--muted)" fontSize="9">
+                    {i18n.language.startsWith("es") ? "Correlación, RLS, Almacenamiento e IA" : "Correlation, RLS, Storage and AI Engine"}
+                  </text>
 
-                  {/* Zone 3: Data & Integrations */}
-                  <rect x="515" y="20" width="220" height="300" rx="8" fill="rgba(96, 201, 255, 0.02)" stroke="var(--line)" strokeDasharray="4 4" />
-                  <text x="525" y="42" fill="var(--cyan)" fontSize="11" fontWeight="700" letterSpacing="0.08em">DATOS & CONECTORES</text>
-
-                  {/* Zone 4: Endpoints */}
-                  <rect x="760" y="20" width="200" height="300" rx="8" fill="rgba(255,255,255,0.015)" stroke="var(--line)" strokeDasharray="4 4" />
-                  <text x="770" y="42" fill="var(--muted)" fontSize="11" fontWeight="700" letterSpacing="0.08em">ENDPOINTS / LAN</text>
+                  {/* Zone 3: Monitored Tenant Network & Assets (Right) */}
+                  <rect x="685" y="15" width="320" height="350" rx="8" fill="rgba(96, 201, 255, 0.02)" stroke="var(--cyan)" strokeDasharray="4 4" strokeOpacity="0.4" />
+                  <text x="695" y="36" fill="var(--cyan)" fontSize="11" fontWeight="700" letterSpacing="0.06em">
+                    🏢 {i18n.language.startsWith("es") ? "3. RED Y ACTIVOS PROTEGIDOS" : "3. PROTECTED TENANT ASSETS"}
+                  </text>
+                  <text x="695" y="50" fill="var(--muted)" fontSize="9">
+                    {i18n.language.startsWith("es") ? "Servidores consolidados, servicios y LAN" : "Consolidated hosts, services and LAN"}
+                  </text>
                 </g>
 
-                {/* Inter-zone connection lines */}
+                {/* Directional Data Flow Lines */}
                 <g strokeWidth="2">
-                  <line x1="200" y1="120" x2="265" y2="100" stroke="url(#edgeNormal)" strokeDasharray="6 3" />
-                  <line x1="200" y1="120" x2="265" y2="180" stroke="url(#edgeNormal)" strokeDasharray="6 3" />
-                  <line x1="475" y1="100" x2="535" y2="100" stroke="url(#edgeNormal)" />
-                  <line x1="475" y1="180" x2="535" y2="180" stroke="url(#edgeNormal)" />
-                  <line x1="475" y1="240" x2="535" y2="240" stroke="url(#edgeNormal)" />
-                  <line x1="720" y1="120" x2="780" y2="100" stroke="url(#edgeNormal)" strokeDasharray="4 4" />
-                  <line x1="720" y1="180" x2="780" y2="180" stroke={warningCount > 0 ? "url(#edgeWarning)" : "url(#edgeNormal)"} strokeDasharray="4 4" />
+                  <path d="M 285 100 L 335 100" stroke="url(#edgeFeed)" strokeDasharray="4 3" />
+                  <path d="M 285 180 L 335 180" stroke="url(#edgeFeed)" strokeDasharray="4 3" />
+                  <path d="M 685 110 L 645 110" stroke="url(#edgeNormal)" strokeDasharray="4 3" />
+                  <path d="M 685 220 L 645 220" stroke={warningCount > 0 ? "url(#edgeWarning)" : "url(#edgeNormal)"} strokeDasharray="4 3" />
                 </g>
 
-                {/* Zone 1 Nodes: Gateway */}
-                {gatewayNodes.map((n, i) => (
+                {/* ZONE 1: Security Feed Nodes (Left) */}
+                {feedsNodes.slice(0, 4).map((n, i) => (
                   <g
                     key={n.id}
                     className="topology-node-badge"
-                    transform={`translate(35, ${70 + i * 80})`}
+                    transform={`translate(25, ${65 + i * 72})`}
                     onClick={() => setSelectedNodeId(n.id)}
                   >
                     <rect
-                      width="170"
-                      height="58"
+                      width="260"
+                      height="60"
                       rx="6"
                       fill={selectedNodeId === n.id ? "var(--panel-raised)" : "var(--panel)"}
-                      stroke={selectedNodeId === n.id ? "var(--accent)" : "var(--line)"}
-                      strokeWidth={selectedNodeId === n.id ? "2" : "1"}
-                    />
-                    <circle cx="16" cy="22" r="5" fill="var(--success)" filter="url(#glow)" />
-                    <text x="28" y="25" fill="var(--text)" fontSize="11" fontWeight="700">Gateway Ingress</text>
-                    <text x="28" y="44" fill="var(--muted)" fontSize="9.5">{n.ip_address}</text>
-                  </g>
-                ))}
-
-                {/* Zone 2 Nodes: Core SIEM, Broker, SOAR */}
-                {coreNodes.slice(0, 3).map((n, i) => (
-                  <g
-                    key={n.id}
-                    className="topology-node-badge"
-                    transform={`translate(260, ${65 + i * 75})`}
-                    onClick={() => setSelectedNodeId(n.id)}
-                  >
-                    <rect
-                      width="215"
-                      height="58"
-                      rx="6"
-                      fill={selectedNodeId === n.id ? "var(--panel-raised)" : "var(--panel)"}
-                      stroke={selectedNodeId === n.id ? "var(--accent)" : "var(--line)"}
+                      stroke={selectedNodeId === n.id ? "var(--warning)" : "var(--line)"}
                       strokeWidth={selectedNodeId === n.id ? "2" : "1"}
                     />
                     <circle
                       cx="16"
                       cy="22"
                       r="5"
-                      fill={n.status === "ONLINE" ? "var(--success)" : "var(--warning)"}
+                      fill={n.status === "ONLINE" ? "var(--warning)" : "var(--danger)"}
                       filter="url(#glow)"
                     />
                     <text x="28" y="25" fill="var(--text)" fontSize="11" fontWeight="700">
-                      {n.name.length > 24 ? n.name.slice(0, 22) + "..." : n.name}
+                      {n.name.length > 28 ? n.name.slice(0, 26) + "..." : n.name}
                     </text>
-                    <text x="28" y="44" fill="var(--muted)" fontSize="9.5">{n.ip_address} • {n.latency_ms}ms</text>
+                    <text x="28" y="42" fill="var(--muted)" fontSize="9.5">
+                      📡 {n.type} • {n.ip_address}
+                    </text>
+                    <text x="28" y="53" fill="var(--text-soft)" fontSize="8.5">
+                      {n.services && n.services.length > 0 ? n.services[0].name : "Security Sensor Feed"}
+                    </text>
                   </g>
                 ))}
 
-                {/* Zone 3 Nodes: DB, OpenSearch, Connectors */}
-                {dataNodes.concat(coreNodes.slice(3)).slice(0, 3).map((n, i) => (
+                {/* ZONE 2: Cyrvanta Core Nodes (Middle) */}
+                {coreNodes.slice(0, 4).map((n, i) => (
                   <g
                     key={n.id}
                     className="topology-node-badge"
-                    transform={`translate(530, ${65 + i * 75})`}
+                    transform={`translate(335, ${65 + i * 72})`}
                     onClick={() => setSelectedNodeId(n.id)}
                   >
                     <rect
-                      width="190"
-                      height="58"
+                      width="310"
+                      height="60"
                       rx="6"
                       fill={selectedNodeId === n.id ? "var(--panel-raised)" : "var(--panel)"}
                       stroke={selectedNodeId === n.id ? "var(--accent)" : "var(--line)"}
@@ -234,54 +256,120 @@ export function SecurityTopologyPanel() {
                       cx="16"
                       cy="22"
                       r="5"
-                      fill={n.status === "ONLINE" ? "var(--cyan)" : "var(--warning)"}
+                      fill={n.status === "ONLINE" ? "var(--accent)" : "var(--warning)"}
                       filter="url(#glow)"
                     />
                     <text x="28" y="25" fill="var(--text)" fontSize="11" fontWeight="700">
-                      {n.name.length > 20 ? n.name.slice(0, 18) + "..." : n.name}
+                      {n.name.length > 32 ? n.name.slice(0, 30) + "..." : n.name}
                     </text>
-                    <text x="28" y="44" fill="var(--muted)" fontSize="9.5">{n.ip_address}</text>
+                    <text x="28" y="42" fill="var(--muted)" fontSize="9.5">
+                      🛡️ {n.ip_address} • ⚡ {n.latency_ms}ms
+                    </text>
+                    <text x="28" y="53" fill="var(--accent)" fontSize="8.5">
+                      {n.services && n.services.length > 0 ? `⚙️ ${n.services.map((s) => s.name).join(" | ")}` : "Core Service"}
+                    </text>
                   </g>
                 ))}
 
-                {/* Zone 4 Nodes: Monitored Endpoints / Assets */}
-                {(endpointNodes.length > 0 ? endpointNodes : [
-                  { id: "wkstn-demo-01", name: "WKSTN-ADMIN-01", ip_address: "10.0.2.55", status: "ONLINE", latency_ms: 12 },
-                  { id: "srv-demo-dc", name: "SRV-DC01", ip_address: "10.0.2.10", status: warningCount > 0 ? "WARNING" : "ONLINE", latency_ms: 8 },
-                  { id: "wkstn-demo-02", name: "WKSTN-FIN-03", ip_address: "10.0.2.88", status: "ONLINE", latency_ms: 14 }
-                ]).slice(0, 3).map((n: any, i) => (
-                  <g
-                    key={n.id}
-                    className="topology-node-badge"
-                    transform={`translate(775, ${65 + i * 75})`}
-                    onClick={() => setSelectedNodeId(n.id)}
-                  >
-                    <rect
-                      width="170"
-                      height="58"
-                      rx="6"
-                      fill={selectedNodeId === n.id ? "var(--panel-raised)" : "var(--panel)"}
-                      stroke={n.status === "WARNING" ? "var(--warning)" : selectedNodeId === n.id ? "var(--accent)" : "var(--line)"}
-                      strokeWidth={selectedNodeId === n.id || n.status === "WARNING" ? "2" : "1"}
-                    />
-                    <circle
-                      cx="16"
-                      cy="22"
-                      r="5"
-                      fill={n.status === "WARNING" ? "var(--warning)" : "var(--success)"}
-                      filter="url(#glow)"
-                    />
-                    <text x="28" y="25" fill="var(--text)" fontSize="11" fontWeight="700">
-                      {n.name.length > 18 ? n.name.slice(0, 16) + "..." : n.name}
-                    </text>
-                    <text x="28" y="44" fill="var(--muted)" fontSize="9.5">{n.ip_address}</text>
-                  </g>
-                ))}
+                {/* ZONE 3: Monitored Protected Assets (Right - Consolidated Hosts) */}
+                {(assetNodes.length > 0
+                  ? assetNodes
+                  : [
+                      {
+                        id: "lab-server-01",
+                        name: "SRV-APP-PROD-01",
+                        type: "SERVER",
+                        category: "MONITORED_ASSET",
+                        ip_address: "10.0.1.60",
+                        ip_addresses: ["10.0.1.60", "192.168.10.60"],
+                        status: "ONLINE",
+                        services: [
+                          { name: "Web (:443)", port: 443 },
+                          { name: "API (:8080)", port: 8080 },
+                        ],
+                      },
+                      {
+                        id: "lab-workstation-01",
+                        name: "WKSTN-ADMIN-01",
+                        type: "ENDPOINT",
+                        category: "MONITORED_ASSET",
+                        ip_address: "10.0.2.15",
+                        ip_addresses: ["10.0.2.15"],
+                        status: "ONLINE",
+                        services: [{ name: "Workstation" }],
+                      },
+                    ]
+                )
+                  .slice(0, 3)
+                  .map((n: any, i) => {
+                    const isWarn = n.status === "WARNING" || (n.active_alerts_count && n.active_alerts_count > 0);
+                    const ipsText = n.ip_addresses && n.ip_addresses.length > 1
+                      ? n.ip_addresses.join(" | ")
+                      : n.ip_address;
+                    const servicesText = n.services && n.services.length > 0
+                      ? n.services.map((s: any) => s.name).join(", ")
+                      : "Host Agent";
+
+                    return (
+                      <g
+                        key={n.id}
+                        className="topology-node-badge"
+                        transform={`translate(695, ${65 + i * 95})`}
+                        onClick={() => setSelectedNodeId(n.id)}
+                      >
+                        <rect
+                          width="300"
+                          height="82"
+                          rx="6"
+                          fill={selectedNodeId === n.id ? "var(--panel-raised)" : "var(--panel)"}
+                          stroke={isWarn ? "var(--warning)" : selectedNodeId === n.id ? "var(--cyan)" : "var(--line)"}
+                          strokeWidth={selectedNodeId === n.id || isWarn ? "2" : "1"}
+                        />
+                        <circle
+                          cx="16"
+                          cy="22"
+                          r="5"
+                          fill={isWarn ? "var(--warning)" : "var(--cyan)"}
+                          filter="url(#glow)"
+                        />
+                        <text x="28" y="25" fill="var(--text)" fontSize="11.5" fontWeight="700">
+                          {n.name.length > 28 ? n.name.slice(0, 26) + "..." : n.name}
+                        </text>
+                        {isWarn && (
+                          <text x="260" y="25" fill="var(--warning)" fontSize="10" fontWeight="700">
+                            ⚠️ {n.active_alerts_count || 1}
+                          </text>
+                        )}
+                        <text x="28" y="44" fill="var(--cyan)" fontSize="9.5" fontFamily="monospace">
+                          🌐 {ipsText.length > 34 ? ipsText.slice(0, 32) + "..." : ipsText}
+                        </text>
+                        <text x="28" y="60" fill="var(--text-soft)" fontSize="9">
+                          ⚙️ {i18n.language.startsWith("es") ? "Servicios" : "Services"}: {servicesText.length > 34 ? servicesText.slice(0, 32) + "..." : servicesText}
+                        </text>
+                        <text x="28" y="74" fill="var(--muted)" fontSize="8.5">
+                          🛡️ {n.monitored_by ? n.monitored_by.join(", ") : "Wazuh Agent"}
+                        </text>
+                      </g>
+                    );
+                  })}
               </svg>
+
+              {/* Visual Map Legend */}
+              <div className="topology-legend">
+                <div style={{ display: "flex", gap: "16px", alignItems: "center" }}>
+                  <span><strong style={{ color: "var(--warning)" }}>🟠 {i18n.language.startsWith("es") ? "Fuentes / Sensores" : "Security Feeds"}</strong> (Wazuh, EDR, FW)</span>
+                  <span><strong style={{ color: "var(--accent)" }}>🔵 {i18n.language.startsWith("es") ? "Plataforma Cyrvanta" : "Cyrvanta Platform"}</strong> (SOC Core)</span>
+                  <span><strong style={{ color: "var(--cyan)" }}>🟢 {i18n.language.startsWith("es") ? "Activos Protegidos" : "Protected Assets"}</strong> (Hosts & Services)</span>
+                </div>
+                <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
+                  <span><span style={{ color: "var(--success)" }}>●</span> {i18n.language.startsWith("es") ? "En Línea" : "Online"}</span>
+                  <span><span style={{ color: "var(--warning)" }}>⚠️</span> {i18n.language.startsWith("es") ? "Con Alertas" : "With Alerts"}</span>
+                </div>
+              </div>
             </div>
           )}
 
-          {/* TABLE VIEW */}
+          {/* TABLE VIEW (Consolidated List View) */}
           {viewMode === "list" && (
             <div>
               {/* Filter Bar */}
@@ -289,23 +377,22 @@ export function SecurityTopologyPanel() {
                 <input
                   type="search"
                   className="topology-filter-input"
-                  placeholder={i18n.language.startsWith("es") ? "🔍 Filtrar nodo, IP, tipo..." : "🔍 Filter node, IP, type..."}
+                  placeholder={i18n.language.startsWith("es") ? "🔍 Filtrar por host, IP, servicio, tipo..." : "🔍 Filter host, IP, service, type..."}
                   value={searchFilter}
                   onChange={(e) => setSearchFilter(e.target.value)}
                 />
                 <div className="topology-tier-filters">
                   {[
-                    { key: "ALL", label: i18n.language.startsWith("es") ? "Todos" : "All" },
-                    { key: "GATEWAY", label: "DMZ" },
-                    { key: "CORE", label: "SecOps / SIEM" },
-                    { key: "DATA", label: i18n.language.startsWith("es") ? "Datos / Conectores" : "Data / Connectors" },
-                    { key: "ENDPOINTS", label: "Endpoints" },
+                    { key: "ALL", label: t("topologyFilterAll") },
+                    { key: "MONITORED_ASSET", label: t("topologyFilterAssets") },
+                    { key: "SECURITY_FEED", label: t("topologyFilterFeeds") },
+                    { key: "CYRVANTA_CORE", label: t("topologyFilterCore") },
                   ].map((filter) => (
                     <button
                       key={filter.key}
                       type="button"
-                      className={`topology-tier-pill ${tierFilter === filter.key ? "active" : ""}`}
-                      onClick={() => setTierFilter(filter.key)}
+                      className={`topology-tier-pill ${categoryFilter === filter.key ? "active" : ""}`}
+                      onClick={() => setCategoryFilter(filter.key)}
                     >
                       {filter.label}
                     </button>
@@ -319,12 +406,12 @@ export function SecurityTopologyPanel() {
                   <thead>
                     <tr>
                       <th>{i18n.language.startsWith("es") ? "Estado" : "Status"}</th>
-                      <th>{i18n.language.startsWith("es") ? "Nodo / Activo" : "Node / Asset"}</th>
-                      <th>{i18n.language.startsWith("es") ? "Capa / Tipo" : "Layer / Type"}</th>
-                      <th>{i18n.language.startsWith("es") ? "Dirección IP" : "IP Address"}</th>
-                      <th>{i18n.language.startsWith("es") ? "Subred" : "Subnet"}</th>
-                      <th>{i18n.language.startsWith("es") ? "Latencia" : "Latency"}</th>
-                      <th>{i18n.language.startsWith("es") ? "Alertas Activas" : "Active Alerts"}</th>
+                      <th>{i18n.language.startsWith("es") ? "Grupo / Rol" : "Group / Role"}</th>
+                      <th>{i18n.language.startsWith("es") ? "Host / Nombre" : "Host / Name"}</th>
+                      <th>{i18n.language.startsWith("es") ? "Tipo" : "Type"}</th>
+                      <th>{i18n.language.startsWith("es") ? "Direcciones IP" : "IP Addresses"}</th>
+                      <th>{i18n.language.startsWith("es") ? "Servicios Integrados" : "Integrated Services"}</th>
+                      <th>{i18n.language.startsWith("es") ? "Alertas" : "Alerts"}</th>
                       <th>{i18n.language.startsWith("es") ? "Acción" : "Action"}</th>
                     </tr>
                   </thead>
@@ -351,6 +438,11 @@ export function SecurityTopologyPanel() {
                             </div>
                           </td>
                           <td>
+                            <span className={`topology-category-pill ${getCategoryClass(node.category)}`}>
+                              {getCategoryLabel(node.category)}
+                            </span>
+                          </td>
+                          <td>
                             <strong>{node.name}</strong>
                             <div style={{ fontSize: "0.75rem", color: "var(--muted)", marginTop: "2px" }}>
                               {i18n.language.startsWith("es") ? node.role_description_es : node.role_description_en}
@@ -362,20 +454,36 @@ export function SecurityTopologyPanel() {
                             </span>
                           </td>
                           <td>
-                            <code className="topology-ip-code">{node.ip_address}</code>
-                          </td>
-                          <td style={{ color: "var(--text-soft)", fontSize: "0.8rem" }}>
-                            {node.subnet}
+                            <div style={{ display: "flex", flexWrap: "wrap", gap: "4px" }}>
+                              {node.ip_addresses && node.ip_addresses.length > 0 ? (
+                                node.ip_addresses.map((ip) => (
+                                  <code key={ip} className="topology-ip-code">{ip}</code>
+                                ))
+                              ) : (
+                                <code className="topology-ip-code">{node.ip_address}</code>
+                              )}
+                            </div>
                           </td>
                           <td>
-                            <span style={{ fontSize: "0.8rem", color: "var(--text-soft)" }}>
-                              ⚡ {node.latency_ms} ms
-                            </span>
+                            {node.services && node.services.length > 0 ? (
+                              <div style={{ display: "flex", flexWrap: "wrap", gap: "4px" }}>
+                                {node.services.map((svc, sIdx) => (
+                                  <span
+                                    key={sIdx}
+                                    className={`topology-service-tag ${svc.status === "WARNING" ? "warning" : ""}`}
+                                  >
+                                    ⚙️ {svc.name} {svc.port ? `(:${svc.port})` : ""}
+                                  </span>
+                                ))}
+                              </div>
+                            ) : (
+                              <span style={{ color: "var(--muted)", fontSize: "0.8rem" }}>—</span>
+                            )}
                           </td>
                           <td>
                             {node.active_alerts_count > 0 ? (
                               <span className="status warning" style={{ fontSize: "0.75rem" }}>
-                                ⚠️ {node.active_alerts_count} {i18n.language.startsWith("es") ? "alerta(s)" : "alert(s)"}
+                                ⚠️ {node.active_alerts_count}
                               </span>
                             ) : (
                               <span style={{ color: "var(--muted)", fontSize: "0.8rem" }}>0</span>
@@ -408,22 +516,33 @@ export function SecurityTopologyPanel() {
             <div className="topology-detail-card">
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "10px" }}>
                 <div>
-                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                    <strong style={{ fontSize: "1.05rem", color: "var(--text)" }}>{selectedNode.name}</strong>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                    <strong style={{ fontSize: "1.1rem", color: "var(--text)" }}>{selectedNode.name}</strong>
                     <span className={`status ${selectedNode.status === "ONLINE" ? "success" : "warning"}`}>
                       {selectedNode.status}
                     </span>
                     <span className="status" style={{ fontSize: "0.75rem" }}>{selectedNode.type}</span>
+                    <span className={`topology-category-pill ${getCategoryClass(selectedNode.category)}`}>
+                      {getCategoryLabel(selectedNode.category)}
+                    </span>
                   </div>
                   <p style={{ margin: "4px 0 0", color: "var(--muted)", fontSize: "0.85rem" }}>
                     {i18n.language.startsWith("es") ? selectedNode.role_description_es : selectedNode.role_description_en}
                   </p>
                 </div>
 
-                <div style={{ display: "flex", gap: "18px", fontSize: "0.85rem" }}>
+                <div style={{ display: "flex", gap: "18px", fontSize: "0.85rem", flexWrap: "wrap" }}>
                   <div>
-                    <span className="muted" style={{ display: "block" }}>IP Address</span>
-                    <strong className="topology-ip-code">{selectedNode.ip_address}</strong>
+                    <span className="muted" style={{ display: "block" }}>{t("topologyIpAddresses")}</span>
+                    <div style={{ display: "flex", gap: "4px", marginTop: "2px" }}>
+                      {selectedNode.ip_addresses && selectedNode.ip_addresses.length > 0 ? (
+                        selectedNode.ip_addresses.map((ip) => (
+                          <strong key={ip} className="topology-ip-code">{ip}</strong>
+                        ))
+                      ) : (
+                        <strong className="topology-ip-code">{selectedNode.ip_address}</strong>
+                      )}
+                    </div>
                   </div>
                   <div>
                     <span className="muted" style={{ display: "block" }}>Subnet</span>
@@ -433,9 +552,58 @@ export function SecurityTopologyPanel() {
                     <span className="muted" style={{ display: "block" }}>Latency</span>
                     <strong>{selectedNode.latency_ms} ms</strong>
                   </div>
+                  {selectedNode.os_info && (
+                    <div>
+                      <span className="muted" style={{ display: "block" }}>{t("topologyOperatingSystem")}</span>
+                      <strong>{selectedNode.os_info}</strong>
+                    </div>
+                  )}
+                  {selectedNode.monitored_by && selectedNode.monitored_by.length > 0 && (
+                    <div>
+                      <span className="muted" style={{ display: "block" }}>{t("topologyMonitoredBy")}</span>
+                      <strong style={{ color: "var(--cyan)" }}>{selectedNode.monitored_by.join(", ")}</strong>
+                    </div>
+                  )}
                 </div>
               </div>
 
+              {/* Host Services Grid */}
+              {selectedNode.services && selectedNode.services.length > 0 && (
+                <div style={{ marginTop: "14px", paddingTop: "10px", borderTop: "1px solid var(--line)" }}>
+                  <strong style={{ fontSize: "0.85rem", color: "var(--text)" }}>
+                    ⚙️ {t("topologyHostServices")} ({selectedNode.services.length}):
+                  </strong>
+                  <div className="topology-host-services-grid">
+                    {selectedNode.services.map((svc, idx) => (
+                      <div
+                        key={idx}
+                        style={{
+                          background: "var(--surface)",
+                          border: "1px solid var(--line)",
+                          borderRadius: "4px",
+                          padding: "6px 10px",
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          fontSize: "0.8rem",
+                        }}
+                      >
+                        <div>
+                          <strong>{svc.name}</strong>
+                          <div style={{ fontSize: "0.72rem", color: "var(--muted)" }}>
+                            {svc.protocol} {svc.port ? `• Port ${svc.port}` : ""} {svc.ip_address ? `• ${svc.ip_address}` : ""}
+                          </div>
+                        </div>
+                        <span className={`status ${svc.status === "ONLINE" ? "success" : "warning"}`} style={{ fontSize: "0.7rem" }}>
+                          {svc.status}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Associated Security Alerts */}
               {selectedNode.active_alerts && selectedNode.active_alerts.length > 0 && (
                 <div style={{ marginTop: "12px", paddingTop: "10px", borderTop: "1px solid var(--line)" }}>
                   <strong style={{ fontSize: "0.82rem", color: "var(--warning)" }}>

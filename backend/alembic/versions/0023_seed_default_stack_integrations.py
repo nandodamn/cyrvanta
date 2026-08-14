@@ -10,7 +10,7 @@ import sqlalchemy as sa
 from cyrvanta.modules.integrations.application.connection_service import (
     CURRENT_CONFIGURATION_SCHEMA_VERSION,
 )
-from cyrvanta.shared.cipher import SecretCipher
+from cyrvanta.modules.directory.application.crypto import SecretCipher
 from cyrvanta.shared.config import get_settings
 
 revision = "0023_default_integrations"

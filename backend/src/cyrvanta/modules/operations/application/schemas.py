@@ -70,17 +70,31 @@ class TopologyNodeAlert(BaseModel):
     observed_at: str
 
 
+class TopologyNodeService(BaseModel):
+    name: str
+    port: int | None = None
+    protocol: str = "TCP"
+    ip_address: str | None = None
+    status: Literal["ONLINE", "WARNING", "OFFLINE"] = "ONLINE"
+    active_alerts_count: int = 0
+
+
 class TopologyNode(BaseModel):
     id: str
     name: str
-    type: Literal["FIREWALL", "SERVER", "DATABASE", "SIEM", "GATEWAY", "ENDPOINT"]
+    type: Literal["FIREWALL", "SERVER", "DATABASE", "SIEM", "GATEWAY", "ENDPOINT", "EDR", "WORKSTATION"]
+    category: Literal["CYRVANTA_CORE", "SECURITY_FEED", "MONITORED_ASSET"] = "CYRVANTA_CORE"
     ip_address: str
+    ip_addresses: list[str] = []
+    services: list[TopologyNodeService] = []
     subnet: str
     status: Literal["ONLINE", "WARNING", "OFFLINE"]
     latency_ms: int
     last_ping: str
     active_alerts_count: int = 0
     active_alerts: list[TopologyNodeAlert] = []
+    os_info: str | None = None
+    monitored_by: list[str] = []
     role_description_es: str
     role_description_en: str
 

@@ -93,12 +93,14 @@ ESSENTIAL_NATIVE_PLAYBOOKS: list[dict[str, object]] = [
         "title_es": "Mitigación y purga de phishing / correo malicioso",
         "title_en": "Phishing & Malicious Email Mitigation",
         "description_es": (
-            "Respuesta de correo: purga masiva de mensajes maliciosos en buzones corporativos "
-            "y bloqueo perimetral de URLs y dominios de ataque."
+            "Respuesta de correo: entrega el incidente aprobado al sistema de seguridad de "
+            "correo configurado por el tenant, que ejecuta la purga de los mensajes y el "
+            "bloqueo de URLs y dominios. Requiere esa integración activa y verificada."
         ),
         "description_en": (
-            "Email response: mass purge of malicious messages from mailboxes, and "
-            "perimeter blocking of attack URLs and sender domains."
+            "Email response: hands the approved incident to the tenant's configured mail "
+            "security system, which performs the message purge and the URL/domain blocking. "
+            "Requires that integration to be active and verified."
         ),
         "mitre_codes": ["T1566", "T1534"],
     },
@@ -135,12 +137,14 @@ ESSENTIAL_NATIVE_PLAYBOOKS: list[dict[str, object]] = [
         "title_es": "Bloqueo perimetral y búsqueda de IoCs",
         "title_en": "Malicious Indicator (IoC) Perimeter Blocking & Hunting",
         "description_es": (
-            "Respuesta ante IoCs: aplica reglas de bloqueo temporal en Firewall/Proxy, "
-            "y ejecuta búsqueda retroactiva del indicador en toda la telemetría."
+            "Respuesta ante IoCs: entrega los indicadores del incidente al Firewall/Proxy "
+            "configurado por el tenant, que aplica las reglas de bloqueo. Requiere esa "
+            "integración activa y verificada."
         ),
         "description_en": (
-            "IoC response: applies temporary blocking rules in Firewall/Proxy, "
-            "and executes retroactive hunting of the indicator across historical telemetry."
+            "IoC response: hands the incident indicators to the tenant's configured "
+            "firewall/proxy, which applies the blocking rules. Requires that integration "
+            "to be active and verified."
         ),
         "mitre_codes": ["T1071", "T1584"],
     },
@@ -163,12 +167,13 @@ ESSENTIAL_NATIVE_PLAYBOOKS: list[dict[str, object]] = [
         "title_es": "Reactivación forzada y remediación de controles",
         "title_en": "Security Controls Reactivation & Hardening",
         "description_es": (
-            "Remediación de evasión: reactiva forzadamente agentes de seguridad (EDR/Syslog), "
-            "audita la brecha de telemetría y eleva la contención del host."
+            "Remediación de evasión: entrega el incidente al EDR configurado por el tenant "
+            "para forzar la reactivación del agente de seguridad. Requiere esa integración "
+            "activa y verificada."
         ),
         "description_en": (
-            "Evasion remediation: force-reactivates security agents (EDR/Syslog), "
-            "audits telemetry gaps, and elevates host containment."
+            "Evasion remediation: hands the incident to the tenant's configured EDR to force "
+            "the security agent back on. Requires that integration to be active and verified."
         ),
         "mitre_codes": ["T1562", "T1070"],
     },
@@ -205,12 +210,14 @@ ESSENTIAL_NATIVE_PLAYBOOKS: list[dict[str, object]] = [
         "title_es": "Preservación y sellado inmutable de evidencia",
         "title_en": "Immutable Evidence Preservation & Sealing",
         "description_es": (
-            "Playbook transversal: sella alertas originales, hashes criptográficos, "
-            "capturas de memoria y logs en almacén inmutable auditado."
+            "Playbook transversal: entrega el snapshot aprobado del incidente al almacén "
+            "de evidencia inmutable configurado por el tenant, que realiza el sellado. "
+            "Requiere esa integración activa y verificada."
         ),
         "description_en": (
-            "Transversal playbook: seals raw alerts, cryptographic hashes, "
-            "memory snapshots, and logs in an audited immutable store."
+            "Transversal playbook: hands the approved incident snapshot to the tenant's "
+            "configured immutable evidence store, which performs the sealing. Requires that "
+            "integration to be active and verified."
         ),
         "mitre_codes": [],
     },
@@ -326,11 +333,15 @@ ESSENTIAL_NATIVE_ACTIONS: dict[str, str] = {
     "incident-report-email":         "incident.report.generate",
     # ── Ticket en ITSM (acción existente, mapeo corregido) ──────────────────────
     "create-security-ticket":        "ticket.create",
-    # ── Webhooks HTTP allowlisted (acción existente, mapeo corregido) ───────────
-    "security-control-disabled":     "webhook.invoke_allowlisted",
-    "malicious-indicator":           "webhook.invoke_allowlisted",
-    "phishing-malicious-email":      "webhook.invoke_allowlisted",
-    "evidence-preservation":         "webhook.invoke_allowlisted",
+    # ── Sistemas externos allowlisted, uno por destino ──────────────────────────
+    # Un binding es único por (tenant, action_code): compartir un único
+    # webhook.invoke_allowlisted obligaba a que la purga de correo, el bloqueo
+    # perimetral, la reactivación del EDR y el sellado de evidencia salieran
+    # todos por la misma URL configurada.
+    "security-control-disabled":     "edr.invoke_allowlisted",
+    "malicious-indicator":           "firewall.invoke_allowlisted",
+    "phishing-malicious-email":      "mail_security.invoke_allowlisted",
+    "evidence-preservation":         "evidence_vault.invoke_allowlisted",
     # ── Contención real de cuentas (nuevas acciones) ─────────────────────────────
     "compromised-account":           "account.disable",
     "privilege-escalation":          "account.disable",
@@ -630,8 +641,15 @@ class PlaybookAdministrationService:
                 return actions == expected_actions
 
             latest_version = None
-            if any(matches_current_catalog(version) for version in existing_versions):
-                latest_version = existing_versions[0]
+            # The newest version is not necessarily the matching one, so pick the
+            # newest that actually runs the current catalog rather than assuming
+            # existing_versions[0] does.
+            current = next(
+                (version for version in existing_versions if matches_current_catalog(version)),
+                None,
+            )
+            if current is not None:
+                latest_version = current
                 if latest_version.status == "DRAFT":
                     latest_version.status = "APPROVED"
                     latest_version.validated_sha256 = latest_version.artifact_sha256
@@ -723,6 +741,21 @@ class PlaybookAdministrationService:
                 )
                 latest_version = seeded_version
 
+            # Runs on both paths: a tenant seeded before the catalog changed
+            # still carries the superseded version, and it stays dispatchable
+            # until it is retired -- whether or not this call created the
+            # replacement.
+            await self._retire_superseded_versions(
+                session,
+                tenant_id,
+                [
+                    version
+                    for version in existing_versions
+                    if not matches_current_catalog(version)
+                ],
+                code,
+            )
+
             if latest_version is not None:
                 # A playbook is only armed when its actions can genuinely run.
                 # Marking the binding active regardless would present an
@@ -772,6 +805,59 @@ class PlaybookAdministrationService:
                         datetime.now(UTC) if actions_ready else None
                     )
 
+        await session.flush()
+
+    async def _retire_superseded_versions(
+        self,
+        session: AsyncSession,
+        tenant_id: UUID,
+        superseded: list[PlaybookVersionModel],
+        code: str,
+    ) -> None:
+        """Disarm the seeded versions the new one replaces.
+
+        Seeding a replacement is not enough on its own: the version it replaces
+        keeps its APPROVED status and its active binding, so the superseded
+        procedure stays dispatchable. When a playbook is remapped -- e.g.
+        contain-and-document-incident going from a lone status write to
+        isolate/report/transition -- leaving the old version armed means the
+        weaker procedure remains the one a tenant can actually run, while the
+        replacement waits on the integrations it now needs.
+
+        Only LIVE catalog versions are retired. SYNTHETIC ones belong to the
+        demo catalog, are never seeded from here, and are not superseded by it.
+        Rows are kept so executions remain immutable history.
+        """
+        for version in superseded:
+            if version.classification != "LIVE" or version.status == "RETIRED":
+                continue
+            version.status = "RETIRED"
+            version.approved_at = None
+            bindings = list(
+                (
+                    await session.scalars(
+                        select(AutomationEngineBindingModel).where(
+                            AutomationEngineBindingModel.tenant_id == tenant_id,
+                            AutomationEngineBindingModel.playbook_version_id == version.id,
+                        )
+                    )
+                ).all()
+            )
+            for binding in bindings:
+                binding.active = False
+                binding.sync_status = "PENDING"
+                binding.observed_digest = None
+                binding.last_verified_at = None
+            self._audit(
+                session,
+                tenant_id,
+                None,
+                uuid4(),
+                "playbook.version.superseded",
+                "playbook_version",
+                version.id,
+                {"workflow_code": code, "version": version.version},
+            )
         await session.flush()
 
     async def get_definition(self, tenant_id: UUID, definition_id: UUID) -> DefinitionResponse:

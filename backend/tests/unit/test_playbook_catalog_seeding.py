@@ -3,12 +3,15 @@ from uuid import UUID
 from sqlalchemy import select, text
 
 from cyrvanta.modules.playbooks.application.administration_service import (
+    ESSENTIAL_NATIVE_ACTIONS,
     ESSENTIAL_NATIVE_PLAYBOOKS,
     RETIRED_PLAYBOOK_CODES,
     PlaybookAdministrationService,
     catalog_step_actions,
 )
 from cyrvanta.modules.playbooks.infrastructure.models import (
+    AutomationEngineBindingModel,
+    NativeActionBindingModel,
     PlaybookDefinitionModel,
     PlaybookVersionModel,
 )
@@ -97,6 +100,96 @@ async def test_multi_step_playbook_chains_its_steps_on_success() -> None:
     assert artifact["timeouts"]["overall_seconds"] >= (
         artifact["timeouts"]["action_seconds"] * len(actions)
     )
+
+
+async def test_remapped_playbook_leaves_no_armed_predecessor() -> None:
+    """Seeding a replacement must also disarm the version it replaces.
+
+    Creating the new version alone left the old one APPROVED with an active
+    binding, so the superseded procedure stayed dispatchable -- and since a
+    remapped playbook usually needs integrations the old one did not, the
+    weaker version was the only one a tenant could actually run.
+    """
+    tenant_id = await _existing_tenant_id()
+    service = PlaybookAdministrationService()
+    await service.list_definitions(tenant_id, limit=100, offset=0)
+
+    async with tenant_session(tenant_id) as session:
+        definition = await session.scalar(
+            select(PlaybookDefinitionModel).where(
+                PlaybookDefinitionModel.tenant_id == tenant_id,
+                PlaybookDefinitionModel.code == "contain-and-document-incident",
+            )
+        )
+        assert definition is not None
+        versions = list(
+            (
+                await session.scalars(
+                    select(PlaybookVersionModel).where(
+                        PlaybookVersionModel.tenant_id == tenant_id,
+                        PlaybookVersionModel.definition_id == definition.id,
+                        PlaybookVersionModel.classification == "LIVE",
+                    )
+                )
+            ).all()
+        )
+        expected = list(catalog_step_actions("contain-and-document-incident"))
+        for version in versions:
+            actions = [
+                step["action"]
+                for step in (version.portable_artifact or {}).get("steps", [])
+                if step.get("type") == "ACTION"
+            ]
+            if actions == expected:
+                continue
+            assert version.status == "RETIRED", (
+                f"superseded version {version.version} still {version.status}"
+            )
+            armed = await session.scalar(
+                select(AutomationEngineBindingModel.id).where(
+                    AutomationEngineBindingModel.tenant_id == tenant_id,
+                    AutomationEngineBindingModel.playbook_version_id == version.id,
+                    AutomationEngineBindingModel.active.is_(True),
+                )
+            )
+            assert armed is None, f"superseded version {version.version} is still armed"
+
+
+async def test_external_system_playbooks_stay_disarmed_until_configured() -> None:
+    """No integration configured means the playbook must not present as ready.
+
+    These four hand an approved incident to a third-party system (mail security,
+    firewall, EDR, evidence vault). Seeding must not arm them on the tenant's
+    behalf: an armed playbook with no destination would only fail once a real
+    incident tried to use it.
+    """
+    tenant_id = await _existing_tenant_id()
+    service = PlaybookAdministrationService()
+
+    result = await service.list_definitions(tenant_id, limit=100, offset=0)
+    by_code = {item.code: item for item in result.items}
+
+    for code in (
+        "phishing-malicious-email",
+        "malicious-indicator",
+        "security-control-disabled",
+        "evidence-preservation",
+    ):
+        action_code = ESSENTIAL_NATIVE_ACTIONS[code]
+        async with tenant_session(tenant_id) as session:
+            binding = await session.scalar(
+                select(NativeActionBindingModel).where(
+                    NativeActionBindingModel.tenant_id == tenant_id,
+                    NativeActionBindingModel.action_code == action_code,
+                    NativeActionBindingModel.active.is_(True),
+                    NativeActionBindingModel.last_verified_at.is_not(None),
+                )
+            )
+        if binding is not None:
+            continue  # This environment really did configure it; nothing to assert.
+        assert by_code[code].readiness_status != "READY", (
+            f"{code} reports ready without a verified {action_code} binding"
+        )
 
 
 async def test_retired_playbooks_are_neither_listed_nor_left_approved() -> None:

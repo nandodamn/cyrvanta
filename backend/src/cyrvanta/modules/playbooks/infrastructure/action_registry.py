@@ -48,11 +48,15 @@ from cyrvanta.shared.target_validation import (
 REAL_ACTIONS = (
     "account.disable",
     "account.enable",
+    "edr.invoke_allowlisted",
     "endpoint.isolate",
+    "evidence_vault.invoke_allowlisted",
+    "firewall.invoke_allowlisted",
     "host.isolate",
     "host.restore",
     "incident.report.generate",
     "incident.status.transition",
+    "mail_security.invoke_allowlisted",
     "notification.send",
     "ticket.create",
     "webhook.invoke_allowlisted",
@@ -73,7 +77,22 @@ _WAZUH_ACTIONS = frozenset({"host.isolate", "host.restore"})
 _SMTP_ACTIONS = frozenset({"notification.send", "incident.report.generate"})
 
 # HTTPS webhook/ticket actions.
-_HTTP_ACTIONS = frozenset({"ticket.create", "webhook.invoke_allowlisted"})
+#
+# The four *.invoke_allowlisted codes below all POST an approved incident
+# snapshot to an allowlisted endpoint, exactly like webhook.invoke_allowlisted.
+# They exist as separate codes because a native action binding is unique per
+# (tenant, action_code): sharing one code would force a mail purge, a firewall
+# block, an EDR reactivation and an evidence seal through a single configured
+# URL. Cyrvanta does not purge mailboxes or write firewall rules itself -- it
+# invokes the system the tenant configured for that purpose.
+_HTTP_ACTIONS = frozenset({
+    "edr.invoke_allowlisted",
+    "evidence_vault.invoke_allowlisted",
+    "firewall.invoke_allowlisted",
+    "mail_security.invoke_allowlisted",
+    "ticket.create",
+    "webhook.invoke_allowlisted",
+})
 
 
 class ActionUnavailableError(LookupError):

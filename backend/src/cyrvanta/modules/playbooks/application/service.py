@@ -19,6 +19,14 @@ from cyrvanta.modules.decision.infrastructure.models import (
 )
 from cyrvanta.modules.identity.infrastructure.models import AuditEventModel
 from cyrvanta.modules.incident.infrastructure.models import IncidentModel
+from cyrvanta.modules.integrations.application.connection_service import (
+    IntegrationConfigurationError,
+    IntegrationConnectionService,
+)
+from cyrvanta.modules.playbooks.application.administration_service import (
+    PLAYBOOK_ROLLBACK_ACTIONS,
+)
+from cyrvanta.modules.playbooks.application.engine_ports import EngineContext
 from cyrvanta.modules.playbooks.application.portable import PortablePlaybookV1
 from cyrvanta.modules.playbooks.application.schemas import (
     ExecutionClaim,
@@ -37,6 +45,7 @@ from cyrvanta.modules.playbooks.infrastructure.action_registry import (
 from cyrvanta.modules.playbooks.infrastructure.models import (
     AutomationEngineBindingModel,
     AutomationReplayNonceModel,
+    NativeActionBindingModel,
     PlaybookDefinitionModel,
     PlaybookExecutionAttemptModel,
     PlaybookExecutionModel,
@@ -426,6 +435,137 @@ class PlaybookExecutionService:
             )
             if execution is None:
                 raise PlaybookNotFound("Execution was not found")
+            return self._response(execution)
+
+    async def rollback(
+        self,
+        *,
+        tenant_id: UUID,
+        actor_user_id: UUID,
+        execution_id: UUID,
+        correlation_id: UUID,
+    ) -> PlaybookExecutionResponse:
+        """Revert the containment applied by one succeeded execution.
+
+        Rollback is an operation on a concrete execution, not a standalone
+        playbook: the reverse action (account.enable / host.restore) runs against
+        the original execution's own recorded inputs, so an analyst can never
+        "restore" a target that this platform did not contain in the first place.
+        """
+        async with tenant_session(tenant_id) as session:
+            execution = await self._locked_execution(session, tenant_id, execution_id)
+            if execution.status != ExecutionStatus.SUCCEEDED.value:
+                raise PlaybookConflict("Only a succeeded execution can be reverted")
+            result = dict(execution.result or {})
+            if result.get("rollback_execution_id"):
+                # Idempotent: the containment was already reverted.
+                return self._response(execution)
+
+            version = await session.scalar(
+                select(PlaybookVersionModel).where(
+                    PlaybookVersionModel.tenant_id == tenant_id,
+                    PlaybookVersionModel.id == execution.playbook_version_id,
+                )
+            )
+            if version is None:
+                raise PlaybookConflict("Execution playbook version is unavailable")
+            rollback_action = PLAYBOOK_ROLLBACK_ACTIONS.get(version.workflow_code)
+            if rollback_action is None:
+                raise PlaybookConflict("This playbook does not support rollback")
+
+            binding = await session.scalar(
+                select(NativeActionBindingModel).where(
+                    NativeActionBindingModel.tenant_id == tenant_id,
+                    NativeActionBindingModel.action_code == rollback_action,
+                    NativeActionBindingModel.action_version == "1.0.0",
+                    NativeActionBindingModel.active.is_(True),
+                    NativeActionBindingModel.last_verified_at.is_not(None),
+                )
+            )
+            if binding is None:
+                raise PlaybookConflict("Rollback action is not configured for this tenant")
+            binding_configuration = dict(binding.configuration)
+            credential_reference = binding.credential_key_id
+            original_inputs = dict(execution.inputs)
+
+        try:
+            connector = ActionRegistry().get(rollback_action, "1.0.0")
+        except ActionUnavailableError as exc:
+            raise PlaybookConflict("Rollback action is unavailable") from exc
+
+        credential = None
+        if connector.describe().egress != "NONE":
+            try:
+                credential = await IntegrationConnectionService(
+                    get_settings()
+                ).resolve_credential(tenant_id, credential_reference)
+            except IntegrationConfigurationError as exc:
+                raise PlaybookConflict("Rollback credential is unavailable") from exc
+
+        # The reverse action reuses the original targets verbatim and is bound to
+        # the original execution, which each reverse action verifies against its
+        # own audit trail before touching anything.
+        rollback_inputs = {
+            **original_inputs,
+            "actor_user_id": str(actor_user_id),
+            "original_execution_id": str(execution_id),
+        }
+        context = EngineContext(
+            tenant_id=tenant_id,
+            correlation_id=correlation_id,
+            causation_id=None,
+            deadline=datetime.now(UTC) + timedelta(seconds=60),
+        )
+        action_result = await connector.execute(
+            context,
+            {"inputs": rollback_inputs, "parameters": {}},
+            binding_configuration,
+            f"rollback:{execution_id}",
+            credential,
+        )
+
+        async with tenant_session(tenant_id) as session:
+            execution = await self._locked_execution(session, tenant_id, execution_id)
+            session.add(
+                AuditEventModel(
+                    tenant_id=tenant_id,
+                    actor_user_id=actor_user_id,
+                    action="playbook.execution.rollback",
+                    resource_type="playbook_execution",
+                    resource_id=execution_id,
+                    outcome="success" if action_result.succeeded else "failure",
+                    correlation_id=correlation_id,
+                    details={
+                        "workflow_code": version.workflow_code,
+                        "rollback_action": rollback_action,
+                        "error_code": action_result.error_code,
+                    },
+                )
+            )
+            if not action_result.succeeded:
+                await self._event(
+                    session,
+                    execution,
+                    correlation_id,
+                    "playbook.execution.rollback_rejected",
+                    {"rollback_action": rollback_action, "error_code": action_result.error_code},
+                )
+                raise PlaybookConflict(
+                    action_result.error_code or "Rollback action did not complete"
+                )
+            merged = dict(execution.result or {})
+            merged["rollback_execution_id"] = str(correlation_id)
+            merged["rollback_action"] = rollback_action
+            merged["rollback_output"] = dict(action_result.output)
+            execution.result = merged
+            await self._event(
+                session,
+                execution,
+                correlation_id,
+                "playbook.execution.rolled_back",
+                {"rollback_action": rollback_action},
+            )
+            await session.flush()
             return self._response(execution)
 
     async def cancel(

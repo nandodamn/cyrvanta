@@ -284,95 +284,41 @@ ESSENTIAL_NATIVE_PLAYBOOKS: list[dict[str, object]] = [
         ),
         "mitre_codes": [],
     },
-    # ── Rollback companions: reversión auditada de acciones de contención ────────
-    {
-        "code": "compromised-account-rollback",
-        "title_es": "Reversión: Reactivación de cuenta contenida",
-        "title_en": "Rollback: Compromised Account Re-enablement",
-        "description_es": (
-            "Rollback auditado: reactiva la cuenta de usuario desactivada por "
-            "'compromised-account'. Requiere original_execution_id y aprobación dual."
-        ),
-        "description_en": (
-            "Audited rollback: re-enables the user account disabled by 'compromised-account'. "
-            "Requires original_execution_id and four-eyes approval."
-        ),
-        "mitre_codes": [],
-    },
-    {
-        "code": "privilege-escalation-rollback",
-        "title_es": "Reversión: Reactivación tras escalamiento anómalo",
-        "title_en": "Rollback: Privilege Escalation Account Re-enablement",
-        "description_es": (
-            "Rollback auditado: reactiva la cuenta suspendida por 'privilege-escalation'. "
-            "Requiere original_execution_id y aprobación dual."
-        ),
-        "description_en": (
-            "Audited rollback: re-enables the account suspended by 'privilege-escalation'. "
-            "Requires original_execution_id and four-eyes approval."
-        ),
-        "mitre_codes": [],
-    },
-    {
-        "code": "compromised-endpoint-rollback",
-        "title_es": "Reversión: Restauración de conectividad de endpoint",
-        "title_en": "Rollback: Compromised Endpoint Network Restoration",
-        "description_es": (
-            "Rollback auditado: restaura la conectividad de red del endpoint aislado por "
-            "'compromised-endpoint' via Wazuh AR. Requiere original_execution_id."
-        ),
-        "description_en": (
-            "Audited rollback: restores network to the endpoint isolated by 'compromised-endpoint' "
-            "via Wazuh Active Response. Requires original_execution_id."
-        ),
-        "mitre_codes": [],
-    },
-    {
-        "code": "lateral-movement-rollback",
-        "title_es": "Reversión: Restauración tras contención de movimiento lateral",
-        "title_en": "Rollback: Lateral Movement Containment Restoration",
-        "description_es": (
-            "Rollback auditado: restaura la conectividad de los endpoints aislados por "
-            "'lateral-movement' via Wazuh AR. Requiere original_execution_id."
-        ),
-        "description_en": (
-            "Audited rollback: restores network to endpoints isolated by 'lateral-movement' "
-            "via Wazuh Active Response. Requires original_execution_id."
-        ),
-        "mitre_codes": [],
-    },
-    {
-        "code": "ransomware-destructive-rollback",
-        "title_es": "Reversión crítica: Restauración post-contención de ransomware",
-        "title_en": "Critical Rollback: Post-Ransomware Containment Restoration",
-        "description_es": (
-            "Rollback de máximo impacto: restaura conectividad de red de los segmentos aislados "
-            "por 'ransomware-destructive'. Requiere doble aprobación FOUR_EYES y original_execution_id."
-        ),
-        "description_en": (
-            "High-impact rollback: restores network to segments isolated by 'ransomware-destructive'. "
-            "Requires FOUR_EYES approval and original_execution_id."
-        ),
-        "mitre_codes": [],
-    },
 ]
+
+# Playbooks whose containment action can be reverted are NOT paired with a
+# separate "rollback playbook" in the catalog -- reverting a containment is an
+# operation performed *on a specific completed execution* of the containment
+# playbook itself (POST /playbook-executions/{id}/rollback), never a standalone
+# procedure an analyst could fire without the original containment context.
+#
+# Maps the containment playbook code -> the registered reverse action executed
+# against the original execution's own recorded inputs. Both reverse actions are
+# real and covered by tests (tests/unit/test_account_containment_actions.py,
+# tests/unit/test_host_isolation_actions.py).
+PLAYBOOK_ROLLBACK_ACTIONS: dict[str, str] = {
+    "compromised-account": "account.enable",
+    "privilege-escalation": "account.enable",
+    "compromised-endpoint": "host.restore",
+    "lateral-movement": "host.restore",
+    "ransomware-destructive": "host.restore",
+}
+
+# Catalog codes retired by the rollback refactor. Seeding retires any lingering
+# definition so tenants provisioned before the change stop listing them.
+RETIRED_PLAYBOOK_CODES: frozenset[str] = frozenset(
+    {
+        "compromised-account-rollback",
+        "privilege-escalation-rollback",
+        "compromised-endpoint-rollback",
+        "lateral-movement-rollback",
+        "ransomware-destructive-rollback",
+    }
+)
 
 PLAYBOOK_MITRE_COVERAGE: dict[str, list[str]] = {
     pb["code"]: list(pb.get("mitre_codes", []))  # type: ignore[arg-type]
     for pb in ESSENTIAL_NATIVE_PLAYBOOKS
-}
-
-# Maps a containment playbook to its audited rollback companion (see
-# ESSENTIAL_NATIVE_ACTIONS: account.disable/host.isolate -> account.enable/host.restore).
-# Static catalog metadata, not a fabricated live result: every target here is a real,
-# tested playbook (tests/unit/test_account_containment_actions.py,
-# tests/unit/test_host_isolation_actions.py) already present in ESSENTIAL_NATIVE_PLAYBOOKS.
-PLAYBOOK_ROLLBACK_TARGETS: dict[str, str] = {
-    "compromised-account": "compromised-account-rollback",
-    "privilege-escalation": "privilege-escalation-rollback",
-    "compromised-endpoint": "compromised-endpoint-rollback",
-    "lateral-movement": "lateral-movement-rollback",
-    "ransomware-destructive": "ransomware-destructive-rollback",
 }
 
 ESSENTIAL_NATIVE_ACTIONS: dict[str, str] = {
@@ -399,12 +345,6 @@ ESSENTIAL_NATIVE_ACTIONS: dict[str, str] = {
     "compromised-endpoint":          "host.isolate",
     "lateral-movement":              "host.isolate",
     "ransomware-destructive":        "host.isolate",
-    # ── Rollbacks companion (FOUR_EYES — nuevos playbooks) ───────────────────────
-    "compromised-account-rollback":      "account.enable",
-    "privilege-escalation-rollback":     "account.enable",
-    "compromised-endpoint-rollback":     "host.restore",
-    "lateral-movement-rollback":         "host.restore",
-    "ransomware-destructive-rollback":   "host.restore",
 }
 
 
@@ -427,12 +367,6 @@ IMPLEMENTED_REAL_PLAYBOOKS = {
     "closure-controlled-learning",
     "simulate-user-block",
     "request-dual-approval",
-    # Rollback companions
-    "compromised-account-rollback",
-    "privilege-escalation-rollback",
-    "compromised-endpoint-rollback",
-    "lateral-movement-rollback",
-    "ransomware-destructive-rollback",
 }
 
 SENSITIVE_KEY = re.compile(
@@ -462,11 +396,6 @@ PLAYBOOK_GOVERNANCE_TAXONOMY: dict[str, str] = {
     "lateral-movement": "FOUR_EYES",
     "security-control-disabled": "FOUR_EYES",
     # Rollbacks: siempre FOUR_EYES (re-apertura de acceso requiere doble aprobación)
-    "compromised-account-rollback": "FOUR_EYES",
-    "privilege-escalation-rollback": "FOUR_EYES",
-    "compromised-endpoint-rollback": "FOUR_EYES",
-    "lateral-movement-rollback": "FOUR_EYES",
-    "ransomware-destructive-rollback": "FOUR_EYES",
     # 👤 SINGLE: Notificaciones de incidentes críticos, tickets SecOps/ITSM y filtrado de IoCs
     "simulate-critical-incident-notification": "SINGLE",
     "escalation-notification": "SINGLE",
@@ -496,7 +425,10 @@ class PlaybookAdministrationService:
                 (
                     await session.scalars(
                         select(PlaybookDefinitionModel)
-                        .where(PlaybookDefinitionModel.tenant_id == tenant_id)
+                        .where(
+                            PlaybookDefinitionModel.tenant_id == tenant_id,
+                            PlaybookDefinitionModel.code.not_in(RETIRED_PLAYBOOK_CODES),
+                        )
                         .order_by(PlaybookDefinitionModel.created_at.desc())
                         .limit(limit)
                         .offset(offset)
@@ -506,7 +438,8 @@ class PlaybookAdministrationService:
             total = int(
                 await session.scalar(
                     select(func.count(PlaybookDefinitionModel.id)).where(
-                        PlaybookDefinitionModel.tenant_id == tenant_id
+                        PlaybookDefinitionModel.tenant_id == tenant_id,
+                        PlaybookDefinitionModel.code.not_in(RETIRED_PLAYBOOK_CODES),
                     )
                 )
                 or 0
@@ -578,6 +511,40 @@ class PlaybookAdministrationService:
                 action_binding.last_verified_at = datetime.now(UTC)
                 await session.flush()
 
+        await self._bind_wazuh_actions(session, tenant_id, tenant_user_id)
+
+        # Retire catalog entries removed from the product (rollback companions are
+        # now an operation on an execution, not standalone playbooks). Definitions
+        # are kept -- their executions are immutable history -- but their versions
+        # are RETIRED so nothing lists or dispatches them again.
+        retired = list(
+            (
+                await session.scalars(
+                    select(PlaybookDefinitionModel).where(
+                        PlaybookDefinitionModel.tenant_id == tenant_id,
+                        PlaybookDefinitionModel.code.in_(RETIRED_PLAYBOOK_CODES),
+                    )
+                )
+            ).all()
+        )
+        for definition in retired:
+            versions = list(
+                (
+                    await session.scalars(
+                        select(PlaybookVersionModel).where(
+                            PlaybookVersionModel.tenant_id == tenant_id,
+                            PlaybookVersionModel.definition_id == definition.id,
+                            PlaybookVersionModel.status != "RETIRED",
+                        )
+                    )
+                ).all()
+            )
+            for version in versions:
+                version.status = "RETIRED"
+                version.approved_at = None
+            if versions:
+                await session.flush()
+
         for pb in ESSENTIAL_NATIVE_PLAYBOOKS:
             code = cast(str, pb["code"])
             desired_approval_mode = PLAYBOOK_GOVERNANCE_TAXONOMY.get(code, "AUTOMATIC")
@@ -624,15 +591,34 @@ class PlaybookAdministrationService:
             )
             current_input_schema = resolve_schema("security/incident-notification-input-v1")
             current_result_schema = resolve_schema("security/incident-notification-result-v1")
-            
+            expected_action = ESSENTIAL_NATIVE_ACTIONS[code]
+
+            def matches_current_catalog(version: PlaybookVersionModel) -> bool:
+                """A seeded version is current only if it still runs the catalog's action.
+
+                Schema equality alone is not enough: when a playbook is remapped to
+                a different action (e.g. compromised-endpoint -> host.isolate), an
+                existing tenant would otherwise keep an older version that quietly
+                performs the previous action while reporting itself READY.
+                """
+                if version.classification != "LIVE":
+                    return False
+                if version.status not in {"DRAFT", "APPROVED"}:
+                    return False
+                if version.input_schema != current_input_schema:
+                    return False
+                if version.result_schema != current_result_schema:
+                    return False
+                steps = (version.portable_artifact or {}).get("steps") or []
+                actions = {
+                    step.get("action")
+                    for step in steps
+                    if isinstance(step, dict) and step.get("type") == "ACTION"
+                }
+                return actions == {expected_action}
+
             latest_version = None
-            if any(
-                version.classification == "LIVE"
-                and version.status in {"DRAFT", "APPROVED"}
-                and version.input_schema == current_input_schema
-                and version.result_schema == current_result_schema
-                for version in existing_versions
-            ):
+            if any(matches_current_catalog(version) for version in existing_versions):
                 latest_version = existing_versions[0]
                 if latest_version.status == "DRAFT":
                     latest_version.status = "APPROVED"
@@ -1404,11 +1390,88 @@ class PlaybookAdministrationService:
             )
             return self._action_binding_response(binding)
 
+    async def _bind_wazuh_actions(
+        self, session: AsyncSession, tenant_id: UUID, tenant_user_id: UUID
+    ) -> None:
+        """Bind host isolation to the tenant's own Wazuh connector once it is verified.
+
+        Host isolation is a first-party capability of this platform: it runs
+        through the same Wazuh manager the tenant already configured, so once
+        that connector has genuinely passed a health check there is nothing for
+        an operator to choose. Until it does, the binding is deliberately left
+        absent so the playbook reports precisely what is missing instead of
+        failing at dispatch time.
+        """
+        credential = await session.scalar(
+            select(IntegrationModel).where(
+                IntegrationModel.tenant_id == tenant_id,
+                IntegrationModel.connector_type == "WAZUH",
+                IntegrationModel.status == "active",
+                IntegrationModel.last_error_code.is_(None),
+                IntegrationModel.last_health_check_at.is_not(None),
+                IntegrationModel.configuration_schema_version
+                == CURRENT_CONFIGURATION_SCHEMA_VERSION,
+            )
+        )
+        for action_code in ("host.isolate", "host.restore"):
+            binding = await session.scalar(
+                select(NativeActionBindingModel).where(
+                    NativeActionBindingModel.tenant_id == tenant_id,
+                    NativeActionBindingModel.action_code == action_code,
+                    NativeActionBindingModel.action_version == "1.0.0",
+                )
+            )
+            if credential is None:
+                # Never leave a binding pointing at a connector that stopped
+                # being usable -- readiness must degrade with reality.
+                if binding is not None and binding.active:
+                    binding.active = False
+                    await session.flush()
+                continue
+            if binding is None:
+                session.add(
+                    NativeActionBindingModel(
+                        tenant_id=tenant_id,
+                        action_code=action_code,
+                        action_version="1.0.0",
+                        connector_type="WAZUH",
+                        credential_key_id=str(credential.id),
+                        configuration={},
+                        configuration_sha256=self._digest({}),
+                        active=True,
+                        created_by_user_id=tenant_user_id,
+                        last_verified_at=credential.last_health_check_at,
+                    )
+                )
+                await session.flush()
+            elif not binding.active or binding.credential_key_id != str(credential.id):
+                binding.active = True
+                binding.credential_key_id = str(credential.id)
+                binding.last_verified_at = credential.last_health_check_at
+                await session.flush()
+
     async def _native_actions_ready(
         self, session: AsyncSession, tenant_id: UUID, artifact: PortablePlaybookV1
     ) -> bool:
+        return not await self._native_action_blockers(session, tenant_id, artifact)
+
+    async def _native_action_blockers(
+        self, session: AsyncSession, tenant_id: UUID, artifact: PortablePlaybookV1
+    ) -> list[str]:
+        """Name exactly what each action still needs before it can run for real.
+
+        A single opaque "configuration required" tells an operator nothing about
+        which connector to set up, so every blocker carries the action it belongs
+        to (``ACTION_BINDING_MISSING:notification.send``).
+        """
+        blockers: list[str] = []
         for step in artifact.steps:
             if not isinstance(step, ActionStep):
+                continue
+            try:
+                connector = self.registry.get(step.action, step.action_version)
+            except ActionUnavailableError:
+                blockers.append(f"ACTION_UNAVAILABLE:{step.action}")
                 continue
             binding = await session.scalar(
                 select(NativeActionBindingModel).where(
@@ -1419,33 +1482,38 @@ class PlaybookAdministrationService:
                     NativeActionBindingModel.last_verified_at.is_not(None),
                 )
             )
-            if binding is None or binding.configuration_sha256 != self._digest(
-                binding.configuration
-            ):
-                return False
+            if binding is None:
+                blockers.append(f"ACTION_BINDING_MISSING:{step.action}")
+                continue
+            if binding.configuration_sha256 != self._digest(binding.configuration):
+                blockers.append(f"ACTION_CONFIGURATION_TAMPERED:{step.action}")
+                continue
+            if connector.describe().egress == "NONE":
+                continue
             try:
-                connector = self.registry.get(step.action, step.action_version)
-            except ActionUnavailableError:
-                return False
-            if connector.describe().egress != "NONE":
-                try:
-                    credential_id = UUID(binding.credential_key_id or "")
-                except ValueError:
-                    return False
-                credential_ready = await session.scalar(
-                    select(IntegrationModel.id).where(
-                        IntegrationModel.tenant_id == tenant_id,
-                        IntegrationModel.id == credential_id,
-                        IntegrationModel.status == "active",
-                        IntegrationModel.last_health_check_at.is_not(None),
-                        IntegrationModel.last_error_code.is_(None),
-                        IntegrationModel.configuration_schema_version
-                        == CURRENT_CONFIGURATION_SCHEMA_VERSION,
-                    )
+                credential_id = UUID(binding.credential_key_id or "")
+            except ValueError:
+                blockers.append(f"ACTION_CREDENTIAL_MISSING:{step.action}")
+                continue
+            credential = await session.scalar(
+                select(IntegrationModel).where(
+                    IntegrationModel.tenant_id == tenant_id,
+                    IntegrationModel.id == credential_id,
                 )
-                if credential_ready is None:
-                    return False
-        return True
+            )
+            if credential is None:
+                blockers.append(f"ACTION_CREDENTIAL_MISSING:{step.action}")
+            elif credential.status != "active":
+                blockers.append(f"ACTION_CREDENTIAL_DISABLED:{step.action}")
+            elif credential.configuration_schema_version != (
+                CURRENT_CONFIGURATION_SCHEMA_VERSION
+            ):
+                blockers.append(f"ACTION_CREDENTIAL_OUTDATED:{step.action}")
+            elif credential.last_error_code is not None:
+                blockers.append(f"ACTION_CREDENTIAL_FAILING:{step.action}")
+            elif credential.last_health_check_at is None:
+                blockers.append(f"ACTION_CREDENTIAL_UNVERIFIED:{step.action}")
+        return blockers
 
     def _version_errors(self, version: PlaybookVersionModel) -> list[str]:
         if version.workflow_code not in IMPLEMENTED_REAL_PLAYBOOKS:
@@ -1547,11 +1615,12 @@ class PlaybookAdministrationService:
         blocking_reasons: list[str] = []
         version_errors = self._version_errors(version)
         blocking_reasons.extend(version_errors)
-        actions_ready = (
-            artifact is not None
-            and not version_errors
-            and await self._native_actions_ready(session, item.tenant_id, artifact)
+        action_blockers = (
+            await self._native_action_blockers(session, item.tenant_id, artifact)
+            if artifact is not None and not version_errors
+            else []
         )
+        actions_ready = artifact is not None and not version_errors and not action_blockers
         if version.status != "APPROVED":
             blocking_reasons.append("PLAYBOOK_NOT_PUBLISHED")
         if binding is None:
@@ -1564,6 +1633,9 @@ class PlaybookAdministrationService:
             blocking_reasons.append("PLAYBOOK_BINDING_UNAVAILABLE")
         if not actions_ready:
             blocking_reasons.append("PLAYBOOK_CONFIGURATION_REQUIRED")
+            # Keep the generic marker (drives the readiness status) and add the
+            # specific, actionable detail so the operator knows what to configure.
+            blocking_reasons.extend(action_blockers)
         if not self.settings.playbook_live_enabled or not self.settings.playbook_dispatch_enabled:
             blocking_reasons.append("PLAYBOOK_LIVE_DISABLED")
         blocking_reasons = list(dict.fromkeys(blocking_reasons))
@@ -1602,8 +1674,8 @@ class PlaybookAdministrationService:
                 ),
                 "target_incident_types": [],
                 "mitre_codes": PLAYBOOK_MITRE_COVERAGE.get(item.code, []),
-                "rollback_supported": item.code in PLAYBOOK_ROLLBACK_TARGETS,
-                "rollback_target_code": PLAYBOOK_ROLLBACK_TARGETS.get(item.code),
+                "rollback_supported": item.code in PLAYBOOK_ROLLBACK_ACTIONS,
+                "rollback_action_code": PLAYBOOK_ROLLBACK_ACTIONS.get(item.code),
                 "rollback_guidance_i18n": None,
                 "automation_policy_i18n": None,
                 "approval_mode": getattr(item, "approval_mode", "AUTOMATIC") or "AUTOMATIC",

@@ -330,7 +330,7 @@ const playbookDefinitionSchema = z.object({
   target_incident_types: z.array(z.string()).default([]),
   mitre_codes: z.array(z.string()).default([]),
   rollback_supported: z.boolean().default(false),
-  rollback_target_code: z.string().nullable().default(null),
+  rollback_action_code: z.string().nullable().default(null),
   rollback_guidance_i18n: z.object({ es: z.string(), en: z.string() }).nullable().default(null),
   automation_policy_i18n: z.object({ es: z.string(), en: z.string() }).nullable().default(null),
   approval_mode: z.enum(["AUTOMATIC", "SINGLE", "FOUR_EYES"]).default("AUTOMATIC"),

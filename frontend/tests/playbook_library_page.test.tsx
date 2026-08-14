@@ -34,7 +34,7 @@ describe("native playbook library", () => {
           target_incident_types: [],
           mitre_codes: [],
           rollback_supported: false,
-          rollback_target_code: null,
+          rollback_action_code: null,
           rollback_guidance_i18n: null,
           automation_policy_i18n: null,
           approval_mode: "SINGLE",

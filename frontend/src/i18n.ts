@@ -486,7 +486,36 @@ const resources = {
       rollbackSupported: "Rollback habilitado",
       rollbackUnavailable: "No existe un procedimiento de reversión publicado para esta versión.",
       rollbackGuidanceUnavailable: "La guía de reversión no fue publicada.",
+      rollbackOnExecution:
+        "La reversión se aplica sobre una ejecución concreta de este playbook, no como un procedimiento aparte: ejecuta la acción «{{action}}» contra los mismos objetivos que este playbook contuvo.",
       policyNotSpecified: "No hay una política publicada para esta versión.",
+      blockingReasonsTitle: "Falta completar para poder ejecutarlo:",
+      blockingReasons: {
+        PLAYBOOK_CONFIGURATION_REQUIRED:
+          "Configuración incompleta: revisá el detalle debajo.",
+        PLAYBOOK_NOT_PUBLISHED: "La versión todavía no fue publicada.",
+        PLAYBOOK_BINDING_UNAVAILABLE:
+          "El motor de ejecución no está vinculado o no está sincronizado.",
+        PLAYBOOK_LIVE_DISABLED:
+          "La ejecución real está desactivada en la configuración de la plataforma.",
+        PLAYBOOK_ACTION_UNAVAILABLE:
+          "Este playbook no tiene una acción real implementada.",
+        ACTION_UNAVAILABLE: "La acción «{{action}}» no está registrada.",
+        ACTION_BINDING_MISSING:
+          "Falta configurar la acción «{{action}}» (Configurar → parámetros).",
+        ACTION_CONFIGURATION_TAMPERED:
+          "La configuración de «{{action}}» no coincide con su firma; volvé a guardarla.",
+        ACTION_CREDENTIAL_MISSING:
+          "«{{action}}» necesita una credencial de producción todavía no asignada.",
+        ACTION_CREDENTIAL_DISABLED:
+          "La credencial de «{{action}}» está deshabilitada.",
+        ACTION_CREDENTIAL_OUTDATED:
+          "La credencial de «{{action}}» usa un esquema viejo; volvé a guardarla.",
+        ACTION_CREDENTIAL_FAILING:
+          "La última verificación de la credencial de «{{action}}» falló.",
+        ACTION_CREDENTIAL_UNVERIFIED:
+          "La credencial de «{{action}}» nunca superó una prueba de conexión.",
+      },
       credentialAliases: "Aliases de credenciales",
       noCredentialAliases: "Esta versión no declara aliases de credenciales.",
       scopeNotSpecified: "El alcance por tipo de incidente no está especificado.",
@@ -1055,7 +1084,33 @@ const resources = {
       rollbackSupported: "Rollback enabled",
       rollbackUnavailable: "No reversal procedure is published for this version.",
       rollbackGuidanceUnavailable: "Rollback guidance has not been published.",
+      rollbackOnExecution:
+        "Rollback applies to a specific execution of this playbook, not as a separate procedure: it runs the «{{action}}» action against the same targets this playbook contained.",
       policyNotSpecified: "No automation policy is published for this version.",
+      blockingReasonsTitle: "Complete these before it can run:",
+      blockingReasons: {
+        PLAYBOOK_CONFIGURATION_REQUIRED: "Configuration incomplete: see the detail below.",
+        PLAYBOOK_NOT_PUBLISHED: "This version has not been published yet.",
+        PLAYBOOK_BINDING_UNAVAILABLE:
+          "The execution engine is not bound or is out of sync.",
+        PLAYBOOK_LIVE_DISABLED:
+          "Real execution is switched off in the platform configuration.",
+        PLAYBOOK_ACTION_UNAVAILABLE: "This playbook has no real action implemented.",
+        ACTION_UNAVAILABLE: "The «{{action}}» action is not registered.",
+        ACTION_BINDING_MISSING:
+          "The «{{action}}» action still needs to be configured (Configure → parameters).",
+        ACTION_CONFIGURATION_TAMPERED:
+          "The «{{action}}» configuration does not match its signature; save it again.",
+        ACTION_CREDENTIAL_MISSING:
+          "«{{action}}» needs a production credential that has not been assigned yet.",
+        ACTION_CREDENTIAL_DISABLED: "The «{{action}}» credential is disabled.",
+        ACTION_CREDENTIAL_OUTDATED:
+          "The «{{action}}» credential uses an outdated schema; save it again.",
+        ACTION_CREDENTIAL_FAILING:
+          "The last health check for the «{{action}}» credential failed.",
+        ACTION_CREDENTIAL_UNVERIFIED:
+          "The «{{action}}» credential has never passed a connection test.",
+      },
       credentialAliases: "Credential aliases",
       noCredentialAliases: "This version declares no credential aliases.",
       scopeNotSpecified: "Incident-type scope is not specified.",

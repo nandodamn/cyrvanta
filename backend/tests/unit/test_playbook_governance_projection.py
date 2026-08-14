@@ -34,7 +34,7 @@ def test_definition_projection_has_no_fabricated_readiness_defaults() -> None:
     """
     Live/derived readiness signals (binding + credential health, execution history)
     must never be fabricated. Static catalog metadata (MITRE coverage, rollback
-    companions) is allowed to be non-empty *only* when sourced from the reviewed,
+    capability) is allowed to be non-empty *only* when sourced from the reviewed,
     tested ESSENTIAL_NATIVE_PLAYBOOKS catalog via a named lookup table -- never
     invented ad hoc in the projection itself (e.g. via string formatting a code).
     """
@@ -58,8 +58,8 @@ def test_definition_projection_has_no_fabricated_readiness_defaults() -> None:
     assert '"automation_policy_i18n": None' in projection
     assert 'else "PENDING"' in projection
     assert "else False" in projection
-    assert '"rollback_supported": item.code in PLAYBOOK_ROLLBACK_TARGETS' in projection
-    assert '"rollback_target_code": PLAYBOOK_ROLLBACK_TARGETS.get(item.code)' in projection
+    assert '"rollback_supported": item.code in PLAYBOOK_ROLLBACK_ACTIONS' in projection
+    assert '"rollback_action_code": PLAYBOOK_ROLLBACK_ACTIONS.get(item.code)' in projection
     assert 'f"rollback-{item.code}"' not in projection
 
     # Both lookup tables must be sourced from the reviewed catalog, not fabricated.
@@ -68,10 +68,33 @@ def test_definition_projection_has_no_fabricated_readiness_defaults() -> None:
         '    pb["code"]: list(pb.get("mitre_codes", []))'
     ) in source
     assert "for pb in ESSENTIAL_NATIVE_PLAYBOOKS" in source
-    rollback_targets = source.split("PLAYBOOK_ROLLBACK_TARGETS: dict[str, str] = {", maxsplit=1)[
+    rollback_actions = source.split("PLAYBOOK_ROLLBACK_ACTIONS: dict[str, str] = {", maxsplit=1)[
         1
     ].split("}", maxsplit=1)[0]
+    # Every rollback target must be a registered reverse ACTION, never another
+    # catalog playbook -- reverting is an operation on an execution.
     for code in ("compromised-account", "compromised-endpoint", "lateral-movement",
                  "privilege-escalation", "ransomware-destructive"):
-        assert f'"{code}"' in rollback_targets
-        assert f'"{code}-rollback"' in rollback_targets
+        assert f'"{code}"' in rollback_actions
+        assert f'"{code}-rollback"' not in rollback_actions
+    for reverse_action in ("account.enable", "host.restore"):
+        assert f'"{reverse_action}"' in rollback_actions
+
+
+def test_rollback_companions_are_not_catalog_playbooks() -> None:
+    """A rollback must never be listable/dispatchable as a standalone procedure."""
+    from cyrvanta.modules.playbooks.application.administration_service import (
+        ESSENTIAL_NATIVE_ACTIONS,
+        ESSENTIAL_NATIVE_PLAYBOOKS,
+        IMPLEMENTED_REAL_PLAYBOOKS,
+        PLAYBOOK_ROLLBACK_ACTIONS,
+        RETIRED_PLAYBOOK_CODES,
+    )
+
+    catalog_codes = {str(item["code"]) for item in ESSENTIAL_NATIVE_PLAYBOOKS}
+    assert not any(code.endswith("-rollback") for code in catalog_codes)
+    assert not any(code.endswith("-rollback") for code in ESSENTIAL_NATIVE_ACTIONS)
+    assert not any(code.endswith("-rollback") for code in IMPLEMENTED_REAL_PLAYBOOKS)
+    assert RETIRED_PLAYBOOK_CODES.isdisjoint(catalog_codes)
+    # Every playbook advertising rollback is itself a real catalog playbook.
+    assert set(PLAYBOOK_ROLLBACK_ACTIONS).issubset(catalog_codes)

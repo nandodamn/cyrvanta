@@ -136,6 +136,31 @@ async def get_execution(execution_id: UUID, context: ExecutionReader) -> Playboo
 
 
 @router.post(
+    "/playbook-executions/{execution_id}/rollback",
+    response_model=PlaybookExecutionResponse,
+)
+async def rollback_execution(
+    execution_id: UUID,
+    request: Request,
+    context: ExecutionRunner,
+) -> PlaybookExecutionResponse:
+    """Revert the containment applied by one succeeded execution.
+
+    Rollback is scoped to an execution, never a standalone playbook: the reverse
+    action runs against that execution's own recorded targets.
+    """
+    try:
+        return await PlaybookExecutionService().rollback(
+            tenant_id=context.tenant_id,
+            actor_user_id=context.user_id,
+            execution_id=execution_id,
+            correlation_id=UUID(request.state.correlation_id),
+        )
+    except (PlaybookConflict, PlaybookNotFound, ValueError) as exc:
+        raise _translate(exc) from exc
+
+
+@router.post(
     "/playbook-executions/{execution_id}/cancel",
     response_model=PlaybookExecutionResponse,
 )

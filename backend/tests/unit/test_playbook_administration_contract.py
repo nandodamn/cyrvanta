@@ -151,7 +151,7 @@ def test_toggle_binding_payload_and_definition_metadata() -> None:
             "target_incident_types": ["credential-access"],
             "mitre_codes": ["T1110", "T1078"],
             "rollback_supported": True,
-            "rollback_target_code": "simulate-user-unblock",
+            "rollback_action_code": "account.enable",
             "rollback_guidance_i18n": {"es": "Desbloquea al usuario.", "en": "Unblocks user."},
             "automation_policy_i18n": {
                 "es": "Aprobación obligatoria.",
@@ -162,7 +162,7 @@ def test_toggle_binding_payload_and_definition_metadata() -> None:
     assert definition.target_incident_types == ["credential-access"]
     assert definition.mitre_codes == ["T1110", "T1078"]
     assert definition.rollback_supported is True
-    assert definition.rollback_target_code == "simulate-user-unblock"
+    assert definition.rollback_action_code == "account.enable"
     assert definition.rollback_guidance_i18n.es == "Desbloquea al usuario."
     assert definition.automation_policy_i18n.en == "Mandatory approval."
 
@@ -176,9 +176,13 @@ def test_catalog_schema_upgrade_creates_one_audited_immutable_successor() -> Non
     )
 
     source = inspect.getsource(PlaybookAdministrationService._ensure_essential_definitions_seeded)
-    assert "version.input_schema == current_input_schema" in source
-    assert "version.result_schema == current_result_schema" in source
-    assert 'version.classification == "LIVE"' in source
-    assert 'version.status in {"DRAFT", "APPROVED"}' in source
+    assert "version.input_schema != current_input_schema" in source
+    assert "version.result_schema != current_result_schema" in source
+    assert 'version.classification != "LIVE"' in source
+    assert 'version.status not in {"DRAFT", "APPROVED"}' in source
     assert '"playbook.version.catalog_seeded"' in source
     assert '"schema_upgrade" if existing_versions else "initial_seed"' in source
+    # A remapped action must also supersede the tenant's seeded version, or an
+    # existing tenant would keep running the previous action while reporting READY.
+    assert "expected_action = ESSENTIAL_NATIVE_ACTIONS[code]" in source
+    assert "return actions == {expected_action}" in source

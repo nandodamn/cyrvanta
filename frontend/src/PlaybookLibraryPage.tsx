@@ -15,6 +15,20 @@ import "./playbook-library.css";
 import { PlaybookDetailsModal } from "./PlaybookDetailsModal";
 import { PlaybookConfigurationModal } from "./PlaybookConfigurationModal";
 
+/**
+ * Blocking reasons arrive either as a bare code ("PLAYBOOK_NOT_PUBLISHED") or
+ * scoped to the action that needs setting up ("ACTION_CREDENTIAL_MISSING:ticket.create").
+ * Show the operator what to fix, falling back to the raw code so a new backend
+ * reason is never silently swallowed.
+ */
+function describeBlockingReason(
+  reason: string,
+  t: ReturnType<typeof useTranslation>["t"],
+): string {
+  const [code, action] = reason.split(":");
+  return t(`blockingReasons.${code}`, { defaultValue: reason, action: action ?? "" });
+}
+
 export function PlaybookLibraryPage() {
   const { t, i18n } = useTranslation();
   const queryClient = useQueryClient();
@@ -400,9 +414,11 @@ export function PlaybookLibraryPage() {
                 </div>
                 {playbook.blocking_reasons.length > 0 && (
                   <div className="security-note" role="status">
-                    <strong>Deshabilitado hasta completar:</strong>
+                    <strong>{t("blockingReasonsTitle")}</strong>
                     <ul>
-                      {playbook.blocking_reasons.map((reason) => <li key={reason}>{reason}</li>)}
+                      {playbook.blocking_reasons.map((reason) => (
+                        <li key={reason}>{describeBlockingReason(reason, t)}</li>
+                      ))}
                     </ul>
                   </div>
                 )}

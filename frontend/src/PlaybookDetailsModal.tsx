@@ -65,7 +65,9 @@ export function PlaybookDetailsModal({ playbook, onClose }: PlaybookDetailsModal
     ? english
       ? playbook.rollback_guidance_i18n.en
       : playbook.rollback_guidance_i18n.es
-    : t("rollbackGuidanceUnavailable");
+    : playbook.rollback_action_code
+      ? t("rollbackOnExecution", { action: playbook.rollback_action_code })
+      : t("rollbackGuidanceUnavailable");
   const lastExecutedAt = playbook.last_executed_at
     ? new Intl.DateTimeFormat(i18n.language, {
         dateStyle: "medium",

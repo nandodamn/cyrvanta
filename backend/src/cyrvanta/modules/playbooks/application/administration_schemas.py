@@ -42,7 +42,9 @@ class DefinitionResponse(StrictModel):
     target_incident_types: list[str] = Field(default_factory=list)
     mitre_codes: list[str] = Field(default_factory=list)
     rollback_supported: bool = False
-    rollback_target_code: str | None = None
+    # Registered reverse action (e.g. account.enable) applied to a completed
+    # execution of this playbook -- not a separate catalog playbook.
+    rollback_action_code: str | None = None
     rollback_guidance_i18n: LocalizedDescription | None = None
     automation_policy_i18n: LocalizedDescription | None = None
     approval_mode: Literal["AUTOMATIC", "SINGLE", "FOUR_EYES"] = "AUTOMATIC"

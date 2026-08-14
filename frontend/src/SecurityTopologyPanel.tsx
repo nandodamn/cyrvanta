@@ -191,6 +191,13 @@ export function SecurityTopologyPanel() {
                   <text x="695" y="50" fill="var(--muted)" fontSize="9">
                     {i18n.language.startsWith("es") ? "Servidores consolidados, servicios y LAN" : "Consolidated hosts, services and LAN"}
                   </text>
+                  {assetNodes.length === 0 && (
+                    <text x="695" y="80" fill="var(--muted)" fontSize="9.5">
+                      {i18n.language.startsWith("es")
+                        ? "Ningún activo monitorizado está reportando."
+                        : "No monitored asset is reporting."}
+                    </text>
+                  )}
                 </g>
 
                 {/* Directional Data Flow Lines */}
@@ -263,7 +270,8 @@ export function SecurityTopologyPanel() {
                       {n.name.length > 32 ? n.name.slice(0, 30) + "..." : n.name}
                     </text>
                     <text x="28" y="42" fill="var(--muted)" fontSize="9.5">
-                      🛡️ {n.ip_address} • ⚡ {n.latency_ms}ms
+                      🛡️ {n.ip_address}
+                      {typeof n.latency_ms === "number" ? ` • ⚡ ${n.latency_ms}ms` : ""}
                     </text>
                     <text x="28" y="53" fill="var(--accent)" fontSize="8.5">
                       {n.services && n.services.length > 0 ? `⚙️ ${n.services.map((s) => s.name).join(" | ")}` : "Core Service"}
@@ -271,35 +279,10 @@ export function SecurityTopologyPanel() {
                   </g>
                 ))}
 
-                {/* ZONE 3: Monitored Protected Assets (Right - Consolidated Hosts) */}
-                {(assetNodes.length > 0
-                  ? assetNodes
-                  : [
-                      {
-                        id: "lab-server-01",
-                        name: "SRV-APP-PROD-01",
-                        type: "SERVER",
-                        category: "MONITORED_ASSET",
-                        ip_address: "10.0.1.60",
-                        ip_addresses: ["10.0.1.60", "192.168.10.60"],
-                        status: "ONLINE",
-                        services: [
-                          { name: "Web (:443)", port: 443 },
-                          { name: "API (:8080)", port: 8080 },
-                        ],
-                      },
-                      {
-                        id: "lab-workstation-01",
-                        name: "WKSTN-ADMIN-01",
-                        type: "ENDPOINT",
-                        category: "MONITORED_ASSET",
-                        ip_address: "10.0.2.15",
-                        ip_addresses: ["10.0.2.15"],
-                        status: "ONLINE",
-                        services: [{ name: "Workstation" }],
-                      },
-                    ]
-                )
+                {/* ZONE 3: Monitored Protected Assets (Right - Consolidated Hosts).
+                    Only assets the platform actually sees are drawn; when none
+                    report, the zone stays empty rather than showing example hosts. */}
+                {assetNodes
                   .slice(0, 3)
                   .map((n: any, i) => {
                     const isWarn = n.status === "WARNING" || (n.active_alerts_count && n.active_alerts_count > 0);

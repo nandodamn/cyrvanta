@@ -89,7 +89,9 @@ class TopologyNode(BaseModel):
     services: list[TopologyNodeService] = []
     subnet: str
     status: Literal["ONLINE", "WARNING", "OFFLINE"]
-    latency_ms: int
+    # None when this node's round trip was not measured (e.g. an agent reported
+    # by the manager rather than probed from here). Never a fabricated number.
+    latency_ms: int | None = None
     last_ping: str
     active_alerts_count: int = 0
     active_alerts: list[TopologyNodeAlert] = []

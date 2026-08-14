@@ -1,12 +1,21 @@
 from __future__ import annotations
 
-import re
+import asyncio
+import socket
+import time
 from datetime import UTC, datetime
+from urllib.parse import urlsplit
 from uuid import UUID
 
-from sqlalchemy import desc, select
+import httpx
+from sqlalchemy import desc, select, text
+from sqlalchemy.exc import SQLAlchemyError
 
-from cyrvanta.modules.incident.infrastructure.models import AlertReferenceModel, IncidentModel
+from cyrvanta.modules.incident.infrastructure.models import AlertReferenceModel
+from cyrvanta.modules.integrations.application.connection_service import (
+    IntegrationConfigurationError,
+    IntegrationConnectionService,
+)
 from cyrvanta.modules.integrations.infrastructure.models import IntegrationModel
 from cyrvanta.modules.operations.application.schemas import (
     NetworkTopologyResponse,
@@ -15,474 +24,576 @@ from cyrvanta.modules.operations.application.schemas import (
     TopologyNodeAlert,
     TopologyNodeService,
 )
-from cyrvanta.shared.database import tenant_session
+from cyrvanta.shared.config import Settings, get_settings
+from cyrvanta.shared.database import SessionFactory, tenant_session
+
+_PROBE_TIMEOUT_SECONDS = 3.0
+_VALID_SEVERITIES = ("critical", "high", "medium", "low", "informational")
+
+
+class _Probe:
+    """Result of a real reachability check against one dependency."""
+
+    __slots__ = ("reachable", "latency_ms", "address", "detail")
+
+    def __init__(
+        self,
+        *,
+        reachable: bool,
+        latency_ms: int | None,
+        address: str | None,
+        detail: str,
+    ) -> None:
+        self.reachable = reachable
+        self.latency_ms = latency_ms
+        self.address = address
+        self.detail = detail
+
+
+async def _resolve(host: str) -> str | None:
+    """Resolve a hostname to its real address, or None when it does not resolve."""
+    try:
+        infos = await asyncio.get_running_loop().getaddrinfo(
+            host, None, family=socket.AF_INET, type=socket.SOCK_STREAM
+        )
+    except (socket.gaierror, OSError):
+        return None
+    return infos[0][4][0] if infos else None
+
+
+async def _probe_tcp(host: str, port: int) -> _Probe:
+    """Open a real TCP connection and measure the real round trip."""
+    address = await _resolve(host)
+    started = time.perf_counter()
+    try:
+        _, writer = await asyncio.wait_for(
+            asyncio.open_connection(host, port), timeout=_PROBE_TIMEOUT_SECONDS
+        )
+    except (TimeoutError, OSError):
+        return _Probe(
+            reachable=False, latency_ms=None, address=address, detail="unreachable"
+        )
+    latency_ms = max(1, round((time.perf_counter() - started) * 1000))
+    writer.close()
+    try:
+        await writer.wait_closed()
+    except OSError:
+        pass
+    return _Probe(
+        reachable=True, latency_ms=latency_ms, address=address, detail=f"tcp/{port}"
+    )
+
+
+async def _probe_http(url: str) -> _Probe:
+    """Issue a real HTTP request and measure the real round trip."""
+    parsed = urlsplit(url)
+    host = parsed.hostname or ""
+    address = await _resolve(host) if host else None
+    started = time.perf_counter()
+    try:
+        async with httpx.AsyncClient(timeout=_PROBE_TIMEOUT_SECONDS, verify=True) as client:
+            response = await client.get(url)
+    except httpx.HTTPError:
+        return _Probe(
+            reachable=False, latency_ms=None, address=address, detail="unreachable"
+        )
+    latency_ms = max(1, round((time.perf_counter() - started) * 1000))
+    return _Probe(
+        reachable=response.is_success,
+        latency_ms=latency_ms,
+        address=address,
+        detail=f"HTTP {response.status_code}",
+    )
+
+
+async def _probe_database() -> _Probe:
+    """Run a real query on the application's own pool and measure it."""
+    settings = get_settings()
+    host = urlsplit(settings.database_url).hostname or "postgres"
+    address = await _resolve(host)
+    started = time.perf_counter()
+    try:
+        async with SessionFactory() as session:
+            await asyncio.wait_for(
+                session.execute(text("SELECT 1")), timeout=_PROBE_TIMEOUT_SECONDS
+            )
+    except (TimeoutError, SQLAlchemyError, OSError):
+        return _Probe(
+            reachable=False, latency_ms=None, address=address, detail="query failed"
+        )
+    latency_ms = max(1, round((time.perf_counter() - started) * 1000))
+    return _Probe(
+        reachable=True, latency_ms=latency_ms, address=address, detail="SELECT 1"
+    )
+
+
+def _subnet_of(address: str | None) -> str:
+    if not address:
+        return "unresolved"
+    octets = address.split(".")
+    if len(octets) != 4:
+        return "unresolved"
+    return f"{'.'.join(octets[:3])}.0/24"
 
 
 class NetworkTopologyService:
+    """Live view of what is actually connected to Cyrvanta, and of Cyrvanta itself.
+
+    Every node, address, latency and status in this projection comes from a real
+    measurement taken when the request is served:
+
+    * Cyrvanta's own dependencies are resolved by DNS and probed over TCP/HTTP.
+    * Monitored assets are the agents the Wazuh manager actually reports.
+    * Security feeds are the tenant's configured integration rows.
+
+    Nothing is invented: an unresolved address reads "unresolved", an unmeasured
+    latency stays ``None``, and a dependency that does not answer is ``OFFLINE``.
+    A host this platform cannot see does not appear at all.
+    """
+
+    def __init__(self, settings: Settings | None = None) -> None:
+        self.settings = settings or get_settings()
+
     async def get_topology(self, tenant_id: UUID) -> NetworkTopologyResponse:
         now_iso = datetime.now(UTC).isoformat()
+        core_nodes = await self._core_nodes(now_iso)
+        feed_nodes, wazuh_configured = await self._feed_nodes(tenant_id, now_iso)
+        asset_nodes = await self._monitored_assets(tenant_id, now_iso)
+        await self._annotate_alerts(tenant_id, asset_nodes, now_iso)
 
-        # Core Cyrvanta Platform Nodes (CYRVANTA_CORE)
-        nodes_dict: dict[str, TopologyNode] = {
-            "gw-01": TopologyNode(
-                id="gw-01",
-                name="Cyrvanta API Gateway & Reverse Proxy",
-                type="GATEWAY",
-                category="CYRVANTA_CORE",
-                ip_address="10.0.0.1",
-                ip_addresses=["10.0.0.1"],
-                services=[
-                    TopologyNodeService(name="HTTPS Ingress API", port=443, protocol="HTTPS", status="ONLINE"),
-                    TopologyNodeService(name="Web Console UI", port=80, protocol="HTTP", status="ONLINE"),
-                ],
-                subnet="10.0.0.0/24 DMZ",
-                status="ONLINE",
-                latency_ms=2,
-                last_ping=now_iso,
-                active_alerts_count=0,
-                active_alerts=[],
-                role_description_es="Gateway perimetral y terminación SSL/TLS segura de Cyrvanta",
-                role_description_en="Cyrvanta perimeter ingress gateway and SSL/TLS proxy",
-            ),
-            "db-01": TopologyNode(
-                id="db-01",
-                name="PostgreSQL Core Database (RLS)",
-                type="DATABASE",
-                category="CYRVANTA_CORE",
-                ip_address="10.0.1.20",
-                ip_addresses=["10.0.1.20"],
-                services=[
-                    TopologyNodeService(name="PostgreSQL Storage Engine", port=5432, protocol="PostgreSQL", status="ONLINE")
-                ],
-                subnet="10.0.1.0/24 Data",
-                status="ONLINE",
-                latency_ms=1,
-                last_ping=now_iso,
-                active_alerts_count=0,
-                active_alerts=[],
-                role_description_es="Almacenamiento relacional transaccional con aislamiento RLS",
-                role_description_en="Relational transactional storage with Row-Level Security isolation",
-            ),
-            "telemetry-01": TopologyNode(
-                id="telemetry-01",
-                name="OpenSearch Telemetry Cluster",
-                type="SERVER",
-                category="CYRVANTA_CORE",
-                ip_address="10.0.1.30",
-                ip_addresses=["10.0.1.30"],
-                services=[
-                    TopologyNodeService(name="OpenSearch REST Indexer", port=9200, protocol="HTTPS", status="ONLINE")
-                ],
-                subnet="10.0.1.0/24 Telemetry",
-                status="ONLINE",
-                latency_ms=4,
-                last_ping=now_iso,
-                active_alerts_count=0,
-                active_alerts=[],
-                role_description_es="Indexador de telemetría masiva y almacén de evidencias",
-                role_description_en="High-volume telemetry and evidence indexer",
-            ),
-            "broker-01": TopologyNode(
-                id="broker-01",
-                name="RabbitMQ Event Broker",
-                type="SERVER",
-                category="CYRVANTA_CORE",
-                ip_address="10.0.1.40",
-                ip_addresses=["10.0.1.40"],
-                services=[
-                    TopologyNodeService(name="AMQP Message Broker", port=5672, protocol="AMQP", status="ONLINE")
-                ],
-                subnet="10.0.1.0/24 MessageBus",
-                status="ONLINE",
-                latency_ms=3,
-                last_ping=now_iso,
-                active_alerts_count=0,
-                active_alerts=[],
-                role_description_es="Broker de mensajería asíncrona de eventos SOC",
-                role_description_en="Asynchronous message broker for SOC events",
-            ),
-            "soar-01": TopologyNode(
-                id="soar-01",
-                name="n8n Automation Engine",
-                type="SERVER",
-                category="CYRVANTA_CORE",
-                ip_address="10.0.1.50",
-                ip_addresses=["10.0.1.50"],
-                services=[
-                    TopologyNodeService(name="Playbook Webhook & Runner", port=5678, protocol="HTTP", status="ONLINE")
-                ],
-                subnet="10.0.1.0/24 Automation",
-                status="ONLINE",
-                latency_ms=6,
-                last_ping=now_iso,
-                active_alerts_count=0,
-                active_alerts=[],
-                role_description_es="Motor de orquestación y flujos de respuesta automatizada",
-                role_description_en="Playbook orchestration and automation response engine",
-            ),
-            "ai-01": TopologyNode(
-                id="ai-01",
-                name="Cyrvanta AI & Correlation Engine",
-                type="SERVER",
-                category="CYRVANTA_CORE",
-                ip_address="10.0.1.55",
-                ip_addresses=["10.0.1.55"],
-                services=[
-                    TopologyNodeService(name="Gemma 4 / Ollama Inference", port=11434, protocol="HTTP", status="ONLINE"),
-                    TopologyNodeService(name="Correlation Worker", status="ONLINE"),
-                ],
-                subnet="10.0.1.0/24 AI-Engine",
-                status="ONLINE",
-                latency_ms=3,
-                last_ping=now_iso,
-                active_alerts_count=0,
-                active_alerts=[],
-                role_description_es="Motor de correlación y análisis asistido por IA (Gemma 4)",
-                role_description_en="AI-assisted correlation and analysis engine (Gemma 4)",
-            ),
-            # Security Detection & Feed Nodes (SECURITY_FEED)
-            "siem-01": TopologyNode(
-                id="siem-01",
-                name="Wazuh SIEM & HIDS Manager",
-                type="SIEM",
-                category="SECURITY_FEED",
-                ip_address="10.0.1.10",
-                ip_addresses=["10.0.1.10"],
-                services=[
-                    TopologyNodeService(name="Wazuh Agent Listener", port=1514, protocol="TCP/TLS", status="ONLINE"),
-                    TopologyNodeService(name="Wazuh REST API", port=55000, protocol="HTTPS", status="ONLINE"),
-                ],
-                subnet="10.0.1.0/24 SecOps",
-                status="ONLINE",
-                latency_ms=5,
-                last_ping=now_iso,
-                active_alerts_count=0,
-                active_alerts=[],
-                role_description_es="Gestor central de eventos de seguridad y agentes de endpoints",
-                role_description_en="Central security event manager and endpoint agent coordinator",
-            ),
-            # Protected Tenant Workloads & Nodes (MONITORED_ASSET)
-            "lab-server-01": TopologyNode(
-                id="lab-server-01",
-                name="SRV-APP-PROD-01 (Application Host)",
-                type="SERVER",
-                category="MONITORED_ASSET",
-                ip_address="10.0.1.60",
-                ip_addresses=["10.0.1.60", "192.168.10.60"],
-                services=[
-                    TopologyNodeService(name="Web ERP Portal", port=443, protocol="HTTPS", ip_address="10.0.1.60", status="ONLINE"),
-                    TopologyNodeService(name="Internal API Backend", port=8080, protocol="HTTP", ip_address="192.168.10.60", status="ONLINE"),
-                    TopologyNodeService(name="SSH Management Daemon", port=22, protocol="TCP", ip_address="10.0.1.60", status="ONLINE"),
-                ],
-                subnet="10.0.1.0/24 Production Servers",
-                status="ONLINE",
-                latency_ms=3,
-                last_ping=now_iso,
-                active_alerts_count=0,
-                active_alerts=[],
-                os_info="Ubuntu Linux 22.04 LTS",
-                monitored_by=["Wazuh Agent #014"],
-                role_description_es="Servidor de aplicaciones consolidado con múltiples IPs y servicios",
-                role_description_en="Consolidated application server with multiple IPs and services",
-            ),
-            "lab-workstation-01": TopologyNode(
-                id="lab-workstation-01",
-                name="WKSTN-ADMIN-01",
-                type="ENDPOINT",
-                category="MONITORED_ASSET",
-                ip_address="10.0.2.15",
-                ip_addresses=["10.0.2.15"],
-                services=[
-                    TopologyNodeService(name="Management Workstation Service", status="ONLINE")
-                ],
-                subnet="10.0.2.0/24 Workstations LAN",
-                status="ONLINE",
-                latency_ms=2,
-                last_ping=now_iso,
-                active_alerts_count=0,
-                active_alerts=[],
-                os_info="Windows 11 Enterprise",
-                monitored_by=["Wazuh Agent #015", "Microsoft Defender"],
-                role_description_es="Estación de trabajo administrativa monitorizada",
-                role_description_en="Monitored administrative workstation endpoint",
-            ),
-        }
+        nodes = [*core_nodes.values(), *feed_nodes.values(), *asset_nodes.values()]
+        edges = self._edges(core_nodes, feed_nodes, asset_nodes, wazuh_configured)
+        return NetworkTopologyResponse(
+            tenant_id=tenant_id, nodes=nodes, edges=edges, updated_at=now_iso
+        )
 
-        # Query configured integrations for this tenant
-        try:
-            async with tenant_session(tenant_id) as session:
-                integrations = list(
-                    (
-                        await session.scalars(
-                            select(IntegrationModel)
-                            .where(IntegrationModel.tenant_id == tenant_id)
-                            .order_by(IntegrationModel.name)
-                        )
-                    ).all()
-                )
+    # ── Cyrvanta itself ────────────────────────────────────────────────────────
 
-                # Map core stack integrations to base nodes to keep topology unified and updated
-                mapped_core_types = {
-                    "WAZUH": "siem-01",
-                    "OPENSEARCH": "telemetry-01",
-                    "N8N": "soar-01",
-                }
+    async def _core_nodes(self, now_iso: str) -> dict[str, TopologyNode]:
+        """Probe each dependency this backend is actually configured to use."""
+        database = urlsplit(self.settings.database_url)
+        redis = urlsplit(self.settings.redis_url)
+        rabbit = urlsplit(self.settings.rabbitmq_url)
 
-                for integ in integrations:
-                    status = "ONLINE" if integ.status in ("active", "healthy") else "WARNING" if integ.status == "pending_verification" else "OFFLINE"
-                    target_base_node = mapped_core_types.get(integ.connector_type)
-
-                    if target_base_node and target_base_node in nodes_dict:
-                        # Enrich existing stack node with real tenant integration state
-                        existing_node = nodes_dict[target_base_node]
-                        nodes_dict[target_base_node] = TopologyNode(
-                            id=existing_node.id,
-                            name=integ.name,
-                            type=existing_node.type,
-                            category=existing_node.category,
-                            ip_address=existing_node.ip_address,
-                            ip_addresses=existing_node.ip_addresses,
-                            services=existing_node.services,
-                            subnet=existing_node.subnet,
-                            status=status,
-                            latency_ms=existing_node.latency_ms,
-                            last_ping=integ.last_health_check_at.isoformat() if integ.last_health_check_at else now_iso,
-                            active_alerts_count=existing_node.active_alerts_count,
-                            active_alerts=existing_node.active_alerts,
-                            os_info=existing_node.os_info,
-                            monitored_by=existing_node.monitored_by,
-                            role_description_es=existing_node.role_description_es,
-                            role_description_en=existing_node.role_description_en,
-                        )
-                    else:
-                        # Additional or custom external connector (SECURITY_FEED)
-                        integ_id = f"integ-{integ.connector_type.lower()}"
-                        is_fw = "FIREWALL" in integ.connector_type or "PALO" in integ.name.upper() or "FORTI" in integ.name.upper()
-                        is_edr = "CROWD" in integ.connector_type or "DEFENDER" in integ.connector_type or "EDR" in integ.name.upper()
-                        node_type = "FIREWALL" if is_fw else "EDR" if is_edr else "SERVER"
-                        
-                        if integ_id not in nodes_dict:
-                            nodes_dict[integ_id] = TopologyNode(
-                                id=integ_id,
-                                name=integ.name,
-                                type=node_type,
-                                category="SECURITY_FEED",
-                                ip_address="10.0.3." + str(10 + len(nodes_dict)),
-                                ip_addresses=["10.0.3." + str(10 + len(nodes_dict))],
-                                services=[
-                                    TopologyNodeService(name=f"Feed Connector ({integ.connector_type})", status=status)
-                                ],
-                                subnet="10.0.3.0/24 Security Feeds",
-                                status=status,
-                                latency_ms=12,
-                                last_ping=integ.last_health_check_at.isoformat() if integ.last_health_check_at else now_iso,
-                                active_alerts_count=0,
-                                active_alerts=[],
-                                role_description_es=f"Fuente de detección y telemetría ({integ.connector_type})",
-                                role_description_en=f"Detection and telemetry source ({integ.connector_type})",
-                            )
-
-                # Query recent alert references to discover active assets and workstations
-                alerts = list(
-                    (
-                        await session.scalars(
-                            select(AlertReferenceModel)
-                            .where(
-                                AlertReferenceModel.tenant_id == tenant_id,
-                                AlertReferenceModel.is_simulated.is_(False),
-                            )
-                            .order_by(desc(AlertReferenceModel.observed_at))
-                            .limit(50)
-                        )
-                    ).all()
-                )
-
-                # Process alerts and consolidate into structured host nodes
-                for alert in alerts:
-                    raw_asset = (alert.asset_summary or alert.indicator_summary or "").strip()
-                    if not raw_asset:
-                        continue
-
-                    # Extract asset host name and potential port/service
-                    clean_name = raw_asset.split()[0].rstrip(",:;")
-                    
-                    # Check for IP:port or hostname:port pattern
-                    detected_port = None
-                    if ":" in clean_name and not clean_name.startswith("http"):
-                        parts = clean_name.split(":")
-                        clean_name = parts[0]
-                        if parts[1].isdigit():
-                            detected_port = int(parts[1])
-
-                    slug = re.sub(r"[^a-zA-Z0-9-]", "-", clean_name.lower())[:32]
-                    asset_id = f"asset-{slug}"
-
-                    is_ip = bool(re.match(r"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$", clean_name))
-                    ip_addr = clean_name if is_ip else f"10.0.2.{abs(hash(clean_name)) % 200 + 10}"
-                    node_name = clean_name if not is_ip else f"Host-{clean_name.replace('.', '-')}"
-                    is_server = "SRV" in clean_name.upper() or "DC" in clean_name.upper() or "DB" in clean_name.upper() or "APP" in clean_name.upper()
-                    node_type = "SERVER" if is_server else "ENDPOINT"
-
-                    severity_str = alert.severity.lower() if alert.severity else "medium"
-                    valid_severities = ("critical", "high", "medium", "low", "informational")
-                    normalized_severity = severity_str if severity_str in valid_severities else "medium"
-
-                    alert_item = TopologyNodeAlert(
-                        id=str(alert.id),
-                        title=alert.title,
-                        severity=normalized_severity,  # type: ignore[arg-type]
-                        category=alert.category or "Security",
-                        observed_at=alert.observed_at.isoformat() if alert.observed_at else now_iso,
-                    )
-
-                    service_name = f"Service on port {detected_port}" if detected_port else "Application Service"
-
-                    if asset_id not in nodes_dict:
-                        node_status = "WARNING" if normalized_severity in ("critical", "high") else "ONLINE"
-                        services_list = [
-                            TopologyNodeService(
-                                name=service_name,
-                                port=detected_port,
-                                protocol="TCP",
-                                ip_address=ip_addr,
-                                status=node_status,
-                                active_alerts_count=1 if normalized_severity in ("critical", "high") else 0,
-                            )
-                        ]
-                        nodes_dict[asset_id] = TopologyNode(
-                            id=asset_id,
-                            name=node_name,
-                            type=node_type,
-                            category="MONITORED_ASSET",
-                            ip_address=ip_addr,
-                            ip_addresses=[ip_addr],
-                            services=services_list,
-                            subnet="10.0.2.0/24 Corporate LAN" if node_type == "ENDPOINT" else "10.0.1.0/24 Production Servers",
-                            status=node_status,
-                            latency_ms=15,
-                            last_ping=now_iso,
-                            active_alerts_count=1,
-                            active_alerts=[alert_item],
-                            os_info="Linux / Windows Server" if is_server else "Windows 11 Enterprise",
-                            monitored_by=["Wazuh Agent", "SIEM Telemetry"],
-                            role_description_es=f"Activo protegido monitorizado ({node_type})",
-                            role_description_en=f"Monitored protected asset ({node_type})",
-                        )
-                    else:
-                        existing_node = nodes_dict[asset_id]
-                        if ip_addr not in existing_node.ip_addresses:
-                            existing_node.ip_addresses.append(ip_addr)
-                        if detected_port and not any(s.port == detected_port for s in existing_node.services):
-                            existing_node.services.append(
-                                TopologyNodeService(
-                                    name=service_name,
-                                    port=detected_port,
-                                    protocol="TCP",
-                                    ip_address=ip_addr,
-                                    status="WARNING" if normalized_severity in ("critical", "high") else "ONLINE",
-                                    active_alerts_count=1 if normalized_severity in ("critical", "high") else 0,
-                                )
-                            )
-                        if len(existing_node.active_alerts) < 5:
-                            existing_node.active_alerts.append(alert_item)
-                        existing_node.active_alerts_count += 1
-                        if normalized_severity in ("critical", "high"):
-                            existing_node.status = "WARNING"
-
-        except Exception:
-            # Resilient fallback: preserve core nodes if DB session or queries encounter any issues
-            pass
-
-        # Build structured topology interconnect edges
-        edges: list[TopologyEdge] = [
-            # Security Feeds -> Cyrvanta Gateway / Core
-            TopologyEdge(
-                id="edge-siem-gw",
-                source_id="siem-01",
-                target_id="gw-01",
-                protocol="HTTPS / REST Ingestion",
-                status="NORMAL",
+        specs: list[tuple[str, str, str, str, str, str, str]] = [
+            # id, display name, type, host, port/url, role_es, role_en
+            (
+                "db-01",
+                "PostgreSQL (sistema de registro)",
+                "DATABASE",
+                database.hostname or "postgres",
+                str(database.port or 5432),
+                "Almacenamiento transaccional con aislamiento RLS por tenant",
+                "Transactional store with per-tenant Row-Level Security",
             ),
-            TopologyEdge(
-                id="edge-siem-telemetry",
-                source_id="siem-01",
-                target_id="telemetry-01",
-                protocol="OpenSearch Bulk TLS",
-                status="NORMAL",
+            (
+                "cache-01",
+                "Redis (sesiones y locks)",
+                "SERVER",
+                redis.hostname or "redis",
+                str(redis.port or 6379),
+                "Cache de sesión y coordinación de locks distribuidos",
+                "Session cache and distributed lock coordination",
             ),
-            # Cyrvanta Core Interconnects
-            TopologyEdge(
-                id="edge-gw-db",
-                source_id="gw-01",
-                target_id="db-01",
-                protocol="PostgreSQL TLS RLS",
-                status="NORMAL",
-            ),
-            TopologyEdge(
-                id="edge-gw-broker",
-                source_id="gw-01",
-                target_id="broker-01",
-                protocol="AMQP TLS 5672",
-                status="NORMAL",
-            ),
-            TopologyEdge(
-                id="edge-broker-soar",
-                source_id="broker-01",
-                target_id="soar-01",
-                protocol="REST Hook Orchestration",
-                status="NORMAL",
-            ),
-            TopologyEdge(
-                id="edge-broker-ai",
-                source_id="broker-01",
-                target_id="ai-01",
-                protocol="Correlation Pipeline",
-                status="NORMAL",
-            ),
-            # Monitored Assets -> Security Feeds / Sensors
-            TopologyEdge(
-                id="edge-lab-server-siem",
-                source_id="lab-server-01",
-                target_id="siem-01",
-                protocol="Wazuh-Agent TLS 1514",
-                status="NORMAL",
-            ),
-            TopologyEdge(
-                id="edge-lab-workstation-siem",
-                source_id="lab-workstation-01",
-                target_id="siem-01",
-                protocol="Wazuh-Agent TLS 1514",
-                status="NORMAL",
+            (
+                "broker-01",
+                "RabbitMQ (bus de eventos)",
+                "SERVER",
+                rabbit.hostname or "rabbitmq",
+                str(rabbit.port or 5672),
+                "Bus asíncrono de eventos de dominio con outbox/inbox",
+                "Asynchronous domain event bus with outbox/inbox delivery",
             ),
         ]
 
-        # Link dynamically discovered assets to security feeds and soar
-        for node_id, node in nodes_dict.items():
-            if node_id.startswith("asset-"):
-                edge_status = "DEGRADED" if node.status == "WARNING" else "BLOCKED" if node.status == "BLOCKED" else "NORMAL"
-                edges.append(
-                    TopologyEdge(
-                        id=f"edge-{node_id}-siem",
-                        source_id=node_id,
-                        target_id="siem-01",
-                        protocol="Wazuh-Agent / Sensor TLS",
-                        status=edge_status,
-                    )
-                )
-            elif node_id.startswith("integ-"):
-                edges.append(
-                    TopologyEdge(
-                        id=f"edge-{node_id}-gw",
-                        source_id=node_id,
-                        target_id="gw-01",
-                        protocol="Security Feed Ingestion",
-                        status="NORMAL",
-                    )
-                )
-
-        return NetworkTopologyResponse(
-            tenant_id=tenant_id,
-            nodes=list(nodes_dict.values()),
-            edges=edges,
-            updated_at=now_iso,
+        # PostgreSQL is checked by actually running a query on the pool the
+        # application uses: proving the port is open would not prove the system
+        # of record answers. The other two are checked at the transport level.
+        probes = await asyncio.gather(
+            _probe_database(),
+            *(_probe_tcp(host, int(port)) for _, _, _, host, port, _, _ in specs[1:]),
         )
+
+        nodes: dict[str, TopologyNode] = {}
+        for (node_id, name, node_type, host, port, role_es, role_en), probe in zip(
+            specs, probes, strict=True
+        ):
+            nodes[node_id] = self._node(
+                node_id=node_id,
+                name=name,
+                node_type=node_type,
+                category="CYRVANTA_CORE",
+                probe=probe,
+                host=host,
+                services=[
+                    TopologyNodeService(
+                        name=name.split(" (")[0],
+                        port=int(port),
+                        protocol="TCP",
+                        status="ONLINE" if probe.reachable else "OFFLINE",
+                    )
+                ],
+                now_iso=now_iso,
+                role_es=role_es,
+                role_en=role_en,
+            )
+
+        # Optional dependencies: only shown when this deployment actually enables
+        # them, so the map never advertises a capability that is switched off.
+        optional: list[tuple[str, str, str, str, str, str, str]] = []
+        if self.settings.opensearch_mode == "live":
+            optional.append(
+                (
+                    "telemetry-01",
+                    "OpenSearch (telemetría)",
+                    "SERVER",
+                    f"{self.settings.opensearch_url}/_cluster/health",
+                    self.settings.opensearch_url,
+                    "Índice de telemetría y evidencia de alto volumen",
+                    "High-volume telemetry and evidence index",
+                )
+            )
+        if self.settings.n8n_mode == "live":
+            optional.append(
+                (
+                    "soar-01",
+                    "n8n (motor externo opcional)",
+                    "SERVER",
+                    f"{self.settings.n8n_base_url}/healthz",
+                    self.settings.n8n_base_url,
+                    "Motor de automatización externo, opcional por binding",
+                    "External automation engine, optional per binding",
+                )
+            )
+        if self.settings.ollama_mode == "live":
+            optional.append(
+                (
+                    "ai-01",
+                    "Ollama (redacción asistida)",
+                    "SERVER",
+                    f"{self.settings.ollama_base_url}/api/tags",
+                    self.settings.ollama_base_url,
+                    "Modelo local de redacción; nunca autoriza ni ejecuta",
+                    "Local drafting model; never authorizes nor executes",
+                )
+            )
+
+        if optional:
+            opt_probes = await asyncio.gather(
+                *(_probe_http(url) for _, _, _, url, _, _, _ in optional)
+            )
+            for (node_id, name, node_type, _, base_url, role_es, role_en), probe in zip(
+                optional, opt_probes, strict=True
+            ):
+                parsed = urlsplit(base_url)
+                nodes[node_id] = self._node(
+                    node_id=node_id,
+                    name=name,
+                    node_type=node_type,
+                    category="CYRVANTA_CORE",
+                    probe=probe,
+                    host=parsed.hostname or base_url,
+                    services=[
+                        TopologyNodeService(
+                            name=name.split(" (")[0],
+                            port=parsed.port,
+                            protocol=(parsed.scheme or "http").upper(),
+                            status="ONLINE" if probe.reachable else "OFFLINE",
+                        )
+                    ],
+                    now_iso=now_iso,
+                    role_es=role_es,
+                    role_en=role_en,
+                )
+        return nodes
+
+    def _node(
+        self,
+        *,
+        node_id: str,
+        name: str,
+        node_type: str,
+        category: str,
+        probe: _Probe,
+        host: str,
+        services: list[TopologyNodeService],
+        now_iso: str,
+        role_es: str,
+        role_en: str,
+        os_info: str | None = None,
+        monitored_by: list[str] | None = None,
+    ) -> TopologyNode:
+        address = probe.address or host
+        return TopologyNode(
+            id=node_id,
+            name=name,
+            type=node_type,  # type: ignore[arg-type]
+            category=category,  # type: ignore[arg-type]
+            ip_address=address,
+            ip_addresses=[address],
+            services=services,
+            subnet=_subnet_of(probe.address),
+            status="ONLINE" if probe.reachable else "OFFLINE",
+            latency_ms=probe.latency_ms,
+            last_ping=now_iso,
+            active_alerts_count=0,
+            active_alerts=[],
+            os_info=os_info,
+            monitored_by=monitored_by or [],
+            role_description_es=role_es,
+            role_description_en=role_en,
+        )
+
+    # ── Configured detection sources ───────────────────────────────────────────
+
+    async def _feed_nodes(
+        self, tenant_id: UUID, now_iso: str
+    ) -> tuple[dict[str, TopologyNode], bool]:
+        """One node per integration row the tenant actually has configured."""
+        nodes: dict[str, TopologyNode] = {}
+        wazuh_configured = False
+        async with tenant_session(tenant_id) as session:
+            integrations = list(
+                (
+                    await session.scalars(
+                        select(IntegrationModel)
+                        .where(IntegrationModel.tenant_id == tenant_id)
+                        .order_by(IntegrationModel.connector_type)
+                    )
+                ).all()
+            )
+
+        for integration in integrations:
+            connector = integration.connector_type.upper()
+            # OpenSearch is already represented as a Cyrvanta core dependency.
+            if connector == "OPENSEARCH":
+                continue
+            if connector == "WAZUH":
+                wazuh_configured = True
+            node_id = f"integ-{connector.lower()}"
+            # "Enabled" is not "working": a connector that never passed a health
+            # check cannot be used by any action, so the map must not paint it
+            # online just because a row says active.
+            verified = (
+                integration.status == "active"
+                and integration.last_error_code is None
+                and integration.last_health_check_at is not None
+            )
+            node_type = "SIEM" if connector == "WAZUH" else "SERVER"
+            nodes[node_id] = TopologyNode(
+                id=node_id,
+                name=integration.name,
+                type=node_type,  # type: ignore[arg-type]
+                category="SECURITY_FEED",
+                ip_address=connector.lower(),
+                ip_addresses=[],
+                services=[
+                    TopologyNodeService(
+                        name=f"{connector} connector",
+                        protocol="HTTPS",
+                        status="ONLINE" if verified else "OFFLINE",
+                    )
+                ],
+                subnet="integración configurada",
+                status="ONLINE" if verified else "OFFLINE",
+                latency_ms=None,
+                last_ping=(
+                    integration.last_health_check_at.isoformat()
+                    if integration.last_health_check_at
+                    else now_iso
+                ),
+                active_alerts_count=0,
+                active_alerts=[],
+                monitored_by=[],
+                role_description_es=(
+                    f"Fuente de detección configurada ({connector})"
+                    if verified
+                    else f"Configurada sin verificar ({connector}): falta un health check correcto"
+                ),
+                role_description_en=(
+                    f"Configured detection source ({connector})"
+                    if verified
+                    else f"Configured but unverified ({connector}): a successful health check is missing"
+                ),
+            )
+        return nodes, wazuh_configured
+
+    # ── Assets Cyrvanta can actually see ───────────────────────────────────────
+
+    async def _monitored_assets(
+        self, tenant_id: UUID, now_iso: str
+    ) -> dict[str, TopologyNode]:
+        """The agents the Wazuh manager really reports -- never a synthesised host."""
+        if self.settings.wazuh_mode != "live":
+            return {}
+        try:
+            credential = await IntegrationConnectionService(
+                self.settings
+            ).resolve_single_connector(tenant_id, "WAZUH")
+        except IntegrationConfigurationError:
+            return {}
+
+        values = credential.values
+        base_url = str(values.get("base_url", "")).rstrip("/")
+        if not base_url:
+            return {}
+        try:
+            async with httpx.AsyncClient(timeout=_PROBE_TIMEOUT_SECONDS, verify=True) as client:
+                token_response = await client.get(
+                    f"{base_url}/security/user/authenticate?raw=true",
+                    auth=(str(values.get("username", "")), str(values.get("password", ""))),
+                )
+                token_response.raise_for_status()
+                agents_response = await client.get(
+                    f"{base_url}/agents",
+                    headers={"Authorization": f"Bearer {token_response.text.strip()}"},
+                    params={"select": "id,name,ip,os.name,os.version,status,lastKeepAlive"},
+                )
+                agents_response.raise_for_status()
+                payload = agents_response.json()
+        except (httpx.HTTPError, ValueError, KeyError):
+            return {}
+
+        nodes: dict[str, TopologyNode] = {}
+        for agent in payload.get("data", {}).get("affected_items", []):
+            agent_id = str(agent.get("id", "")).strip()
+            name = str(agent.get("name", "")).strip()
+            if not agent_id or not name:
+                continue
+            # Agent 000 is the manager's own local agent, already shown as a feed.
+            if agent_id == "000":
+                continue
+            address = str(agent.get("ip") or "").strip()
+            operating_system = agent.get("os") or {}
+            os_info = " ".join(
+                part
+                for part in (
+                    str(operating_system.get("name") or "").strip(),
+                    str(operating_system.get("version") or "").strip(),
+                )
+                if part
+            ) or None
+            reported = str(agent.get("status", "")).strip().lower()
+            status = "ONLINE" if reported == "active" else "OFFLINE"
+            last_keep_alive = str(agent.get("lastKeepAlive") or "").strip()
+            nodes[f"agent-{agent_id}"] = TopologyNode(
+                id=f"agent-{agent_id}",
+                name=name,
+                type="ENDPOINT",
+                category="MONITORED_ASSET",
+                ip_address=address or "unresolved",
+                ip_addresses=[address] if address else [],
+                services=[],
+                subnet=_subnet_of(address or None),
+                status=status,  # type: ignore[arg-type]
+                latency_ms=None,
+                last_ping=last_keep_alive or now_iso,
+                active_alerts_count=0,
+                active_alerts=[],
+                os_info=os_info,
+                monitored_by=[f"Wazuh agent {agent_id}"],
+                role_description_es="Activo con agente Wazuh reportando al manager",
+                role_description_en="Asset with a Wazuh agent reporting to the manager",
+            )
+        return nodes
+
+    async def _annotate_alerts(
+        self, tenant_id: UUID, assets: dict[str, TopologyNode], now_iso: str
+    ) -> None:
+        """Attach real alerts to assets, matching only on what the agent reports.
+
+        An alert about a host Cyrvanta does not monitor never invents a node --
+        the map would otherwise claim visibility the platform does not have.
+        """
+        if not assets:
+            return
+        async with tenant_session(tenant_id) as session:
+            alerts = list(
+                (
+                    await session.scalars(
+                        select(AlertReferenceModel)
+                        .where(
+                            AlertReferenceModel.tenant_id == tenant_id,
+                            AlertReferenceModel.is_simulated.is_(False),
+                        )
+                        .order_by(desc(AlertReferenceModel.observed_at))
+                        .limit(100)
+                    )
+                ).all()
+            )
+
+        by_identity: dict[str, TopologyNode] = {}
+        for node in assets.values():
+            by_identity[node.name.casefold()] = node
+            for address in node.ip_addresses:
+                by_identity[address] = node
+
+        for alert in alerts:
+            raw = (alert.asset_summary or alert.indicator_summary or "").strip()
+            if not raw:
+                continue
+            candidate = raw.split()[0].rstrip(",:;").split(":")[0]
+            node = by_identity.get(candidate) or by_identity.get(candidate.casefold())
+            if node is None:
+                continue
+            severity = (alert.severity or "").lower()
+            if severity not in _VALID_SEVERITIES:
+                severity = "medium"
+            node.active_alerts_count += 1
+            if len(node.active_alerts) < 5:
+                node.active_alerts.append(
+                    TopologyNodeAlert(
+                        id=str(alert.id),
+                        title=alert.title,
+                        severity=severity,  # type: ignore[arg-type]
+                        category=alert.category or "security",
+                        observed_at=(
+                            alert.observed_at.isoformat() if alert.observed_at else now_iso
+                        ),
+                    )
+                )
+            if severity in ("critical", "high") and node.status == "ONLINE":
+                node.status = "WARNING"
+
+    # ── Real relationships only ────────────────────────────────────────────────
+
+    @staticmethod
+    def _edges(
+        core: dict[str, TopologyNode],
+        feeds: dict[str, TopologyNode],
+        assets: dict[str, TopologyNode],
+        wazuh_configured: bool,
+    ) -> list[TopologyEdge]:
+        edges: list[TopologyEdge] = []
+
+        def link(edge_id: str, source: str, target: str, protocol: str) -> None:
+            source_node = core.get(source) or feeds.get(source) or assets.get(source)
+            target_node = core.get(target) or feeds.get(target) or assets.get(target)
+            if source_node is None or target_node is None:
+                return
+            degraded = "OFFLINE" in (source_node.status, target_node.status)
+            edges.append(
+                TopologyEdge(
+                    id=edge_id,
+                    source_id=source,
+                    target_id=target,
+                    protocol=protocol,
+                    status="DEGRADED" if degraded else "NORMAL",
+                )
+            )
+
+        link("edge-db", "db-01", "broker-01", "Outbox transaccional")
+        link("edge-cache", "cache-01", "broker-01", "Coordinación de locks")
+        link("edge-telemetry", "integ-wazuh", "telemetry-01", "Indexación de telemetría")
+        link("edge-soar", "broker-01", "soar-01", "Dispatch de playbooks")
+        link("edge-ai", "broker-01", "ai-01", "Redacción asistida")
+
+        if wazuh_configured:
+            for asset_id in assets:
+                link(
+                    f"edge-{asset_id}-wazuh",
+                    asset_id,
+                    "integ-wazuh",
+                    "Agente Wazuh (1514/tcp)",
+                )
+        return edges

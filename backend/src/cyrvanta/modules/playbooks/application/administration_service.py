@@ -638,6 +638,7 @@ class PlaybookAdministrationService:
                     latest_version.status = "APPROVED"
                     latest_version.validated_sha256 = latest_version.artifact_sha256
                     latest_version.validated_at = datetime.now(UTC)
+                    latest_version.validated_by_user_id = tenant_user_id
                     latest_version.approved_at = datetime.now(UTC)
                     await session.flush()
             else:
@@ -693,10 +694,11 @@ class PlaybookAdministrationService:
                     timeout_seconds=60,
                     validated_sha256=digest,
                     validated_at=datetime.now(UTC),
+                    validated_by_user_id=tenant_user_id,
                 )
                 session.add(seeded_version)
                 await session.flush()
-                await self._record_audit(
+                self._audit(
                     session,
                     tenant_id,
                     None,

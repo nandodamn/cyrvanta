@@ -88,6 +88,49 @@ export function SecurityTopologyPanel() {
   const canvasHeight = contentBottom + CANVAS_PADDING;
   const zoneHeight = canvasHeight - ZONE_TOP - CANVAS_PADDING;
 
+  // The drawing keeps its own coordinate space (1020 x canvasHeight) while the
+  // viewport stays a constant size on screen. Without this, a tenant with many
+  // nodes got a taller drawing squeezed into the same box, shrinking every
+  // label until it was unreadable. Now extra nodes make the map navigable
+  // rather than smaller.
+  const VIEWPORT_WIDTH = 1020;
+  const VIEWPORT_HEIGHT = 420;
+  const MIN_ZOOM = 0.35;
+  const MAX_ZOOM = 3;
+
+  const fitZoom = Math.min(
+    1,
+    VIEWPORT_HEIGHT / canvasHeight,
+    VIEWPORT_WIDTH / VIEWPORT_WIDTH,
+  );
+  // `null` means "fit everything", the state the map opens in and returns to.
+  const [view, setView] = useState<{ zoom: number; x: number; y: number } | null>(null);
+  const [isPanning, setIsPanning] = useState(false);
+
+  // A tenant with hundreds of assets fits at well under MIN_ZOOM, so the floor
+  // has to follow the fitted scale: otherwise zooming out from the fitted view
+  // would clamp upwards and zoom *in*.
+  const minZoom = Math.min(MIN_ZOOM, fitZoom);
+  const clampZoom = (value: number) => Math.min(MAX_ZOOM, Math.max(minZoom, value));
+  const centeredPan = (zoom: number) => ({
+    x: (VIEWPORT_WIDTH - VIEWPORT_WIDTH * zoom) / 2,
+    y: (VIEWPORT_HEIGHT - canvasHeight * zoom) / 2,
+  });
+  const currentView = view ?? { zoom: fitZoom, ...centeredPan(fitZoom) };
+  const isFitted = view === null;
+
+  const zoomBy = (factor: number) => {
+    const nextZoom = clampZoom(currentView.zoom * factor);
+    if (nextZoom === currentView.zoom) return;
+    // Keep the viewport centre fixed so zooming does not drift the map away.
+    const ratio = nextZoom / currentView.zoom;
+    setView({
+      zoom: nextZoom,
+      x: VIEWPORT_WIDTH / 2 - (VIEWPORT_WIDTH / 2 - currentView.x) * ratio,
+      y: VIEWPORT_HEIGHT / 2 - (VIEWPORT_HEIGHT / 2 - currentView.y) * ratio,
+    });
+  };
+
   const getCategoryLabel = (cat?: string) => {
     if (cat === "SECURITY_FEED") return t("topologyFilterFeeds");
     if (cat === "CYRVANTA_CORE") return t("topologyFilterCore");
@@ -168,7 +211,76 @@ export function SecurityTopologyPanel() {
           {/* VISUAL GRAPH VIEW (3 Operational Zones) */}
           {viewMode === "graph" && (
             <div className="topology-graph-container">
-              <svg className="topology-svg-canvas" viewBox={`0 0 1020 ${canvasHeight}`}>
+              <div className="topology-zoom-controls">
+                <button
+                  type="button"
+                  onClick={() => zoomBy(1 / 1.25)}
+                  disabled={currentView.zoom <= minZoom}
+                  aria-label={i18n.language.startsWith("es") ? "Alejar" : "Zoom out"}
+                  title={i18n.language.startsWith("es") ? "Alejar" : "Zoom out"}
+                >
+                  −
+                </button>
+                <span className="topology-zoom-level" aria-live="polite">
+                  {Math.round(currentView.zoom * 100)}%
+                </span>
+                <button
+                  type="button"
+                  onClick={() => zoomBy(1.25)}
+                  disabled={currentView.zoom >= MAX_ZOOM}
+                  aria-label={i18n.language.startsWith("es") ? "Acercar" : "Zoom in"}
+                  title={i18n.language.startsWith("es") ? "Acercar" : "Zoom in"}
+                >
+                  +
+                </button>
+                <button
+                  type="button"
+                  className="topology-zoom-reset"
+                  onClick={() => setView(null)}
+                  disabled={isFitted}
+                  title={
+                    i18n.language.startsWith("es")
+                      ? "Ver todo el mapa"
+                      : "Fit the whole map"
+                  }
+                >
+                  {i18n.language.startsWith("es") ? "Ajustar" : "Fit"}
+                </button>
+              </div>
+              <svg
+                className={`topology-svg-canvas${isPanning ? " panning" : ""}`}
+                viewBox={`0 0 ${VIEWPORT_WIDTH} ${VIEWPORT_HEIGHT}`}
+                role="application"
+                aria-label={
+                  i18n.language.startsWith("es")
+                    ? "Mapa de topología: arrastra para desplazar, rueda del ratón para acercar"
+                    : "Topology map: drag to pan, scroll to zoom"
+                }
+                onWheel={(event) => {
+                  event.preventDefault();
+                  zoomBy(event.deltaY < 0 ? 1.15 : 1 / 1.15);
+                }}
+                onPointerDown={(event) => {
+                  // Only a drag on empty canvas pans; clicks on nodes still select.
+                  if ((event.target as Element).closest(".topology-node-badge")) return;
+                  event.currentTarget.setPointerCapture(event.pointerId);
+                  setIsPanning(true);
+                }}
+                onPointerMove={(event) => {
+                  if (!isPanning) return;
+                  const scale = VIEWPORT_WIDTH / event.currentTarget.getBoundingClientRect().width;
+                  setView({
+                    zoom: currentView.zoom,
+                    x: currentView.x + event.movementX * scale,
+                    y: currentView.y + event.movementY * scale,
+                  });
+                }}
+                onPointerUp={(event) => {
+                  event.currentTarget.releasePointerCapture(event.pointerId);
+                  setIsPanning(false);
+                }}
+                onPointerCancel={() => setIsPanning(false)}
+              >
                 <defs>
                   <linearGradient id="edgeNormal" x1="0%" y1="0%" x2="100%" y2="0%">
                     <stop offset="0%" stopColor="var(--accent)" stopOpacity="0.5" />
@@ -187,6 +299,8 @@ export function SecurityTopologyPanel() {
                     <feComposite in="SourceGraphic" in2="blur" operator="over" />
                   </filter>
                 </defs>
+
+                <g transform={`translate(${currentView.x} ${currentView.y}) scale(${currentView.zoom})`}>
 
                 {/* 3 Operational Zones */}
                 <g opacity="0.7">
@@ -359,6 +473,7 @@ export function SecurityTopologyPanel() {
                       </g>
                     );
                   })}
+                </g>
               </svg>
 
               {/* Visual Map Legend */}

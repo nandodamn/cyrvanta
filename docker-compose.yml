@@ -48,7 +48,7 @@ services:
       retries: 20
 
   backend:
-    build: ./backend
+    build: {context: ., dockerfile: backend/Dockerfile}
     profiles: [core]
     env_file: .env
     command: ["/bin/sh", "-c", "DATABASE_URL=$${DATABASE_ADMIN_URL} alembic upgrade head && uvicorn cyrvanta.main:app --host 0.0.0.0 --port 8000"]
@@ -65,7 +65,7 @@ services:
       retries: 15
 
   worker:
-    build: ./backend
+    build: {context: ., dockerfile: backend/Dockerfile}
     profiles: [core]
     env_file: .env
     command: ["python", "-m", "cyrvanta.worker"]
@@ -76,7 +76,7 @@ services:
     restart: unless-stopped
 
   scheduler:
-    build: ./backend
+    build: {context: ., dockerfile: backend/Dockerfile}
     profiles: [core]
     env_file: .env
     command: ["python", "-m", "cyrvanta.scheduler"]
@@ -147,6 +147,8 @@ services:
     volumes:
       - wazuh_data:/var/ossec/data
       - ./infrastructure/wazuh/manager/ossec.conf:/wazuh-config-mount/etc/ossec.conf:ro
+      - ./infrastructure/wazuh/manager/certs/server.crt:/wazuh-config-mount/api/configuration/ssl/server.crt:ro
+      - ./infrastructure/wazuh/manager/certs/server.key:/wazuh-config-mount/api/configuration/ssl/server.key:ro
     depends_on:
       opensearch: { condition: service_healthy }
     networks: [internal, host-access]

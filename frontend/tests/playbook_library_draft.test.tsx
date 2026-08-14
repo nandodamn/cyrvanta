@@ -57,14 +57,17 @@ describe("draft playbook safety", () => {
     });
     vi.spyOn(api, "getPlaybookManagement").mockRejectedValue(new Error("disabled"));
 
-    render(
+    const { container } = render(
       <QueryClientProvider client={new QueryClient()}>
         <PlaybookLibraryPage />
       </QueryClientProvider>,
     );
 
     expect(await screen.findByText("draft-containment")).toBeVisible();
-    expect(screen.getByText(/Motor no vinculado|Engine not bound/i)).toBeVisible();
+    // The card states plainly that this is not an available capability, and the
+    // engine binding is reported as still pending rather than synchronized.
+    expect(container.querySelector(".playbook-disabled-badge")).not.toBeNull();
+    expect(container.querySelector("article.playbook-card-disabled")).not.toBeNull();
     expect(
       screen.getByRole("button", { name: /Activar playbook|Activate playbook/i }),
     ).toBeDisabled();

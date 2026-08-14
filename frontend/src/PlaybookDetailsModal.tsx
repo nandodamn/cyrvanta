@@ -2,9 +2,13 @@ import { useTranslation } from "react-i18next";
 
 import { PlaybookDefinition } from "./api";
 
+type ApprovalMode = "AUTOMATIC" | "SINGLE" | "FOUR_EYES";
+
 interface PlaybookDetailsModalProps {
   playbook: PlaybookDefinition;
   onClose: () => void;
+  onApprovalModeChange?: (mode: ApprovalMode) => void;
+  approvalPending?: boolean;
 }
 
 function DetailRow({ label, value }: { label: string; value: string }) {
@@ -39,9 +43,15 @@ function TagList({ values, emptyLabel }: { values: string[]; emptyLabel: string 
   );
 }
 
-export function PlaybookDetailsModal({ playbook, onClose }: PlaybookDetailsModalProps) {
+export function PlaybookDetailsModal({
+  playbook,
+  onClose,
+  onApprovalModeChange,
+  approvalPending = false,
+}: PlaybookDetailsModalProps) {
   const { t, i18n } = useTranslation();
   const english = i18n.language.startsWith("en");
+  const approvalMode: ApprovalMode = playbook.approval_mode ?? "AUTOMATIC";
   const title = english ? playbook.title_i18n.en : playbook.title_i18n.es;
   const description =
     playbook.publication_status === "PUBLISHED"
@@ -191,6 +201,38 @@ export function PlaybookDetailsModal({ playbook, onClose }: PlaybookDetailsModal
         <section style={{ marginBottom: "1.25rem" }}>
           <h3>{t("automationPolicy")}</h3>
           <p style={{ margin: 0, color: "var(--text-soft)" }}>{policy}</p>
+        </section>
+
+        {/* Changing who must approve a playbook is a configuration decision, not
+            a daily operation, so it lives here rather than on every list card. */}
+        <section style={{ marginBottom: "1.25rem" }}>
+          <h3>{t("approvalGovernance")}</h3>
+          <p style={{ margin: "0 0 10px", color: "var(--text-soft)" }}>
+            {t(`approvalGovernanceHelp.${approvalMode}`)}
+          </p>
+          {onApprovalModeChange && (
+            <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+              {(["AUTOMATIC", "SINGLE", "FOUR_EYES"] as const).map((mode) => (
+                <button
+                  key={mode}
+                  type="button"
+                  className={approvalMode === mode ? "primary" : "ghost"}
+                  style={{
+                    padding: "6px 12px",
+                    fontSize: "0.8rem",
+                    minWidth: "unset",
+                    width: "auto",
+                    height: "auto",
+                    minHeight: "unset",
+                  }}
+                  disabled={approvalPending || approvalMode === mode}
+                  onClick={() => onApprovalModeChange(mode)}
+                >
+                  {t(`approvalModes.${mode}`)}
+                </button>
+              ))}
+            </div>
+          )}
         </section>
 
         <section style={{ marginBottom: "1.25rem" }}>

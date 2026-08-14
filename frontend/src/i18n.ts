@@ -489,6 +489,18 @@ const resources = {
       rollbackOnExecution:
         "La reversión se aplica sobre una ejecución concreta de este playbook, no como un procedimiento aparte: ejecuta la acción «{{action}}» contra los mismos objetivos que este playbook contuvo.",
       policyNotSpecified: "No hay una política publicada para esta versión.",
+      approvalGovernance: "Gobernanza de disparo y aprobación",
+      approvalGovernanceHelp: {
+        AUTOMATIC: "⚡ Disparo automático inmediato, sin retención.",
+        SINGLE: "👤 Requiere la firma de 1 analista autorizador antes de ejecutar.",
+        FOUR_EYES:
+          "👥 Requiere la firma independiente de 2 analistas (principio de 4 ojos).",
+      },
+      approvalModes: {
+        AUTOMATIC: "⚡ Automático",
+        SINGLE: "👤 Simple",
+        FOUR_EYES: "👥 Doble (4 ojos)",
+      },
       playbookDisabled: "Deshabilitado",
       cannotActivateIncomplete:
         "No se puede activar hasta completar la configuración pendiente.",
@@ -1090,6 +1102,18 @@ const resources = {
       rollbackOnExecution:
         "Rollback applies to a specific execution of this playbook, not as a separate procedure: it runs the «{{action}}» action against the same targets this playbook contained.",
       policyNotSpecified: "No automation policy is published for this version.",
+      approvalGovernance: "Trigger and approval governance",
+      approvalGovernanceHelp: {
+        AUTOMATIC: "⚡ Immediate automatic trigger, with no hold.",
+        SINGLE: "👤 Requires one authorizing analyst's signature before it runs.",
+        FOUR_EYES:
+          "👥 Requires two analysts to sign independently (four-eyes principle).",
+      },
+      approvalModes: {
+        AUTOMATIC: "⚡ Automatic",
+        SINGLE: "👤 Single",
+        FOUR_EYES: "👥 Dual (four eyes)",
+      },
       playbookDisabled: "Disabled",
       cannotActivateIncomplete:
         "Cannot be activated until the pending configuration is completed.",

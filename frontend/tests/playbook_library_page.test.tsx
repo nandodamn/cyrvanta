@@ -61,10 +61,15 @@ describe("native playbook library", () => {
     );
 
     expect(await screen.findByText("notify-critical-incident")).toBeVisible();
+    // "Cyrvanta Native" is stated once for the whole library, in the page header,
+    // rather than repeated on every card as a constant fact.
     expect(screen.getAllByText("Cyrvanta Native").length).toBeGreaterThan(0);
-    expect(screen.getByText("LIVE")).toBeVisible();
+    // The card keeps only the facts that actually differ between playbooks.
     expect(screen.getByText("SYNCHRONIZED")).toBeVisible();
     expect(screen.getByText("SUCCEEDED")).toBeVisible();
+    expect(screen.queryByText("LIVE")).not.toBeInTheDocument();
+    expect(screen.queryByText("MEDIUM")).not.toBeInTheDocument();
+    expect(screen.queryByText("PUBLISHED")).not.toBeInTheDocument();
     expect(screen.getAllByText(/n8n opcional|optional n8n/i).length).toBeGreaterThan(0);
     expect(screen.getByText(/Sin mappings sustentados|No supported mappings/i)).toBeVisible();
     expect(screen.queryByText("T1078")).not.toBeInTheDocument();

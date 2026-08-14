@@ -400,27 +400,11 @@ export function PlaybookLibraryPage() {
                   </div>
                 </div>
 
+                {/* Only facts that actually differ between playbooks stay on the
+                    card. Engine, execution mode, impact and publication status are
+                    identical across the whole catalog, and are still available in
+                    the details modal for the cases where they do diverge. */}
                 <div className="playbook-facts">
-                  <div>
-                    <span>{t("automationEngine")}</span>
-                    <strong>
-                      {playbook.engine_type === "NATIVE"
-                        ? "Cyrvanta Native"
-                        : playbook.engine_type ?? t("engineNotBound")}
-                    </strong>
-                  </div>
-                  <div>
-                    <span>{t("mode")}</span>
-                    <strong>{playbook.execution_mode ?? t("notAvailableVersion")}</strong>
-                  </div>
-                  <div>
-                    <span>{t("impact")}</span>
-                    <strong>{playbook.impact ?? t("notAvailableVersion")}</strong>
-                  </div>
-                  <div>
-                    <span>{t("publicationStatus")}</span>
-                    <strong>{playbook.publication_status ?? t("notAvailableVersion")}</strong>
-                  </div>
                   <div>
                     <span>{t("bindingStatus")}</span>
                     <strong>{playbook.binding_status ?? t("syncPending")}</strong>
@@ -440,53 +424,6 @@ export function PlaybookLibraryPage() {
                     </ul>
                   </div>
                 )}
-
-                {/* Gobernanza Bar */}
-                <div className="connector-grid" style={{ marginBottom: "0.5rem" }}>
-                  <div style={{ gridColumn: "span 2", background: "rgba(255,255,255,0.02)", padding: "10px 14px", borderRadius: "6px", border: "1px solid var(--line)" }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "8px" }}>
-                      <div>
-                        <strong style={{ display: "block", fontSize: "0.85rem", color: "var(--text)" }}>
-                          🛡️ Gobernanza de Disparo & Aprobación
-                        </strong>
-                        <small style={{ color: "var(--muted)", fontSize: "0.75rem" }}>
-                          {currentMode === "AUTOMATIC" && "⚡ Disparo automático inmediato sin retención."}
-                          {currentMode === "SINGLE" && "👤 Requiere la firma de 1 analista autorizador antes de ejecutar."}
-                          {currentMode === "FOUR_EYES" && "👥 Requiere la firma independiente de 2 analistas (Principio de 4 Ojos)."}
-                        </small>
-                      </div>
-                      <div style={{ display: "flex", gap: "6px" }}>
-                        <button
-                          type="button"
-                          className={currentMode === "AUTOMATIC" ? "primary" : "ghost"}
-                          style={{ padding: "4px 10px", fontSize: "0.75rem", minWidth: "unset", width: "auto" }}
-                          disabled={approvalMutation.isPending}
-                          onClick={() => approvalMutation.mutate({ id: playbook.id, mode: "AUTOMATIC" })}
-                        >
-                          ⚡ Automático
-                        </button>
-                        <button
-                          type="button"
-                          className={currentMode === "SINGLE" ? "primary" : "ghost"}
-                          style={{ padding: "4px 10px", fontSize: "0.75rem", minWidth: "unset", width: "auto" }}
-                          disabled={approvalMutation.isPending}
-                          onClick={() => approvalMutation.mutate({ id: playbook.id, mode: "SINGLE" })}
-                        >
-                          👤 Simple
-                        </button>
-                        <button
-                          type="button"
-                          className={currentMode === "FOUR_EYES" ? "primary" : "ghost"}
-                          style={{ padding: "4px 10px", fontSize: "0.75rem", minWidth: "unset", width: "auto" }}
-                          disabled={approvalMutation.isPending}
-                          onClick={() => approvalMutation.mutate({ id: playbook.id, mode: "FOUR_EYES" })}
-                        >
-                          👥 Doble (4 Ojos)
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
 
                 {/* Card Action Footer */}
                 <div style={{ borderTop: "1px solid var(--line)", paddingTop: "8px", marginTop: "8px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "8px" }}>
@@ -532,6 +469,11 @@ export function PlaybookLibraryPage() {
         <PlaybookDetailsModal
           playbook={selectedDetails}
           onClose={() => setSelectedDetails(null)}
+          approvalPending={approvalMutation.isPending}
+          onApprovalModeChange={(mode) => {
+            approvalMutation.mutate({ id: selectedDetails.id, mode });
+            setSelectedDetails({ ...selectedDetails, approval_mode: mode });
+          }}
         />
       )}
 

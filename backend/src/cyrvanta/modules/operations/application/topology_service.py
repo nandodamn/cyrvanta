@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import socket
 import time
 from datetime import UTC, datetime
@@ -27,7 +28,15 @@ from cyrvanta.modules.operations.application.schemas import (
 from cyrvanta.shared.config import Settings, get_settings
 from cyrvanta.shared.database import SessionFactory, tenant_session
 
+logger = logging.getLogger("cyrvanta.operations.topology")
+
 _PROBE_TIMEOUT_SECONDS = 3.0
+# Listing the manager's agents is a real API query, not a reachability probe: it
+# authenticates and then reads the agent inventory, which routinely takes longer
+# than the probe budget. It gets the connector's own configured timeout instead.
+_DEFAULT_WAZUH_TIMEOUT_SECONDS = 10
+_MIN_WAZUH_TIMEOUT_SECONDS = 1
+_MAX_WAZUH_TIMEOUT_SECONDS = 30
 _VALID_SEVERITIES = ("critical", "high", "medium", "low", "informational")
 
 
@@ -125,6 +134,17 @@ async def _probe_database() -> _Probe:
     return _Probe(
         reachable=True, latency_ms=latency_ms, address=address, detail="SELECT 1"
     )
+
+
+def _resolve_wazuh_timeout(configured: object) -> int:
+    """Clamp the connector's configured timeout the same way integrations do."""
+    try:
+        timeout = int(configured)  # type: ignore[call-overload]
+    except (TypeError, ValueError):
+        return _DEFAULT_WAZUH_TIMEOUT_SECONDS
+    if isinstance(configured, bool):
+        return _DEFAULT_WAZUH_TIMEOUT_SECONDS
+    return min(_MAX_WAZUH_TIMEOUT_SECONDS, max(_MIN_WAZUH_TIMEOUT_SECONDS, timeout))
 
 
 def _subnet_of(address: str | None) -> str:
@@ -430,15 +450,27 @@ class NetworkTopologyService:
             credential = await IntegrationConnectionService(
                 self.settings
             ).resolve_single_connector(tenant_id, "WAZUH")
-        except IntegrationConfigurationError:
+        except IntegrationConfigurationError as error:
+            # An unusable connector means the map genuinely cannot see any asset,
+            # but staying silent made an empty map indistinguishable from a
+            # tenant that monitors nothing.
+            logger.warning(
+                "topology: no usable Wazuh connector for tenant %s: %s",
+                tenant_id,
+                error,
+            )
             return {}
 
         values = credential.values
         base_url = str(values.get("base_url", "")).rstrip("/")
         if not base_url:
+            logger.warning(
+                "topology: Wazuh connector for tenant %s has no base_url", tenant_id
+            )
             return {}
+        timeout_seconds = _resolve_wazuh_timeout(values.get("timeout_seconds"))
         try:
-            async with httpx.AsyncClient(timeout=_PROBE_TIMEOUT_SECONDS, verify=True) as client:
+            async with httpx.AsyncClient(timeout=timeout_seconds, verify=True) as client:
                 token_response = await client.get(
                     f"{base_url}/security/user/authenticate?raw=true",
                     auth=(str(values.get("username", "")), str(values.get("password", ""))),
@@ -451,7 +483,16 @@ class NetworkTopologyService:
                 )
                 agents_response.raise_for_status()
                 payload = agents_response.json()
-        except (httpx.HTTPError, ValueError, KeyError):
+        except (httpx.HTTPError, ValueError, KeyError) as error:
+            logger.warning(
+                "topology: could not read Wazuh agents for tenant %s from %s "
+                "(timeout %ss): %s: %s",
+                tenant_id,
+                base_url,
+                timeout_seconds,
+                type(error).__name__,
+                error,
+            )
             return {}
 
         nodes: dict[str, TopologyNode] = {}

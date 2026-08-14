@@ -4,7 +4,9 @@ from uuid import UUID
 import pytest
 
 from cyrvanta.modules.operations.application.topology_service import (
+    _PROBE_TIMEOUT_SECONDS,
     NetworkTopologyService,
+    _resolve_wazuh_timeout,
     _subnet_of,
 )
 from cyrvanta.shared.database import SessionFactory
@@ -92,3 +94,24 @@ def test_subnet_is_derived_from_a_real_address_or_marked_unresolved() -> None:
     assert _subnet_of("172.18.0.6") == "172.18.0.0/24"
     assert _subnet_of(None) == "unresolved"
     assert _subnet_of("not-an-address") == "unresolved"
+
+
+def test_wazuh_timeout_uses_the_connector_budget_not_the_probe_budget() -> None:
+    """Regression: listing agents reused the 3s probe budget and timed out.
+
+    Authenticating and then reading the agent inventory is a real API query that
+    routinely takes longer than a reachability probe, so live lab hosts silently
+    disappeared from the map. The connector's own configured timeout governs it.
+    """
+    # Unset, malformed, or non-integer values fall back to the connector default.
+    assert _resolve_wazuh_timeout(None) == 10
+    assert _resolve_wazuh_timeout("not-a-number") == 10
+    assert _resolve_wazuh_timeout(True) == 10
+
+    # A configured value is honoured, clamped to the same range integrations use.
+    assert _resolve_wazuh_timeout(15) == 15
+    assert _resolve_wazuh_timeout(0) == 1
+    assert _resolve_wazuh_timeout(120) == 30
+
+    # The budget must exceed the probe budget, which is what caused the bug.
+    assert _resolve_wazuh_timeout(None) > _PROBE_TIMEOUT_SECONDS

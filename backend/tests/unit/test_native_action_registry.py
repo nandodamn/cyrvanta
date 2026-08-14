@@ -7,16 +7,22 @@ from cyrvanta.modules.playbooks.infrastructure.action_registry import (
 )
 
 
+# Internal, idempotent actions: replaying them cannot double-apply their effect.
+_RETRY_SAFE_ACTIONS = {
+    "incident.status.transition",
+    "endpoint.isolate",
+    "account.disable",
+    "account.enable",
+}
+
+
 def test_registry_exposes_only_real_actions() -> None:
     descriptors = ActionRegistry().descriptors()
 
     assert tuple(item.code for item in descriptors) == tuple(sorted(REAL_ACTIONS))
     assert all(item.modes == ("LIVE",) for item in descriptors)
-    assert next(
-        item for item in descriptors if item.code == "incident.status.transition"
-    ).retry_safe
     assert all(
-        not item.retry_safe for item in descriptors if item.code != "incident.status.transition"
+        item.retry_safe == (item.code in _RETRY_SAFE_ACTIONS) for item in descriptors
     )
 
 

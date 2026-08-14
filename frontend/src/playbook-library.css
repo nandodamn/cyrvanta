@@ -23,18 +23,22 @@
 }
 
 .optional-engine {
-  margin-top: 1rem;
+  margin-top: 1.5rem;
+}
+
+.optional-engine > p.muted {
+  margin: 0;
+  padding: 14px 18px 0 18px;
+}
+
+.optional-engine > .playbook-list {
+  padding: 14px 18px 18px 18px;
 }
 
 .optional-engine summary,
 .advanced-secrets summary {
   cursor: pointer;
   font-weight: 700;
-}
-
-.optional-engine[open] summary,
-.advanced-secrets[open] summary {
-  margin-bottom: 1rem;
 }
 
 .toggle-control {

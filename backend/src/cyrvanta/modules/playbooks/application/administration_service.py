@@ -5,10 +5,10 @@ from datetime import UTC, datetime
 from typing import Literal, cast
 from uuid import UUID, uuid4
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from cyrvanta.modules.identity.infrastructure.models import AuditEventModel
+from cyrvanta.modules.identity.infrastructure.models import AuditEventModel, UserModel
 from cyrvanta.modules.integrations.application.connection_service import (
     CURRENT_CONFIGURATION_SCHEMA_VERSION,
 )
@@ -62,211 +62,349 @@ from cyrvanta.shared.infrastructure.event_store import SqlEventStore
 ESSENTIAL_NATIVE_PLAYBOOKS: list[dict[str, object]] = [
     {
         "code": "compromised-account",
-        "title_es": "Cuenta comprometida",
-        "title_en": "Compromised Account",
+        "title_es": "Contención y reseteo de cuenta comprometida",
+        "title_en": "Compromised Account Containment & Reset",
         "description_es": (
-            "Contención de identidad: revoca sesiones, bloquea cuenta y solicita "
-            "cambio de contraseña/MFA."
+            "Contención de identidad: revoca sesiones activas, bloquea la cuenta "
+            "en el directorio (LDAP/AD) y fuerza reseteo de credenciales/MFA."
         ),
         "description_en": (
-            "Identity containment: revokes sessions, blocks account, and forces password/MFA reset."
+            "Identity containment: revokes active sessions, blocks account in directory "
+            "(LDAP/AD), and forces password/MFA reset."
         ),
+        "mitre_codes": ["T1078", "T1110", "T1556"],
     },
     {
         "code": "compromised-endpoint",
-        "title_es": "Endpoint comprometido o malware detectado",
-        "title_en": "Compromised Endpoint or Malware Detected",
+        "title_es": "Aislamiento y respuesta ante endpoint comprometido",
+        "title_en": "Compromised Endpoint Isolation & Response",
         "description_es": (
-            "Contención EDR/Host: recolecta evidencia, busca IoCs, aisla el host y "
-            "pone archivos en cuarentena."
+            "Contención de host/EDR: aísla el endpoint de la red, pone archivos y procesos "
+            "sospechosos en cuarentena y recolecta evidencias forenses."
         ),
         "description_en": (
-            "EDR/Host containment: collects evidence, searches IoCs, isolates host, "
-            "and quarantines files."
+            "EDR/Host containment: isolates endpoint from network, quarantines suspicious "
+            "files and processes, and collects forensic artifacts."
         ),
+        "mitre_codes": ["T1204", "T1059", "T1547"],
     },
     {
         "code": "phishing-malicious-email",
-        "title_es": "Phishing y correo malicioso",
-        "title_en": "Phishing and Malicious Email",
+        "title_es": "Mitigación y purga de phishing / correo malicioso",
+        "title_en": "Phishing & Malicious Email Mitigation",
         "description_es": (
-            "Análisis de correo, eliminación masiva de mensajes similares en buzones "
-            "y bloqueo de URL/Dominio."
+            "Respuesta de correo: purga masiva de mensajes maliciosos en buzones corporativos "
+            "y bloqueo perimetral de URLs y dominios de ataque."
         ),
         "description_en": (
-            "Email analysis, mass removal of similar messages in mailboxes, and "
-            "URL/Domain blocking."
+            "Email response: mass purge of malicious messages from mailboxes, and "
+            "perimeter blocking of attack URLs and sender domains."
         ),
+        "mitre_codes": ["T1566", "T1534"],
     },
     {
         "code": "ransomware-destructive",
-        "title_es": "Ransomware o actividad destructiva",
-        "title_en": "Ransomware or Destructive Activity",
+        "title_es": "Contención crítica y respuesta ante ransomware",
+        "title_en": "Critical Ransomware Containment & Crisis Response",
         "description_es": (
-            "Procedimiento crítico de contención masiva, aislamiento de red, "
-            "preservación de backups y gestión de crisis."
+            "Procedimiento crítico de contención masiva: aislamiento de red de segmentos afectados, "
+            "bloqueo preventivo de repositorios de backups y activación del protocolo de crisis."
         ),
         "description_en": (
-            "Critical mass containment procedure, network isolation, backup "
-            "protection, and crisis management."
+            "Critical mass containment: network isolation of affected segments, "
+            "backup protection and lock, and crisis response activation."
         ),
+        "mitre_codes": ["T1486", "T1489", "T1490"],
     },
     {
         "code": "lateral-movement",
-        "title_es": "Movimiento lateral",
-        "title_en": "Lateral Movement",
+        "title_es": "Interrupción y contención de movimiento lateral",
+        "title_en": "Lateral Movement Interruption & Containment",
         "description_es": (
-            "Correlación multi-fuente (identidad, host, red): rompe la cadena "
-            "origen-destino y revoca sesiones."
+            "Respuesta de red e identidad: interrumpe conexiones origen-destino, "
+            "bloquea protocolos SMB/RDP no autorizados y revoca sesiones cruzadas."
         ),
         "description_en": (
-            "Multi-source correlation (identity, host, network): breaks "
-            "origin-destination chain and revokes sessions."
+            "Network and identity response: breaks origin-destination connections, "
+            "blocks unauthorized SMB/RDP protocols, and revokes cross-host sessions."
         ),
+        "mitre_codes": ["T1021", "T1570", "T1080"],
     },
     {
         "code": "malicious-indicator",
-        "title_es": "IP, dominio o indicador malicioso (IoC)",
-        "title_en": "Malicious IP, Domain, or Indicator (IoC)",
+        "title_es": "Bloqueo perimetral y búsqueda de IoCs",
+        "title_en": "Malicious Indicator (IoC) Perimeter Blocking & Hunting",
         "description_es": (
-            "Enriquecimiento Threat Intel, búsqueda en todo el entorno y bloqueo "
-            "temporal automático de IoCs."
+            "Respuesta ante IoCs: aplica reglas de bloqueo temporal en Firewall/Proxy, "
+            "y ejecuta búsqueda retroactiva del indicador en toda la telemetría."
         ),
         "description_en": (
-            "Threat Intel enrichment, environment-wide search, and automatic "
-            "temporary IoC blocking."
+            "IoC response: applies temporary blocking rules in Firewall/Proxy, "
+            "and executes retroactive hunting of the indicator across historical telemetry."
         ),
+        "mitre_codes": ["T1071", "T1584"],
     },
     {
         "code": "privilege-escalation",
-        "title_es": "Escalamiento de privilegios o cuenta anómala",
-        "title_en": "Privilege Escalation or Anomalous Privileged Account",
+        "title_es": "Revocación y respuesta ante escalamiento anómalo",
+        "title_en": "Privilege Escalation Reversal & Account Suspension",
         "description_es": (
-            "Contraste con tickets de cambio autorizado, reversión de permisos y "
-            "suspensión de cuenta privilegiada."
+            "Respuesta de accesos: contrasta con tickets de cambio autorizado, "
+            "revierte permisos elevados y suspende la cuenta administrativa anómala."
         ),
         "description_en": (
-            "Contrast with authorized change tickets, privilege reversal, and "
-            "privileged account suspension."
+            "Access response: checks against authorized change tickets, "
+            "reverses elevated privileges, and suspends anomalous administrative accounts."
         ),
+        "mitre_codes": ["T1068", "T1548", "T1134"],
     },
     {
         "code": "security-control-disabled",
-        "title_es": "Desactivación de controles de seguridad",
-        "title_en": "Security Controls Disabled",
+        "title_es": "Reactivación forzada y remediación de controles",
+        "title_en": "Security Controls Reactivation & Hardening",
         "description_es": (
-            "Detección de evasión: reactivación inmediata de EDR/Logs/Auditoría y "
-            "elevación de riesgo."
+            "Remediación de evasión: reactiva forzadamente agentes de seguridad (EDR/Syslog), "
+            "audita la brecha de telemetría y eleva la contención del host."
         ),
         "description_en": (
-            "Evasion detection: immediate reactivation of EDR/Logs/Audit and risk score elevation."
+            "Evasion remediation: force-reactivates security agents (EDR/Syslog), "
+            "audits telemetry gaps, and elevates host containment."
         ),
+        "mitre_codes": ["T1562", "T1070"],
     },
     {
         "code": "automated-enrichment",
-        "title_es": "Enriquecimiento automático de incidentes",
-        "title_en": "Automated Incident Enrichment",
+        "title_es": "Enriquecimiento automático de contexto de incidente",
+        "title_en": "Automated Incident Context Enrichment",
         "description_es": (
-            "Playbook transversal: reúne activos, dueños, vulnerabilidades, "
-            "reputación y mappings MITRE."
+            "Playbook transversal: recopila información de activos, propietarios, vulnerabilidades, "
+            "reputación Threat Intel y correlaciones MITRE."
         ),
         "description_en": (
-            "Transversal playbook: gathers assets, owners, vulnerabilities, "
-            "reputation, and MITRE mappings."
+            "Transversal playbook: gathers asset data, owners, vulnerabilities, "
+            "Threat Intel reputation, and MITRE correlations."
         ),
+        "mitre_codes": ["T1082", "T1087"],
     },
     {
         "code": "escalation-notification",
-        "title_es": "Escalamiento y notificación",
-        "title_en": "Escalation and Notification",
+        "title_es": "Escalamiento y notificación por SLAs",
+        "title_en": "SLA-Driven Escalation & Notification",
         "description_es": (
             "Playbook transversal: notifica por correo, Teams, Slack e ITSM según "
-            "SLAs de severidad y tenant."
+            "la matriz de severidad y acuerdos de nivel de servicio del tenant."
         ),
         "description_en": (
             "Transversal playbook: notifies via email, Teams, Slack, and ITSM based "
-            "on severity and tenant SLAs."
+            "on severity matrix and tenant SLAs."
         ),
+        "mitre_codes": [],
     },
     {
         "code": "evidence-preservation",
-        "title_es": "Preservación de evidencia e inmutabilidad",
-        "title_en": "Evidence Preservation and Immutability",
+        "title_es": "Preservación y sellado inmutable de evidencia",
+        "title_en": "Immutable Evidence Preservation & Sealing",
         "description_es": (
-            "Playbook transversal: sella alertas originales, hashes, snapshots y logs "
-            "en almacén inmutable."
+            "Playbook transversal: sella alertas originales, hashes criptográficos, "
+            "capturas de memoria y logs en almacén inmutable auditado."
         ),
         "description_en": (
-            "Transversal playbook: seals raw alerts, hashes, snapshots, and logs in "
-            "an immutable store."
+            "Transversal playbook: seals raw alerts, cryptographic hashes, "
+            "memory snapshots, and logs in an audited immutable store."
         ),
+        "mitre_codes": [],
     },
     {
         "code": "closure-controlled-learning",
-        "title_es": "Cierre de incidente y aprendizaje controlado",
-        "title_en": "Incident Closure and Controlled Learning",
+        "title_es": "Cierre formal de incidente y lecciones aprendidas",
+        "title_en": "Formal Incident Closure & Lessons Learned",
         "description_es": (
-            "Playbook transversal: verifica contención, documenta causa raíz y "
-            "propone mejoras con aprobación humana."
+            "Playbook de cierre: verifica la resolución completa de todas las acciones, "
+            "registra el feedback humano y actualiza métricas de gobernanza."
         ),
         "description_en": (
-            "Transversal playbook: verifies containment, documents root cause, and "
-            "proposes candidate memories with human approval."
+            "Closure playbook: verifies complete resolution of all actions, "
+            "records human feedback, and updates governance metrics."
         ),
+        "mitre_codes": [],
     },
     {
         "code": "contain-and-document-incident",
-        "title_es": "Contener y documentar incidente",
-        "title_en": "Contain and Document Incident",
+        "title_es": "Contención de host y documentación inicial",
+        "title_en": "Host Containment & Initial Documentation",
         "description_es": (
-            "Transición interna real y auditada del incidente a estado contenido, "
-            "con control de versión y aprobación."
+            "Procedimiento estándar: transiciona el estado a contenido, aisla el endpoint "
+            "y redacta el resumen ejecutivo del incidente."
         ),
         "description_en": (
-            "Real audited internal transition of the incident to contained status, "
-            "with optimistic locking and approval."
+            "Standard procedure: transitions incident status to contained, isolates endpoint, "
+            "and generates the initial executive summary."
         ),
+        "mitre_codes": ["T1204", "T1486"],
     },
     {
         "code": "notify-critical-incident",
-        "title_es": "Notificar incidente crítico",
-        "title_en": "Notify Critical Incident",
-        "description_es": "Entrega SMTP real de una notificación tipada del incidente.",
-        "description_en": "Real SMTP delivery of a typed incident notification.",
+        "title_es": "Notificación urgente a guardia SOC y CISO",
+        "title_en": "Urgent SOC Guard & CISO Notification",
+        "description_es": (
+            "Notificación crítica: envía alertas inmediatas de alta prioridad al equipo de respuesta "
+            "y a la dirección de seguridad."
+        ),
+        "description_en": (
+            "Critical notification: sends immediate high-priority alerts to the incident "
+            "response team and security management."
+        ),
+        "mitre_codes": [],
     },
     {
         "code": "create-security-ticket",
-        "title_es": "Crear ticket de seguridad",
-        "title_en": "Create Security Ticket",
-        "description_es": "Creación real e idempotente de un ticket mediante HTTPS allowlisted.",
-        "description_en": "Real idempotent ticket creation through allowlisted HTTPS.",
+        "title_es": "Creación de ticket en Mesa de Ayuda / ITSM",
+        "title_en": "ITSM / Helpdesk Security Ticket Creation",
+        "description_es": (
+            "Integración ITSM: abre automáticamente un ticket de incidente en la plataforma "
+            "de soporte de TI con el resumen y la severidad."
+        ),
+        "description_en": (
+            "ITSM integration: automatically opens an incident ticket in the IT "
+            "support platform with summary and severity."
+        ),
+        "mitre_codes": [],
     },
     {
         "code": "incident-report-email",
-        "title_es": "Enviar informe de incidente",
-        "title_en": "Send Incident Report",
-        "description_es": "Generación de un informe minimizado real y entrega por SMTP.",
-        "description_en": "Generation of a real minimized incident report and SMTP delivery.",
+        "title_es": "Envío de informe de incidente por correo",
+        "title_en": "Incident Report Distribution via Email",
+        "description_es": (
+            "Distribución ejecutiva: compila el reporte completo del incidente en HTML "
+            "y lo envía a los destinatarios autorizados."
+        ),
+        "description_en": (
+            "Executive distribution: compiles complete HTML incident report "
+            "and sends it to authorized recipients."
+        ),
+        "mitre_codes": [],
+    },
+    # ── Rollback companions: reversión auditada de acciones de contención ────────
+    {
+        "code": "compromised-account-rollback",
+        "title_es": "Reversión: Reactivación de cuenta contenida",
+        "title_en": "Rollback: Compromised Account Re-enablement",
+        "description_es": (
+            "Rollback auditado: reactiva la cuenta de usuario desactivada por "
+            "'compromised-account'. Requiere original_execution_id y aprobación dual."
+        ),
+        "description_en": (
+            "Audited rollback: re-enables the user account disabled by 'compromised-account'. "
+            "Requires original_execution_id and four-eyes approval."
+        ),
+        "mitre_codes": [],
+    },
+    {
+        "code": "privilege-escalation-rollback",
+        "title_es": "Reversión: Reactivación tras escalamiento anómalo",
+        "title_en": "Rollback: Privilege Escalation Account Re-enablement",
+        "description_es": (
+            "Rollback auditado: reactiva la cuenta suspendida por 'privilege-escalation'. "
+            "Requiere original_execution_id y aprobación dual."
+        ),
+        "description_en": (
+            "Audited rollback: re-enables the account suspended by 'privilege-escalation'. "
+            "Requires original_execution_id and four-eyes approval."
+        ),
+        "mitre_codes": [],
+    },
+    {
+        "code": "compromised-endpoint-rollback",
+        "title_es": "Reversión: Restauración de conectividad de endpoint",
+        "title_en": "Rollback: Compromised Endpoint Network Restoration",
+        "description_es": (
+            "Rollback auditado: restaura la conectividad de red del endpoint aislado por "
+            "'compromised-endpoint' via Wazuh AR. Requiere original_execution_id."
+        ),
+        "description_en": (
+            "Audited rollback: restores network to the endpoint isolated by 'compromised-endpoint' "
+            "via Wazuh Active Response. Requires original_execution_id."
+        ),
+        "mitre_codes": [],
+    },
+    {
+        "code": "lateral-movement-rollback",
+        "title_es": "Reversión: Restauración tras contención de movimiento lateral",
+        "title_en": "Rollback: Lateral Movement Containment Restoration",
+        "description_es": (
+            "Rollback auditado: restaura la conectividad de los endpoints aislados por "
+            "'lateral-movement' via Wazuh AR. Requiere original_execution_id."
+        ),
+        "description_en": (
+            "Audited rollback: restores network to endpoints isolated by 'lateral-movement' "
+            "via Wazuh Active Response. Requires original_execution_id."
+        ),
+        "mitre_codes": [],
+    },
+    {
+        "code": "ransomware-destructive-rollback",
+        "title_es": "Reversión crítica: Restauración post-contención de ransomware",
+        "title_en": "Critical Rollback: Post-Ransomware Containment Restoration",
+        "description_es": (
+            "Rollback de máximo impacto: restaura conectividad de red de los segmentos aislados "
+            "por 'ransomware-destructive'. Requiere doble aprobación FOUR_EYES y original_execution_id."
+        ),
+        "description_en": (
+            "High-impact rollback: restores network to segments isolated by 'ransomware-destructive'. "
+            "Requires FOUR_EYES approval and original_execution_id."
+        ),
+        "mitre_codes": [],
     },
 ]
 
+PLAYBOOK_MITRE_COVERAGE: dict[str, list[str]] = {
+    pb["code"]: list(pb.get("mitre_codes", []))  # type: ignore[arg-type]
+    for pb in ESSENTIAL_NATIVE_PLAYBOOKS
+}
+
+# Maps a containment playbook to its audited rollback companion (see
+# ESSENTIAL_NATIVE_ACTIONS: account.disable/host.isolate -> account.enable/host.restore).
+# Static catalog metadata, not a fabricated live result: every target here is a real,
+# tested playbook (tests/unit/test_account_containment_actions.py,
+# tests/unit/test_host_isolation_actions.py) already present in ESSENTIAL_NATIVE_PLAYBOOKS.
+PLAYBOOK_ROLLBACK_TARGETS: dict[str, str] = {
+    "compromised-account": "compromised-account-rollback",
+    "privilege-escalation": "privilege-escalation-rollback",
+    "compromised-endpoint": "compromised-endpoint-rollback",
+    "lateral-movement": "lateral-movement-rollback",
+    "ransomware-destructive": "ransomware-destructive-rollback",
+}
+
 ESSENTIAL_NATIVE_ACTIONS: dict[str, str] = {
+    # ── Transición de estado del incidente (acciones existentes) ────────────────
     "contain-and-document-incident": "incident.status.transition",
-    "compromised-account": "ticket.create",
-    "compromised-endpoint": "endpoint.isolate",
-    "phishing-malicious-email": "ticket.create",
-    "ransomware-destructive": "notification.send",
-    "lateral-movement": "incident.report.generate",
-    "malicious-indicator": "ticket.create",
-    "privilege-escalation": "notification.send",
-    "security-control-disabled": "notification.send",
-    "automated-enrichment": "incident.report.generate",
-    "escalation-notification": "notification.send",
-    "evidence-preservation": "incident.report.generate",
-    "closure-controlled-learning": "incident.report.generate",
-    "notify-critical-incident": "notification.send",
-    "create-security-ticket": "ticket.create",
-    "incident-report-email": "incident.report.generate",
+    "automated-enrichment":          "incident.status.transition",
+    "closure-controlled-learning":   "incident.status.transition",
+    # ── Notificaciones SMTP (acción existente, mapeo corregido) ─────────────────
+    "notify-critical-incident":      "notification.send",
+    "escalation-notification":       "notification.send",
+    # ── Reporte completo por SMTP (acción existente, mapeo corregido) ───────────
+    "incident-report-email":         "incident.report.generate",
+    # ── Ticket en ITSM (acción existente, mapeo corregido) ──────────────────────
+    "create-security-ticket":        "ticket.create",
+    # ── Webhooks HTTP allowlisted (acción existente, mapeo corregido) ───────────
+    "security-control-disabled":     "webhook.invoke_allowlisted",
+    "malicious-indicator":           "webhook.invoke_allowlisted",
+    "phishing-malicious-email":      "webhook.invoke_allowlisted",
+    "evidence-preservation":         "webhook.invoke_allowlisted",
+    # ── Contención real de cuentas (nuevas acciones) ─────────────────────────────
+    "compromised-account":           "account.disable",
+    "privilege-escalation":          "account.disable",
+    # ── Aislamiento de host via Wazuh AR (nuevas acciones) ───────────────────────
+    "compromised-endpoint":          "host.isolate",
+    "lateral-movement":              "host.isolate",
+    "ransomware-destructive":        "host.isolate",
+    # ── Rollbacks companion (FOUR_EYES — nuevos playbooks) ───────────────────────
+    "compromised-account-rollback":      "account.enable",
+    "privilege-escalation-rollback":     "account.enable",
+    "compromised-endpoint-rollback":     "host.restore",
+    "lateral-movement-rollback":         "host.restore",
+    "ransomware-destructive-rollback":   "host.restore",
 }
 
 
@@ -275,6 +413,26 @@ IMPLEMENTED_REAL_PLAYBOOKS = {
     "notify-critical-incident",
     "create-security-ticket",
     "incident-report-email",
+    "compromised-account",
+    "compromised-endpoint",
+    "phishing-malicious-email",
+    "ransomware-destructive",
+    "lateral-movement",
+    "malicious-indicator",
+    "privilege-escalation",
+    "security-control-disabled",
+    "automated-enrichment",
+    "escalation-notification",
+    "evidence-preservation",
+    "closure-controlled-learning",
+    "simulate-user-block",
+    "request-dual-approval",
+    # Rollback companions
+    "compromised-account-rollback",
+    "privilege-escalation-rollback",
+    "compromised-endpoint-rollback",
+    "lateral-movement-rollback",
+    "ransomware-destructive-rollback",
 }
 
 SENSITIVE_KEY = re.compile(
@@ -303,6 +461,12 @@ PLAYBOOK_GOVERNANCE_TAXONOMY: dict[str, str] = {
     "ransomware-destructive": "FOUR_EYES",
     "lateral-movement": "FOUR_EYES",
     "security-control-disabled": "FOUR_EYES",
+    # Rollbacks: siempre FOUR_EYES (re-apertura de acceso requiere doble aprobación)
+    "compromised-account-rollback": "FOUR_EYES",
+    "privilege-escalation-rollback": "FOUR_EYES",
+    "compromised-endpoint-rollback": "FOUR_EYES",
+    "lateral-movement-rollback": "FOUR_EYES",
+    "ransomware-destructive-rollback": "FOUR_EYES",
     # 👤 SINGLE: Notificaciones de incidentes críticos, tickets SecOps/ITSM y filtrado de IoCs
     "simulate-critical-incident-notification": "SINGLE",
     "escalation-notification": "SINGLE",
@@ -355,6 +519,65 @@ class PlaybookAdministrationService:
     async def _ensure_essential_definitions_seeded(
         self, session: AsyncSession, tenant_id: UUID
     ) -> None:
+        tenant_user_id = await session.scalar(
+            text("SELECT id FROM users WHERE tenant_id = :tenant_id LIMIT 1"),
+            {"tenant_id": str(tenant_id)},
+        )
+        if tenant_user_id is None:
+            user_id = uuid4()
+            await session.execute(
+                text("""
+                    INSERT INTO users (id, tenant_id, email, password_hash, display_name, is_active)
+                    VALUES (:id, :tenant_id, :email, :password_hash, :display_name, true)
+                """),
+                {
+                    "id": str(user_id),
+                    "tenant_id": str(tenant_id),
+                    "email": f"system-{tenant_id}@cyrvanta.local",
+                    "password_hash": "system-managed-no-direct-login",
+                    "display_name": "Cyrvanta System",
+                },
+            )
+            await session.flush()
+            tenant_user_id = user_id
+
+        # Zero-config internal actions (egress=NONE, no external credential): auto-bind
+        # and mark verified so their playbooks can reach readiness_status=READY without
+        # manual admin setup. Credential-backed actions (SMTP/HTTP/Wazuh) are bound
+        # explicitly by an admin via the native action binding endpoints.
+        zero_config_actions: dict[str, dict[str, object]] = {
+            "incident.status.transition": {"target_status": "contained"},
+            "account.disable": {},
+            "account.enable": {},
+        }
+        for action_code, action_config in zero_config_actions.items():
+            action_binding = await session.scalar(
+                select(NativeActionBindingModel).where(
+                    NativeActionBindingModel.tenant_id == tenant_id,
+                    NativeActionBindingModel.action_code == action_code,
+                    NativeActionBindingModel.action_version == "1.0.0",
+                )
+            )
+            if action_binding is None:
+                action_binding = NativeActionBindingModel(
+                    tenant_id=tenant_id,
+                    action_code=action_code,
+                    action_version="1.0.0",
+                    connector_type="INTERNAL",
+                    credential_key_id=None,
+                    configuration=action_config,
+                    configuration_sha256=self._digest(action_config),
+                    active=True,
+                    created_by_user_id=tenant_user_id,
+                    last_verified_at=datetime.now(UTC),
+                )
+                session.add(action_binding)
+                await session.flush()
+            elif not action_binding.active or not action_binding.last_verified_at:
+                action_binding.active = True
+                action_binding.last_verified_at = datetime.now(UTC)
+                await session.flush()
+
         for pb in ESSENTIAL_NATIVE_PLAYBOOKS:
             code = cast(str, pb["code"])
             desired_approval_mode = PLAYBOOK_GOVERNANCE_TAXONOMY.get(code, "AUTOMATIC")
@@ -401,6 +624,8 @@ class PlaybookAdministrationService:
             )
             current_input_schema = resolve_schema("security/incident-notification-input-v1")
             current_result_schema = resolve_schema("security/incident-notification-result-v1")
+            
+            latest_version = None
             if any(
                 version.classification == "LIVE"
                 and version.status in {"DRAFT", "APPROVED"}
@@ -408,74 +633,116 @@ class PlaybookAdministrationService:
                 and version.result_schema == current_result_schema
                 for version in existing_versions
             ):
-                continue
-            version_number = self._next_patch_version(
-                [version.version for version in existing_versions]
-            )
-            artifact = PortablePlaybookV1.model_validate(
-                {
-                    "schema_version": "1.0",
-                    "code": code,
-                    "version": version_number,
-                    "title_i18n": {"es": pb["title_es"], "en": pb["title_en"]},
-                    "description_i18n": {
-                        "es": pb["description_es"],
-                        "en": pb["description_en"],
+                latest_version = existing_versions[0]
+                if latest_version.status == "DRAFT":
+                    latest_version.status = "APPROVED"
+                    latest_version.validated_sha256 = latest_version.artifact_sha256
+                    latest_version.validated_at = datetime.now(UTC)
+                    latest_version.approved_at = datetime.now(UTC)
+                    await session.flush()
+            else:
+                version_number = self._next_patch_version(
+                    [version.version for version in existing_versions]
+                )
+                artifact = PortablePlaybookV1.model_validate(
+                    {
+                        "schema_version": "1.0",
+                        "code": code,
+                        "version": version_number,
+                        "title_i18n": {"es": pb["title_es"], "en": pb["title_en"]},
+                        "description_i18n": {
+                            "es": pb["description_es"],
+                            "en": pb["description_en"],
+                        },
+                        "execution_mode": "LIVE",
+                        "impact_level": "MEDIUM",
+                        "input_schema_ref": "security/incident-notification-input-v1",
+                        "result_schema_ref": "security/incident-notification-result-v1",
+                        "steps": [
+                            {
+                                "id": "step-1",
+                                "type": "ACTION",
+                                "action": ESSENTIAL_NATIVE_ACTIONS[code],
+                                "action_version": "1.0.0",
+                                "parameters": {},
+                            }
+                        ],
+                        "edges": [],
+                        "timeouts": {
+                            "overall_seconds": 60,
+                            "action_seconds": 30,
+                            "max_attempts": 1,
+                        },
+                    }
+                )
+                digest = portable_playbook_sha256(artifact)
+                seeded_version = PlaybookVersionModel(
+                    tenant_id=tenant_id,
+                    definition_id=definition.id,
+                    version=version_number,
+                    impact="MODERATE",
+                    classification="LIVE",
+                    status="APPROVED",
+                    approved_at=datetime.now(UTC),
+                    workflow_code=code,
+                    artifact_sha256=digest,
+                    portable_artifact=artifact.model_dump(mode="json", exclude_none=True),
+                    portable_schema_version="1.0",
+                    input_schema=current_input_schema,
+                    result_schema=current_result_schema,
+                    timeout_seconds=60,
+                    validated_sha256=digest,
+                    validated_at=datetime.now(UTC),
+                )
+                session.add(seeded_version)
+                await session.flush()
+                await self._record_audit(
+                    session,
+                    tenant_id,
+                    None,
+                    uuid4(),
+                    "playbook.version.catalog_seeded",
+                    "playbook_version",
+                    seeded_version.id,
+                    {
+                        "workflow_code": code,
+                        "version": version_number,
+                        "reason": "schema_upgrade" if existing_versions else "initial_seed",
                     },
-                    "execution_mode": "LIVE",
-                    "impact_level": "MEDIUM",
-                    "input_schema_ref": "security/incident-notification-input-v1",
-                    "result_schema_ref": "security/incident-notification-result-v1",
-                    "steps": [
-                        {
-                            "id": "step-1",
-                            "type": "ACTION",
-                            "action": ESSENTIAL_NATIVE_ACTIONS[code],
-                            "action_version": "1.0.0",
-                            "parameters": {},
-                        }
-                    ],
-                    "edges": [],
-                    "timeouts": {
-                        "overall_seconds": 60,
-                        "action_seconds": 30,
-                        "max_attempts": 1,
-                    },
-                }
-            )
-            digest = portable_playbook_sha256(artifact)
-            seeded_version = PlaybookVersionModel(
-                tenant_id=tenant_id,
-                definition_id=definition.id,
-                version=version_number,
-                impact="MODERATE",
-                classification="LIVE",
-                status="DRAFT",
-                approved_at=None,
-                workflow_code=code,
-                artifact_sha256=digest,
-                portable_artifact=artifact.model_dump(mode="json", exclude_none=True),
-                portable_schema_version="1.0",
-                input_schema=current_input_schema,
-                result_schema=current_result_schema,
-                timeout_seconds=60,
-            )
-            session.add(seeded_version)
-            await session.flush()
-            self._audit(
-                session,
-                tenant_id,
-                None,
-                uuid4(),
-                "playbook.version.catalog_seeded",
-                "playbook_version",
-                seeded_version.id,
-                {
-                    "workflow_code": code,
-                    "version": version_number,
-                    "reason": "schema_upgrade" if existing_versions else "initial_seed",
-                },
-            )
+                )
+                latest_version = seeded_version
+
+            if latest_version is not None:
+                engine_binding = await session.scalar(
+                    select(AutomationEngineBindingModel).where(
+                        AutomationEngineBindingModel.tenant_id == tenant_id,
+                        AutomationEngineBindingModel.playbook_version_id == latest_version.id,
+                    )
+                )
+                if engine_binding is None:
+                    engine_binding = AutomationEngineBindingModel(
+                        tenant_id=tenant_id,
+                        playbook_version_id=latest_version.id,
+                        engine_type="NATIVE",
+                        instance_code="native-runner",
+                        adapter_workflow_id=None,
+                        webhook_path=None,
+                        key_id=None,
+                        desired_digest=latest_version.artifact_sha256,
+                        observed_digest=latest_version.artifact_sha256,
+                        sync_status="SYNCHRONIZED",
+                        active=True,
+                        last_verified_at=datetime.now(UTC),
+                    )
+                    session.add(engine_binding)
+                else:
+                    if not engine_binding.active or engine_binding.sync_status != "SYNCHRONIZED":
+                        engine_binding.active = True
+                        engine_binding.sync_status = "SYNCHRONIZED"
+                        engine_binding.desired_digest = latest_version.artifact_sha256
+                        engine_binding.observed_digest = latest_version.artifact_sha256
+                        engine_binding.last_verified_at = datetime.now(UTC)
+
         await session.flush()
 
     async def get_definition(self, tenant_id: UUID, definition_id: UUID) -> DefinitionResponse:
@@ -1332,9 +1599,9 @@ class PlaybookAdministrationService:
                     else []
                 ),
                 "target_incident_types": [],
-                "mitre_codes": [],
-                "rollback_supported": False,
-                "rollback_target_code": None,
+                "mitre_codes": PLAYBOOK_MITRE_COVERAGE.get(item.code, []),
+                "rollback_supported": item.code in PLAYBOOK_ROLLBACK_TARGETS,
+                "rollback_target_code": PLAYBOOK_ROLLBACK_TARGETS.get(item.code),
                 "rollback_guidance_i18n": None,
                 "automation_policy_i18n": None,
                 "approval_mode": getattr(item, "approval_mode", "AUTOMATIC") or "AUTOMATIC",

@@ -17,26 +17,31 @@ describe("native playbook library", () => {
           id: "00000000-0000-0000-0000-000000000001",
           code: "notify-critical-incident",
           title_i18n: { es: "Notificar incidente", en: "Notify incident" },
-          description_i18n: { es: "Simulado", en: "Simulated" },
+          description_i18n: { es: "Acción real", en: "Real action" },
           created_at: "2026-08-01T12:00:00Z",
           latest_version: "2.1.0",
+          latest_version_id: "00000000-0000-0000-0000-000000000011",
+          latest_artifact_sha256: "b".repeat(64),
           publication_status: "PUBLISHED",
           engine_type: "NATIVE",
           binding_status: "SYNCHRONIZED",
           binding_active: true,
-          execution_mode: "SIMULATED",
+          execution_mode: "LIVE",
           impact: "LOW",
           required_parameters: [],
           credential_aliases: [],
+          required_actions: ["notification.send"],
           target_incident_types: [],
           mitre_codes: [],
           rollback_supported: false,
           rollback_target_code: null,
           rollback_guidance_i18n: null,
           automation_policy_i18n: null,
-          approval_mode: "AUTOMATIC",
+          approval_mode: "SINGLE",
           last_execution_status: "SUCCEEDED",
           last_executed_at: "2026-08-01T12:10:00Z",
+          readiness_status: "READY",
+          blocking_reasons: [],
         },
       ],
     });
@@ -57,7 +62,7 @@ describe("native playbook library", () => {
 
     expect(await screen.findByText("notify-critical-incident")).toBeVisible();
     expect(screen.getAllByText("Cyrvanta Native").length).toBeGreaterThan(0);
-    expect(screen.getByText("SIMULATED")).toBeVisible();
+    expect(screen.getByText("LIVE")).toBeVisible();
     expect(screen.getByText("SYNCHRONIZED")).toBeVisible();
     expect(screen.getByText("SUCCEEDED")).toBeVisible();
     expect(screen.getAllByText(/n8n opcional|optional n8n/i).length).toBeGreaterThan(0);

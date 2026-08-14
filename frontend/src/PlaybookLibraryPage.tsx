@@ -69,6 +69,27 @@ export function PlaybookLibraryPage() {
     },
   });
 
+  const [categoryFilter, setCategoryFilter] = useState<"ALL" | "SOAR_SOPS" | "TRANSVERSAL">("ALL");
+
+  const items = nativeLibrary.data?.items ?? [];
+  const filteredItems = items.filter((pb) => {
+    const isSop = pb.mitre_codes.length > 0 || [
+      "compromised-account",
+      "compromised-endpoint",
+      "phishing-malicious-email",
+      "ransomware-destructive",
+      "lateral-movement",
+      "malicious-indicator",
+      "privilege-escalation",
+      "security-control-disabled",
+      "contain-and-document-incident",
+    ].includes(pb.code);
+
+    if (categoryFilter === "SOAR_SOPS") return isSop;
+    if (categoryFilter === "TRANSVERSAL") return !isSop;
+    return true;
+  });
+
   return (
     <>
       <div className="page-title">
@@ -114,11 +135,67 @@ export function PlaybookLibraryPage() {
             <h2>{t("nativeLibrary")}</h2>
           </div>
         </div>
+
+        {/* Category Tabs */}
+        <div style={{ display: "flex", gap: "8px", margin: "1rem 0", flexWrap: "wrap", alignItems: "center" }}>
+          <span style={{ fontSize: "0.85rem", color: "var(--muted)", fontWeight: 600, marginRight: "4px" }}>
+            Filtrar por categoría:
+          </span>
+          <button
+            type="button"
+            className="ghost"
+            style={{
+              padding: "5px 14px",
+              fontSize: "0.8rem",
+              borderRadius: "6px",
+              background: categoryFilter === "ALL" ? "var(--panel-raised)" : "transparent",
+              border: categoryFilter === "ALL" ? "1px solid var(--accent)" : "1px solid transparent",
+              color: categoryFilter === "ALL" ? "var(--accent)" : "var(--text-soft)",
+              fontWeight: categoryFilter === "ALL" ? 700 : 400,
+            }}
+            onClick={() => setCategoryFilter("ALL")}
+          >
+            📋 Todos ({items.length})
+          </button>
+          <button
+            type="button"
+            className="ghost"
+            style={{
+              padding: "5px 14px",
+              fontSize: "0.8rem",
+              borderRadius: "6px",
+              background: categoryFilter === "SOAR_SOPS" ? "var(--panel-raised)" : "transparent",
+              border: categoryFilter === "SOAR_SOPS" ? "1px solid var(--accent)" : "1px solid transparent",
+              color: categoryFilter === "SOAR_SOPS" ? "var(--accent)" : "var(--text-soft)",
+              fontWeight: categoryFilter === "SOAR_SOPS" ? 700 : 400,
+            }}
+            onClick={() => setCategoryFilter("SOAR_SOPS")}
+          >
+            🛡️ Procedimientos de Respuesta / SOPs ({items.filter(pb => pb.mitre_codes.length > 0 || ["compromised-account", "compromised-endpoint", "phishing-malicious-email", "ransomware-destructive", "lateral-movement", "malicious-indicator", "privilege-escalation", "security-control-disabled", "contain-and-document-incident"].includes(pb.code)).length})
+          </button>
+          <button
+            type="button"
+            className="ghost"
+            style={{
+              padding: "5px 14px",
+              fontSize: "0.8rem",
+              borderRadius: "6px",
+              background: categoryFilter === "TRANSVERSAL" ? "var(--panel-raised)" : "transparent",
+              border: categoryFilter === "TRANSVERSAL" ? "1px solid var(--accent)" : "1px solid transparent",
+              color: categoryFilter === "TRANSVERSAL" ? "var(--accent)" : "var(--text-soft)",
+              fontWeight: categoryFilter === "TRANSVERSAL" ? 700 : 400,
+            }}
+            onClick={() => setCategoryFilter("TRANSVERSAL")}
+          >
+            ⚙️ Tareas Operativas Transversales ({items.filter(pb => pb.mitre_codes.length === 0 && !["compromised-account", "compromised-endpoint", "phishing-malicious-email", "ransomware-destructive", "lateral-movement", "malicious-indicator", "privilege-escalation", "security-control-disabled", "contain-and-document-incident"].includes(pb.code)).length})
+          </button>
+        </div>
+
         {nativeLibrary.isLoading && <p>{t("loading")}</p>}
         {nativeLibrary.isError && <p role="alert">{t("error")}</p>}
-        {nativeLibrary.data?.items.length === 0 && <p>{t("emptyState")}</p>}
+        {filteredItems.length === 0 && <p>{t("emptyState")}</p>}
         <div className="playbook-list">
-          {nativeLibrary.data?.items.map((playbook) => {
+          {filteredItems.map((playbook) => {
             const currentMode = playbook.approval_mode ?? "AUTOMATIC";
             const isPublished = playbook.publication_status === "PUBLISHED";
             return (
@@ -168,20 +245,41 @@ export function PlaybookLibraryPage() {
                     <code>{playbook.code}</code>
                   </div>
 
-                  {/* Top Right Action Button Row (All 3 Buttons Aligned Horizontally) */}
+                  {/* Top Right Action Button Row */}
                   <div style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" }}>
                     <button
                       type="button"
                       className="ghost"
+                      style={{
+                        padding: "6px 12px",
+                        fontSize: "0.775rem",
+                        height: "auto",
+                        minHeight: "unset",
+                        minWidth: "unset",
+                        width: "auto",
+                        whiteSpace: "nowrap",
+                        border: "1px solid var(--line)",
+                        fontWeight: 600,
+                      }}
                       onClick={() => setSelectedConfiguration(playbook)}
                     >
-                      Configurar
-                    </button>                    {playbook.publication_status === "DRAFT"
+                      ⚙️ Configurar
+                    </button>
+                    {playbook.publication_status === "DRAFT"
                       && playbook.latest_version_id
                       && playbook.latest_artifact_sha256 && (
                       <button
                         type="button"
                         className="ghost"
+                        style={{
+                          padding: "6px 12px",
+                          fontSize: "0.775rem",
+                          height: "auto",
+                          minHeight: "unset",
+                          minWidth: "unset",
+                          width: "auto",
+                          whiteSpace: "nowrap",
+                        }}
                         disabled={publishMutation.isPending}
                         onClick={() => publishMutation.mutate({
                           versionId: playbook.latest_version_id!,
@@ -208,7 +306,7 @@ export function PlaybookLibraryPage() {
                       }}
                       onClick={() => setSelectedDetails(playbook)}
                     >
-                      {t("viewPlaybookDetails")}
+                      ℹ️ {t("viewPlaybookDetails")}
                     </button>
                     <button
                       type="button"
@@ -357,16 +455,36 @@ export function PlaybookLibraryPage() {
                 </div>
 
                 {/* Card Action Footer */}
-                <div style={{ borderTop: "1px solid var(--line)", paddingTop: "8px", marginTop: "8px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
+                <div style={{ borderTop: "1px solid var(--line)", paddingTop: "8px", marginTop: "8px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "8px" }}>
+                  <div style={{ display: "flex", gap: "10px", alignItems: "center", flexWrap: "wrap" }}>
                     {playbook.rollback_supported && (
                       <span className="demo-badge active">{t("rollbackSupported")}</span>
                     )}
-                    <span style={{ fontSize: "0.75rem", color: "var(--muted)" }}>
-                      {t("mitreTechniques")}: {playbook.mitre_codes.length > 0
-                        ? playbook.mitre_codes.join(", ")
-                        : t("noMitreMappings")}
-                    </span>
+                    {playbook.mitre_codes.length > 0 ? (
+                      <div style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
+                        <span style={{ fontSize: "0.75rem", color: "var(--muted)", fontWeight: 600 }}>🛡️ Mitiga:</span>
+                        {playbook.mitre_codes.map((code) => (
+                          <span
+                            key={code}
+                            style={{
+                              padding: "2px 6px",
+                              borderRadius: "4px",
+                              fontSize: "0.7rem",
+                              background: "rgba(59, 130, 246, 0.12)",
+                              color: "#60a5fa",
+                              border: "1px solid rgba(59, 130, 246, 0.3)",
+                              fontWeight: 600,
+                            }}
+                          >
+                            {code}
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <span style={{ fontSize: "0.75rem", color: "var(--muted)" }}>
+                        {t("mitreTechniques")}: {t("noMitreMappings")}
+                      </span>
+                    )}
                   </div>
                 </div>
             </article>

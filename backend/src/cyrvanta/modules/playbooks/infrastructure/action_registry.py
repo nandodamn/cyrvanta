@@ -4,14 +4,15 @@ import asyncio
 import hashlib
 import smtplib
 import ssl
+from datetime import UTC, datetime
 from email.message import EmailMessage
 from urllib.parse import unquote, urljoin, urlsplit
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import httpx
 from sqlalchemy import select
 
-from cyrvanta.modules.identity.infrastructure.models import AuditEventModel
+from cyrvanta.modules.identity.infrastructure.models import AuditEventModel, UserModel
 from cyrvanta.modules.incident.application.schemas import IncidentTransition
 from cyrvanta.modules.incident.application.service import (
     IncidentConflict,
@@ -21,6 +22,8 @@ from cyrvanta.modules.incident.application.service import (
 )
 from cyrvanta.modules.incident.infrastructure.models import IncidentModel
 from cyrvanta.modules.integrations.application.connection_service import (
+    IntegrationConfigurationError,
+    IntegrationConnectionService,
     StoredIntegrationCredential,
 )
 from cyrvanta.modules.operations.application.reporting import (
@@ -43,12 +46,34 @@ from cyrvanta.shared.target_validation import (
 )
 
 REAL_ACTIONS = (
+    "account.disable",
+    "account.enable",
+    "endpoint.isolate",
+    "host.isolate",
+    "host.restore",
+    "incident.report.generate",
     "incident.status.transition",
     "notification.send",
     "ticket.create",
-    "incident.report.generate",
     "webhook.invoke_allowlisted",
 )
+
+# Internal actions (no egress, retry-safe): no external credential required.
+_INTERNAL_ACTIONS = frozenset({
+    "incident.status.transition",
+    "endpoint.isolate",
+    "account.disable",
+    "account.enable",
+})
+
+# Actions that call Wazuh Active Response (require WAZUH credential).
+_WAZUH_ACTIONS = frozenset({"host.isolate", "host.restore"})
+
+# SMTP actions.
+_SMTP_ACTIONS = frozenset({"notification.send", "incident.report.generate"})
+
+# HTTPS webhook/ticket actions.
+_HTTP_ACTIONS = frozenset({"ticket.create", "webhook.invoke_allowlisted"})
 
 
 class ActionUnavailableError(LookupError):
@@ -62,27 +87,47 @@ class RealActionConnector:
         self._code = code
 
     def describe(self) -> ActionDescriptor:
-        is_http = self._code in {"ticket.create", "webhook.invoke_allowlisted"}
-        is_internal = self._code == "incident.status.transition"
+        is_http = self._code in _HTTP_ACTIONS
+        is_internal = self._code in _INTERNAL_ACTIONS
+        is_wazuh = self._code in _WAZUH_ACTIONS
+        is_high_impact = self._code in {
+            "account.disable", "account.enable", "host.isolate", "host.restore"
+        }
+        retry_safe = self._code in {
+            "incident.status.transition", "endpoint.isolate",
+            "account.disable", "account.enable",
+        }
+        if is_internal:
+            egress = "NONE"
+        elif is_wazuh or is_http:
+            egress = "HTTPS"
+        else:
+            egress = "SMTP"
         return ActionDescriptor(
             code=self._code,
             version="1.0.0",
             modes=("LIVE",),
-            impact="MEDIUM",
+            impact="HIGH" if is_high_impact else "MEDIUM",
             timeout_seconds=30,
-            retry_safe=is_internal,
+            retry_safe=retry_safe,
             cancellable=False,
-            egress="NONE" if is_internal else "HTTPS" if is_http else "SMTP",
+            egress=egress,
         )
 
     def validate_configuration(self, configuration: dict[str, object]) -> ValidationResult:
         invalid = ValidationResult(False, ("PLAYBOOK_ACTION_CONFIG_INVALID",))
-        if self._code == "incident.status.transition":
+        if self._code in {"incident.status.transition", "endpoint.isolate"}:
             return (
                 ValidationResult(True)
-                if configuration == {"target_status": "contained"}
+                if configuration in ({"target_status": "contained"}, {"isolation_mode": "network"})
+                or not configuration
                 else invalid
             )
+        # account.disable / account.enable / host.isolate / host.restore: no operator
+        # configuration — all inputs come at runtime, isolation always runs the
+        # reviewed cyrvanta-network-isolate AR script (see infrastructure/wazuh/agent/).
+        if self._code in {"account.disable", "account.enable", "host.isolate", "host.restore"}:
+            return ValidationResult(True) if not configuration else invalid
         if self._code in {"notification.send", "incident.report.generate"}:
             required, allowed = {"to"}, {"to", "subject_prefix"}
         else:
@@ -152,7 +197,7 @@ class RealActionConnector:
         validation = self.validate_configuration(configuration)
         if not validation.valid:
             return ActionResult(False, {}, validation.error_codes[0])
-        if self._code == "incident.status.transition":
+        if self._code in {"incident.status.transition", "endpoint.isolate"}:
             inputs = action_input.get("inputs")
             if not isinstance(inputs, dict):
                 return ActionResult(False, {}, "PLAYBOOK_ACTION_CONFIG_INVALID")
@@ -211,6 +256,20 @@ class RealActionConnector:
                 },
                 safe_detail="Incident transitioned to contained",
             )
+        # ── Account containment: disable / enable user in Cyrvanta BD ─────────
+        if self._code == "account.disable":
+            return await self._execute_account_disable(context, action_input, idempotency_key)
+        if self._code == "account.enable":
+            return await self._execute_account_enable(context, action_input, idempotency_key)
+        # ── Host isolation via Wazuh Active Response ───────────────────────────
+        if self._code == "host.isolate":
+            return await self._execute_host_isolate(
+                context, action_input, configuration, idempotency_key, credential_handle
+            )
+        if self._code == "host.restore":
+            return await self._execute_host_restore(
+                context, action_input, configuration, idempotency_key, credential_handle
+            )
         if not isinstance(credential_handle, StoredIntegrationCredential):
             return ActionResult(False, {}, "PLAYBOOK_CREDENTIAL_UNAVAILABLE")
         try:
@@ -246,6 +305,433 @@ class RealActionConnector:
             True,
             {"effect": "applied", "action_code": self._code, "status": status, "receipt": receipt},
             safe_detail="External action completed",
+        )
+
+    # ── Private helpers: account containment ───────────────────────────────────
+
+    async def _execute_account_disable(
+        self,
+        context: EngineContext,
+        action_input: dict[str, object],
+        idempotency_key: str,
+    ) -> ActionResult:
+        """Disable a Cyrvanta user (is_active=False) and record an immutable audit snapshot."""
+        inputs = action_input.get("inputs")
+        if not isinstance(inputs, dict):
+            return ActionResult(False, {}, "PLAYBOOK_ACTION_CONFIG_INVALID")
+        try:
+            target_user_id = UUID(str(inputs["target_user_id"]))
+            actor_user_id = UUID(str(inputs["actor_user_id"]))
+        except (KeyError, ValueError):
+            return ActionResult(False, {}, "PLAYBOOK_ACTION_CONFIG_INVALID")
+        async with tenant_session(context.tenant_id) as session:
+            # Idempotency: check prior audit event for this correlation
+            prior = await session.scalar(
+                select(AuditEventModel.id).where(
+                    AuditEventModel.tenant_id == context.tenant_id,
+                    AuditEventModel.resource_id == target_user_id,
+                    AuditEventModel.action == "user.account.disabled",
+                    AuditEventModel.correlation_id == context.correlation_id,
+                )
+            )
+            if prior is not None:
+                # Already executed — return success (idempotent)
+                receipt = hashlib.sha256(
+                    f"{idempotency_key}:{target_user_id}:disabled".encode()
+                ).hexdigest()[:24]
+                return ActionResult(
+                    True,
+                    {"effect": "idempotent", "action_code": self._code,
+                     "target_user_id": str(target_user_id), "receipt": receipt},
+                    safe_detail="Account already disabled (idempotent)",
+                )
+            user = await session.scalar(
+                select(UserModel).where(
+                    UserModel.tenant_id == context.tenant_id,
+                    UserModel.id == target_user_id,
+                )
+            )
+            if user is None:
+                return ActionResult(False, {}, "PLAYBOOK_ACTION_FAILED", "Target user not found")
+            snapshot = {
+                "was_active": user.is_active,
+                "email": user.email,
+                "display_name": user.display_name,
+            }
+            user.is_active = False
+            user.updated_at = datetime.now(UTC)
+            session.add(
+                AuditEventModel(
+                    id=uuid4(),
+                    tenant_id=context.tenant_id,
+                    actor_user_id=actor_user_id,
+                    action="user.account.disabled",
+                    resource_type="user",
+                    resource_id=target_user_id,
+                    outcome="SUCCESS",
+                    correlation_id=context.correlation_id,
+                    details={"playbook_action": self._code, "snapshot": snapshot},
+                )
+            )
+            await session.flush()
+        receipt = hashlib.sha256(
+            f"{idempotency_key}:{target_user_id}:disabled".encode()
+        ).hexdigest()[:24]
+        return ActionResult(
+            True,
+            {
+                "effect": "applied",
+                "action_code": self._code,
+                "target_user_id": str(target_user_id),
+                "snapshot": snapshot,
+                "receipt": receipt,
+            },
+            safe_detail="User account disabled",
+        )
+
+    async def _execute_account_enable(
+        self,
+        context: EngineContext,
+        action_input: dict[str, object],
+        idempotency_key: str,
+    ) -> ActionResult:
+        """Re-enable a Cyrvanta user (rollback of account.disable). Requires original_execution_id."""
+        inputs = action_input.get("inputs")
+        if not isinstance(inputs, dict):
+            return ActionResult(False, {}, "PLAYBOOK_ACTION_CONFIG_INVALID")
+        try:
+            target_user_id = UUID(str(inputs["target_user_id"]))
+            actor_user_id = UUID(str(inputs["actor_user_id"]))
+            original_execution_id = str(inputs["original_execution_id"])
+        except (KeyError, ValueError):
+            return ActionResult(False, {}, "PLAYBOOK_ACTION_CONFIG_INVALID")
+        async with tenant_session(context.tenant_id) as session:
+            # Verify the original disable audit event exists (rollback traceability)
+            original_event = await session.scalar(
+                select(AuditEventModel).where(
+                    AuditEventModel.tenant_id == context.tenant_id,
+                    AuditEventModel.resource_id == target_user_id,
+                    AuditEventModel.action == "user.account.disabled",
+                )
+            )
+            if original_event is None:
+                return ActionResult(
+                    False, {}, "PLAYBOOK_STATE_CONFLICT",
+                    "No prior account.disable audit event found for this user"
+                )
+            # Idempotency: check prior enable for this correlation
+            prior = await session.scalar(
+                select(AuditEventModel.id).where(
+                    AuditEventModel.tenant_id == context.tenant_id,
+                    AuditEventModel.resource_id == target_user_id,
+                    AuditEventModel.action == "user.account.enabled",
+                    AuditEventModel.correlation_id == context.correlation_id,
+                )
+            )
+            if prior is not None:
+                receipt = hashlib.sha256(
+                    f"{idempotency_key}:{target_user_id}:enabled".encode()
+                ).hexdigest()[:24]
+                return ActionResult(
+                    True,
+                    {"effect": "idempotent", "action_code": self._code,
+                     "target_user_id": str(target_user_id), "receipt": receipt},
+                    safe_detail="Account already re-enabled (idempotent)",
+                )
+            user = await session.scalar(
+                select(UserModel).where(
+                    UserModel.tenant_id == context.tenant_id,
+                    UserModel.id == target_user_id,
+                )
+            )
+            if user is None:
+                return ActionResult(False, {}, "PLAYBOOK_ACTION_FAILED", "Target user not found")
+            user.is_active = True
+            user.updated_at = datetime.now(UTC)
+            session.add(
+                AuditEventModel(
+                    id=uuid4(),
+                    tenant_id=context.tenant_id,
+                    actor_user_id=actor_user_id,
+                    action="user.account.enabled",
+                    resource_type="user",
+                    resource_id=target_user_id,
+                    outcome="SUCCESS",
+                    correlation_id=context.correlation_id,
+                    details={
+                        "playbook_action": self._code,
+                        "original_execution_id": original_execution_id,
+                        "rollback": True,
+                    },
+                )
+            )
+            await session.flush()
+        receipt = hashlib.sha256(
+            f"{idempotency_key}:{target_user_id}:enabled".encode()
+        ).hexdigest()[:24]
+        return ActionResult(
+            True,
+            {
+                "effect": "applied",
+                "action_code": self._code,
+                "target_user_id": str(target_user_id),
+                "original_execution_id": original_execution_id,
+                "receipt": receipt,
+            },
+            safe_detail="User account re-enabled (rollback)",
+        )
+
+    # ── Private helpers: Wazuh Active Response ─────────────────────────────────
+
+    async def _wazuh_authenticate(self, credential: dict[str, object]) -> str:
+        """Obtain a short-lived Wazuh bearer token via basic authentication."""
+        base_url = str(credential["base_url"]).rstrip("/")
+        timeout = min(30, max(1, int(credential.get("timeout_seconds", 10))))
+        auth = (str(credential["username"]), str(credential["password"]))
+        async with httpx.AsyncClient(timeout=timeout, follow_redirects=False,
+                                     verify=True) as client:
+            resp = await client.get(
+                f"{base_url}/security/user/authenticate?raw=true",
+                auth=auth,
+            )
+            resp.raise_for_status()
+        token = resp.text.strip()
+        if not token or len(token) > 4096 or contains_control_characters(token):
+            raise ValueError("Invalid Wazuh authentication token")
+        return token
+
+    async def _execute_host_isolate(
+        self,
+        context: EngineContext,
+        action_input: dict[str, object],
+        configuration: dict[str, object],
+        idempotency_key: str,
+        credential_handle: CredentialHandle | None,
+    ) -> ActionResult:
+        """Send a Wazuh Active Response command to isolate a host from the network."""
+        if not isinstance(credential_handle, StoredIntegrationCredential):
+            return ActionResult(False, {}, "PLAYBOOK_CREDENTIAL_UNAVAILABLE")
+        inputs = action_input.get("inputs")
+        if not isinstance(inputs, dict):
+            return ActionResult(False, {}, "PLAYBOOK_ACTION_CONFIG_INVALID")
+        try:
+            target_agent_id = str(inputs["target_agent_id"])
+            actor_user_id = UUID(str(inputs["actor_user_id"]))
+        except (KeyError, ValueError):
+            return ActionResult(False, {}, "PLAYBOOK_ACTION_CONFIG_INVALID")
+        # Validate agent_id format: 3-digit Wazuh ID or full UUID
+        if not target_agent_id or len(target_agent_id) > 64 or contains_control_characters(target_agent_id):
+            return ActionResult(False, {}, "PLAYBOOK_ACTION_CONFIG_INVALID")
+        credential = credential_handle.values
+        base_url = str(credential["base_url"]).rstrip("/")
+        timeout = min(30, max(1, int(credential.get("timeout_seconds", 10))))
+        async with tenant_session(context.tenant_id) as session:
+            # Idempotency: check prior audit event
+            prior = await session.scalar(
+                select(AuditEventModel.id).where(
+                    AuditEventModel.tenant_id == context.tenant_id,
+                    AuditEventModel.action == "host.network.isolated",
+                    AuditEventModel.correlation_id == context.correlation_id,
+                )
+            )
+            if prior is not None:
+                receipt = hashlib.sha256(
+                    f"{idempotency_key}:{target_agent_id}:isolated".encode()
+                ).hexdigest()[:24]
+                return ActionResult(
+                    True,
+                    {"effect": "idempotent", "action_code": self._code,
+                     "target_agent_id": target_agent_id, "receipt": receipt},
+                    safe_detail="Host already isolated (idempotent)",
+                )
+        try:
+            token = await self._wazuh_authenticate(credential)
+            ar_payload = {
+                "command": "!cyrvanta-network-isolate",
+                "arguments": ["add", str(context.correlation_id)],
+            }
+            headers = {
+                "Authorization": f"Bearer {token}",
+                "Content-Type": "application/json",
+                "X-Cyrvanta-Correlation": str(context.correlation_id),
+            }
+            async with httpx.AsyncClient(timeout=timeout, follow_redirects=False,
+                                         verify=True) as client:
+                resp = await client.put(
+                    f"{base_url}/active-response",
+                    params={"agents_list": target_agent_id},
+                    headers=headers,
+                    json=ar_payload,
+                )
+                resp.raise_for_status()
+                body = resp.json()
+            if body.get("error") or body["data"]["total_failed_items"] > 0:
+                return ActionResult(False, {}, "PLAYBOOK_ACTION_FAILED",
+                                    "Wazuh rejected the active-response command")
+            wazuh_task_id = resp.headers.get("X-Request-Id", "")
+        except httpx.HTTPError:
+            return ActionResult(False, {}, "PLAYBOOK_ACTION_OUTCOME_UNKNOWN",
+                                "Wazuh AR isolation command outcome unknown")
+        except (ValueError, KeyError):
+            return ActionResult(False, {}, "PLAYBOOK_ACTION_FAILED")
+        # Write audit event
+        async with tenant_session(context.tenant_id) as session:
+            session.add(
+                AuditEventModel(
+                    id=uuid4(),
+                    tenant_id=context.tenant_id,
+                    actor_user_id=actor_user_id,
+                    action="host.network.isolated",
+                    resource_type="wazuh_agent",
+                    resource_id=None,
+                    outcome="SUCCESS",
+                    correlation_id=context.correlation_id,
+                    details={
+                        "playbook_action": self._code,
+                        "target_agent_id": target_agent_id,
+                        "wazuh_task_id": wazuh_task_id,
+                    },
+                )
+            )
+            await session.flush()
+        receipt = hashlib.sha256(
+            f"{idempotency_key}:{target_agent_id}:isolated".encode()
+        ).hexdigest()[:24]
+        return ActionResult(
+            True,
+            {
+                "effect": "applied",
+                "action_code": self._code,
+                "target_agent_id": target_agent_id,
+                "wazuh_task_id": wazuh_task_id,
+                "receipt": receipt,
+            },
+            safe_detail="Host network isolated via Wazuh AR",
+        )
+
+    async def _execute_host_restore(
+        self,
+        context: EngineContext,
+        action_input: dict[str, object],
+        configuration: dict[str, object],
+        idempotency_key: str,
+        credential_handle: CredentialHandle | None,
+    ) -> ActionResult:
+        """Send a Wazuh Active Response command to restore host network (rollback of host.isolate)."""
+        if not isinstance(credential_handle, StoredIntegrationCredential):
+            return ActionResult(False, {}, "PLAYBOOK_CREDENTIAL_UNAVAILABLE")
+        inputs = action_input.get("inputs")
+        if not isinstance(inputs, dict):
+            return ActionResult(False, {}, "PLAYBOOK_ACTION_CONFIG_INVALID")
+        try:
+            target_agent_id = str(inputs["target_agent_id"])
+            actor_user_id = UUID(str(inputs["actor_user_id"]))
+            original_execution_id = str(inputs["original_execution_id"])
+        except (KeyError, ValueError):
+            return ActionResult(False, {}, "PLAYBOOK_ACTION_CONFIG_INVALID")
+        if not target_agent_id or len(target_agent_id) > 64 or contains_control_characters(target_agent_id):
+            return ActionResult(False, {}, "PLAYBOOK_ACTION_CONFIG_INVALID")
+        async with tenant_session(context.tenant_id) as session:
+            # Verify prior isolation event exists (rollback traceability)
+            original_event = await session.scalar(
+                select(AuditEventModel).where(
+                    AuditEventModel.tenant_id == context.tenant_id,
+                    AuditEventModel.action == "host.network.isolated",
+                    AuditEventModel.details["target_agent_id"].astext == target_agent_id,
+                )
+            )
+            if original_event is None:
+                return ActionResult(
+                    False, {}, "PLAYBOOK_STATE_CONFLICT",
+                    "No prior host.isolate audit event found for this agent"
+                )
+            # Idempotency
+            prior = await session.scalar(
+                select(AuditEventModel.id).where(
+                    AuditEventModel.tenant_id == context.tenant_id,
+                    AuditEventModel.action == "host.network.restored",
+                    AuditEventModel.correlation_id == context.correlation_id,
+                )
+            )
+            if prior is not None:
+                receipt = hashlib.sha256(
+                    f"{idempotency_key}:{target_agent_id}:restored".encode()
+                ).hexdigest()[:24]
+                return ActionResult(
+                    True,
+                    {"effect": "idempotent", "action_code": self._code,
+                     "target_agent_id": target_agent_id, "receipt": receipt},
+                    safe_detail="Host already restored (idempotent)",
+                )
+        credential = credential_handle.values
+        base_url = str(credential["base_url"]).rstrip("/")
+        timeout = min(30, max(1, int(credential.get("timeout_seconds", 10))))
+        try:
+            token = await self._wazuh_authenticate(credential)
+            ar_payload = {
+                "command": "!cyrvanta-network-isolate",
+                "arguments": ["delete", str(context.correlation_id)],
+            }
+            headers = {
+                "Authorization": f"Bearer {token}",
+                "Content-Type": "application/json",
+                "X-Cyrvanta-Correlation": str(context.correlation_id),
+            }
+            async with httpx.AsyncClient(timeout=timeout, follow_redirects=False,
+                                         verify=True) as client:
+                resp = await client.put(
+                    f"{base_url}/active-response",
+                    params={"agents_list": target_agent_id},
+                    headers=headers,
+                    json=ar_payload,
+                )
+                resp.raise_for_status()
+                body = resp.json()
+            if body.get("error") or body["data"]["total_failed_items"] > 0:
+                return ActionResult(False, {}, "PLAYBOOK_ACTION_FAILED",
+                                    "Wazuh rejected the active-response command")
+            wazuh_task_id = resp.headers.get("X-Request-Id", "")
+        except httpx.HTTPError:
+            return ActionResult(False, {}, "PLAYBOOK_ACTION_OUTCOME_UNKNOWN",
+                                "Wazuh AR restore command outcome unknown")
+        except (ValueError, KeyError):
+            return ActionResult(False, {}, "PLAYBOOK_ACTION_FAILED")
+        # Write audit event
+        async with tenant_session(context.tenant_id) as session:
+            session.add(
+                AuditEventModel(
+                    id=uuid4(),
+                    tenant_id=context.tenant_id,
+                    actor_user_id=actor_user_id,
+                    action="host.network.restored",
+                    resource_type="wazuh_agent",
+                    resource_id=None,
+                    outcome="SUCCESS",
+                    correlation_id=context.correlation_id,
+                    details={
+                        "playbook_action": self._code,
+                        "target_agent_id": target_agent_id,
+                        "wazuh_task_id": wazuh_task_id,
+                        "original_execution_id": original_execution_id,
+                        "rollback": True,
+                    },
+                )
+            )
+            await session.flush()
+        receipt = hashlib.sha256(
+            f"{idempotency_key}:{target_agent_id}:restored".encode()
+        ).hexdigest()[:24]
+        return ActionResult(
+            True,
+            {
+                "effect": "applied",
+                "action_code": self._code,
+                "target_agent_id": target_agent_id,
+                "original_execution_id": original_execution_id,
+                "wazuh_task_id": wazuh_task_id,
+                "receipt": receipt,
+            },
+            safe_detail="Host network restored via Wazuh AR (rollback)",
         )
 
     async def _safe_external_payload(

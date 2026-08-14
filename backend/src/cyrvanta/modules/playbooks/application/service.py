@@ -334,6 +334,7 @@ class PlaybookExecutionService:
                 global_kill_switch=global_kill_switch,
                 tenant_kill_switch=policy.kill_switch,
                 is_simulated=incident.is_simulated,
+                automatic_response_enabled=get_settings().decision_automatic_response_enabled,
             )
         except ValueError as exc:
             raise PlaybookConflict("Authorized policy material is invalid") from exc

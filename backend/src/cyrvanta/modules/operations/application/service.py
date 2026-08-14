@@ -72,19 +72,19 @@ PLAYBOOK_METADATA = {
     "block-ip-address": ("Cyrvanta — Block IP Address", ("firewall-gateway",)),
     "isolate-endpoint": ("Cyrvanta — Isolate Host Endpoint", ("edr-agent",)),
     "revoke-user-sessions": ("Cyrvanta — Revoke Active User Sessions", ("identity-provider",)),
-    "notify-critical-incident": (
+    "cyrvanta-notify-critical-incident": (
         "Cyrvanta — Notify Critical Incident",
         ("notification-channel",),
     ),
-    "create-security-ticket": (
+    "cyrvanta-create-security-ticket": (
         "Cyrvanta — Create Security Ticket",
         ("ticketing-system",),
     ),
-    "request-dual-approval": (
+    "cyrvanta-request-dual-approval": (
         "Cyrvanta — Request Dual Approval",
         ("notification-channel",),
     ),
-    "incident-report-email": (
+    "cyrvanta-incident-report-email": (
         "Cyrvanta — Incident Report Email",
         ("smtp-outbound",),
     ),

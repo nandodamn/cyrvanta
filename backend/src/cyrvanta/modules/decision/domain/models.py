@@ -53,6 +53,7 @@ def evaluate_policy(
     global_kill_switch: bool,
     tenant_kill_switch: bool,
     is_simulated: bool,
+    automatic_response_enabled: bool = False,
 ) -> PolicyResult:
     if global_kill_switch or tenant_kill_switch:
         return PolicyResult(EvaluationOutcome.DENIED, 0, ("KILL_SWITCH_ACTIVE",))
@@ -61,7 +62,9 @@ def evaluate_policy(
     if requested_mode is ResponseMode.RECOMMENDATION_ONLY:
         return PolicyResult(EvaluationOutcome.DENIED, 0, ("RECOMMENDATION_ONLY",))
     if requested_mode is ResponseMode.AUTOMATIC:
-        return PolicyResult(EvaluationOutcome.DENIED, 0, ("AUTOMATIC_DISABLED",))
+        if not automatic_response_enabled:
+            return PolicyResult(EvaluationOutcome.DENIED, 0, ("AUTOMATIC_DISABLED",))
+        return PolicyResult(EvaluationOutcome.ELIGIBLE_FOR_AUTOMATIC, 0, ("AUTOMATIC_APPROVED",))
     if impact is ActionImpact.HIGH or requested_mode is ResponseMode.DUAL_APPROVAL:
         return PolicyResult(
             EvaluationOutcome.DUAL_APPROVAL_REQUIRED,

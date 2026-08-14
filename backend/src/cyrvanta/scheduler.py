@@ -3,6 +3,9 @@ import logging
 
 from cyrvanta.modules.decision.application.service import DecisionService
 from cyrvanta.modules.governed_memory.application.service import GovernedMemoryService
+from cyrvanta.modules.integrations.application.automatic_wazuh_ingestion import (
+    AutomaticWazuhIngestionService,
+)
 from cyrvanta.modules.playbooks.infrastructure.hybrid_dispatcher import (
     HybridPlaybookDispatcher,
 )
@@ -17,6 +20,7 @@ async def run() -> None:
     dispatcher = HybridPlaybookDispatcher(settings)
     decisions = DecisionService()
     memory = GovernedMemoryService()
+    wazuh_ingestion = AutomaticWazuhIngestionService(settings)
     while True:
         logger.info("scheduler_heartbeat")
         dispatched = await dispatcher.dispatch_pending()
@@ -25,6 +29,15 @@ async def run() -> None:
         timed_out = await dispatcher.reconcile_timeouts()
         if timed_out:
             logger.info("playbook_timeouts_reconciled", extra={"count": timed_out})
+        try:
+            synced_tenants = await wazuh_ingestion.synchronize_all_tenants()
+        except Exception:
+            logger.exception("wazuh_ingestion_cycle_failed")
+        else:
+            if synced_tenants:
+                logger.info(
+                    "wazuh_ingestion_cycle_completed", extra={"tenants": synced_tenants}
+                )
         expired_requests, expired_authorizations = await decisions.expire_due()
         if expired_requests or expired_authorizations:
             logger.info(

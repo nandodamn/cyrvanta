@@ -51,6 +51,47 @@ def test_policy_denies_critical_automatic_and_kill_switch() -> None:
     assert killed.reason_codes == ("KILL_SWITCH_ACTIVE",)
 
 
+def test_policy_allows_automatic_only_when_explicitly_enabled() -> None:
+    still_denied = evaluate_policy(
+        impact=ActionImpact.LOW,
+        requested_mode=ResponseMode.AUTOMATIC,
+        global_kill_switch=False,
+        tenant_kill_switch=False,
+        is_simulated=False,
+        automatic_response_enabled=False,
+    )
+    enabled = evaluate_policy(
+        impact=ActionImpact.LOW,
+        requested_mode=ResponseMode.AUTOMATIC,
+        global_kill_switch=False,
+        tenant_kill_switch=False,
+        is_simulated=False,
+        automatic_response_enabled=True,
+    )
+    enabled_but_killed = evaluate_policy(
+        impact=ActionImpact.LOW,
+        requested_mode=ResponseMode.AUTOMATIC,
+        global_kill_switch=True,
+        tenant_kill_switch=False,
+        is_simulated=False,
+        automatic_response_enabled=True,
+    )
+    enabled_but_critical = evaluate_policy(
+        impact=ActionImpact.CRITICAL,
+        requested_mode=ResponseMode.AUTOMATIC,
+        global_kill_switch=False,
+        tenant_kill_switch=False,
+        is_simulated=False,
+        automatic_response_enabled=True,
+    )
+    assert still_denied.outcome is EvaluationOutcome.DENIED
+    assert still_denied.reason_codes == ("AUTOMATIC_DISABLED",)
+    assert enabled.outcome is EvaluationOutcome.ELIGIBLE_FOR_AUTOMATIC
+    assert enabled.reason_codes == ("AUTOMATIC_APPROVED",)
+    assert enabled_but_killed.reason_codes == ("KILL_SWITCH_ACTIVE",)
+    assert enabled_but_critical.reason_codes == ("CRITICAL_ACTION_DENIED",)
+
+
 def test_fingerprint_is_deterministic_and_sensitive_to_material_change() -> None:
     left = {"targets": ["a"], "parameters": {"b": 2, "a": 1}}
     reordered = {"parameters": {"a": 1, "b": 2}, "targets": ["a"]}

@@ -291,6 +291,7 @@ class DecisionService:
                 global_kill_switch=get_settings().automation_kill_switch,
                 tenant_kill_switch=policy.kill_switch,
                 is_simulated=incident.is_simulated,
+                automatic_response_enabled=get_settings().decision_automatic_response_enabled,
             )
             proposal = ActionProposalModel(
                 tenant_id=tenant_id,

@@ -48,9 +48,12 @@ class Settings(BaseSettings):
     n8n_base_url: str = "http://n8n:5678"
     n8n_editor_url: str = "http://localhost:5678"
     n8n_api_key: str = ""
+    # Must match the "id" field baked into infrastructure/n8n/workflows/*.json --
+    # those are the real, deployed n8n workflow ids (cyrvanta- prefixed).
     n8n_allowed_workflow_ids: str = (
-        "notify-critical-incident,create-security-ticket,"
-        "request-dual-approval,incident-report-email"
+        "cyrvanta-simulate-user-block,cyrvanta-notify-critical-incident,"
+        "cyrvanta-create-security-ticket,cyrvanta-request-dual-approval,"
+        "cyrvanta-incident-report-email"
     )
     n8n_dispatch_key: str = ""
     n8n_callback_key: str = ""
@@ -60,6 +63,10 @@ class Settings(BaseSettings):
     playbook_native_enabled_tenants: str = ""
     playbook_live_enabled: bool = False
     playbook_dispatch_enabled: bool = False
+    # PHASE_20: ResponseMode.AUTOMATIC is denied unconditionally unless this is
+    # explicitly enabled. Default off -- "respuesta automática desactivada por
+    # defecto" (D-007). Human-approval/dual-approval modes are unaffected.
+    decision_automatic_response_enabled: bool = False
     memory_influence_enabled: bool = False
     memory_max_validity_days: int = Field(default=90, ge=1, le=365)
     memory_minimum_sample_size: int = Field(default=20, ge=1, le=10_000)

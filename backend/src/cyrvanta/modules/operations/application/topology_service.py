@@ -38,6 +38,11 @@ _DEFAULT_WAZUH_TIMEOUT_SECONDS = 10
 _MIN_WAZUH_TIMEOUT_SECONDS = 1
 _MAX_WAZUH_TIMEOUT_SECONDS = 30
 _VALID_SEVERITIES = ("critical", "high", "medium", "low", "informational")
+# Connectors this platform runs as its own dependency and already probes in
+# _core_nodes. They are not detection sources, so the security-feed zone must
+# not list them: n8n executes playbooks and Ollama drafts wording, neither
+# reports findings.
+_CORE_REPRESENTED_CONNECTORS = frozenset({"OPENSEARCH", "N8N", "OLLAMA"})
 
 
 class _Probe:
@@ -385,8 +390,10 @@ class NetworkTopologyService:
 
         for integration in integrations:
             connector = integration.connector_type.upper()
-            # OpenSearch is already represented as a Cyrvanta core dependency.
-            if connector == "OPENSEARCH":
+            if connector in _CORE_REPRESENTED_CONNECTORS:
+                # Drawing these here would put the same system on the map twice,
+                # once probed as a core dependency and once as a configuration
+                # row, with two different statuses for one service.
                 continue
             if connector == "WAZUH":
                 wazuh_configured = True

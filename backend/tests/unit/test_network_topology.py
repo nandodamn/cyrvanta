@@ -4,6 +4,7 @@ from uuid import UUID
 import pytest
 
 from cyrvanta.modules.operations.application.topology_service import (
+    _CORE_REPRESENTED_CONNECTORS,
     _PROBE_TIMEOUT_SECONDS,
     NetworkTopologyService,
     _resolve_wazuh_timeout,
@@ -115,3 +116,25 @@ def test_wazuh_timeout_uses_the_connector_budget_not_the_probe_budget() -> None:
 
     # The budget must exceed the probe budget, which is what caused the bug.
     assert _resolve_wazuh_timeout(None) > _PROBE_TIMEOUT_SECONDS
+
+
+@pytest.mark.asyncio
+async def test_core_dependencies_are_not_also_drawn_as_security_feeds() -> None:
+    """Regression: n8n appeared twice, as a core node and as a "security feed".
+
+    _core_nodes probes n8n and Ollama as dependencies this platform runs, while
+    _feed_nodes drew a node for every integration row. The same service then
+    showed up in two zones with two independent statuses -- and in the feed zone
+    it claimed to be a detection source, which neither one is.
+    """
+    tenant_id = await _existing_tenant_id()
+
+    response = await NetworkTopologyService().get_topology(tenant_id)
+
+    feed_ids = {n.id for n in response.nodes if n.category == "SECURITY_FEED"}
+    for connector in _CORE_REPRESENTED_CONNECTORS:
+        assert f"integ-{connector.lower()}" not in feed_ids, connector
+
+    # Every node id is still unique across the whole projection.
+    ids = [node.id for node in response.nodes]
+    assert len(ids) == len(set(ids))

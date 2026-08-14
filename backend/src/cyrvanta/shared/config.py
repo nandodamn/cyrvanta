@@ -42,7 +42,15 @@ class Settings(BaseSettings):
     ollama_mode: Literal["disabled", "live"] = "disabled"
     ollama_base_url: str = "http://host.docker.internal:11434"
     ollama_model: str = "gemma4:e4b"
-    ai_request_timeout_seconds: int = 120
+    # How long the provider asks Ollama to keep the model resident after a call.
+    # Incidents arrive minutes or hours apart, and Ollama evicts an idle model
+    # after five minutes by default, so without this nearly every request pays
+    # the full load cost of a multi-gigabyte model before it can infer.
+    ollama_keep_alive: str = "30m"
+    # Must cover a cold load of the configured model, not just inference: a
+    # 9.6 GB model needs roughly two minutes to page in on CPU, against ~25s to
+    # infer once resident. Redaction is dropped silently when this is exceeded.
+    ai_request_timeout_seconds: int = 300
     n8n_mode: Literal["disabled", "live"] = "disabled"
     n8n_enabled: bool = False
     n8n_base_url: str = "http://n8n:5678"

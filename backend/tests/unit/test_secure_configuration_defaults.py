@@ -71,3 +71,23 @@ def test_production_rejects_unsafe_security_configuration(
 ) -> None:
     with pytest.raises(ValidationError):
         production_settings(**override)
+
+
+def test_ai_timeout_covers_a_cold_model_load() -> None:
+    """Regression: redaction was dropped silently whenever the model was cold.
+
+    Inference against a resident model takes about 25s, but Ollama evicts an
+    idle model after five minutes, and paging a multi-gigabyte model back in
+    measured 121s-151s. The old 120s budget therefore expired mid-load, and
+    because the provider turns any failure into None, the explanation was lost
+    without a trace -- precisely in the sporadic-incident pattern a SOC has.
+    """
+    defaults = {name: field.default for name, field in Settings.model_fields.items()}
+
+    # Must leave real headroom over an observed cold load, not just inference.
+    assert defaults["ai_request_timeout_seconds"] >= 300
+
+    # Asking Ollama to retain the model is what keeps that cold load rare.
+    keep_alive = defaults["ollama_keep_alive"]
+    assert isinstance(keep_alive, str)
+    assert keep_alive.strip() not in ("", "0", "0s")

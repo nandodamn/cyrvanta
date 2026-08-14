@@ -55,6 +55,11 @@ class OllamaAIProvider:
                         "prompt": prompt,
                         "stream": False,
                         "format": "json",
+                        # Keeping the model resident turns the next incident's
+                        # redaction from a cold multi-gigabyte load into plain
+                        # inference. Ollama would otherwise evict it while the
+                        # SOC waits for the next alert.
+                        "keep_alive": self._settings.ollama_keep_alive,
                     },
                 )
                 response.raise_for_status()

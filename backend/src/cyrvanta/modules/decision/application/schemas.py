@@ -22,7 +22,6 @@ class ActionProposalCreate(BaseModel):
         "automated-enrichment",
         "escalation-notification",
         "evidence-preservation",
-        "closure-controlled-learning",
         "notify-critical-incident",
         "create-security-ticket",
         "incident-report-email",

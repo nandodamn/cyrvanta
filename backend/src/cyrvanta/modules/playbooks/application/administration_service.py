@@ -191,12 +191,12 @@ ESSENTIAL_NATIVE_PLAYBOOKS: list[dict[str, object]] = [
         "title_es": "Escalamiento y notificación por SLAs",
         "title_en": "SLA-Driven Escalation & Notification",
         "description_es": (
-            "Playbook transversal: notifica por correo, Teams, Slack e ITSM según "
-            "la matriz de severidad y acuerdos de nivel de servicio del tenant."
+            "Playbook transversal: notifica por correo a los destinatarios definidos "
+            "según la matriz de severidad y los acuerdos de nivel de servicio del tenant."
         ),
         "description_en": (
-            "Transversal playbook: notifies via email, Teams, Slack, and ITSM based "
-            "on severity matrix and tenant SLAs."
+            "Transversal playbook: notifies configured recipients by email based "
+            "on the tenant severity matrix and service level agreements."
         ),
         "mitre_codes": [],
     },
@@ -211,20 +211,6 @@ ESSENTIAL_NATIVE_PLAYBOOKS: list[dict[str, object]] = [
         "description_en": (
             "Transversal playbook: seals raw alerts, cryptographic hashes, "
             "memory snapshots, and logs in an audited immutable store."
-        ),
-        "mitre_codes": [],
-    },
-    {
-        "code": "closure-controlled-learning",
-        "title_es": "Cierre formal de incidente y lecciones aprendidas",
-        "title_en": "Formal Incident Closure & Lessons Learned",
-        "description_es": (
-            "Playbook de cierre: verifica la resolución completa de todas las acciones, "
-            "registra el feedback humano y actualiza métricas de gobernanza."
-        ),
-        "description_en": (
-            "Closure playbook: verifies complete resolution of all actions, "
-            "records human feedback, and updates governance metrics."
         ),
         "mitre_codes": [],
     },
@@ -306,6 +292,10 @@ PLAYBOOK_ROLLBACK_ACTIONS: dict[str, str] = {
 
 # Catalog codes retired by the rollback refactor. Seeding retires any lingering
 # definition so tenants provisioned before the change stop listing them.
+#
+# closure-controlled-learning was retired separately: its only registered action
+# transitioned the incident status, while its stated purpose (recording human
+# feedback and governance metrics) belongs to the governed_memory module.
 RETIRED_PLAYBOOK_CODES: frozenset[str] = frozenset(
     {
         "compromised-account-rollback",
@@ -313,6 +303,7 @@ RETIRED_PLAYBOOK_CODES: frozenset[str] = frozenset(
         "compromised-endpoint-rollback",
         "lateral-movement-rollback",
         "ransomware-destructive-rollback",
+        "closure-controlled-learning",
     }
 )
 
@@ -325,7 +316,6 @@ ESSENTIAL_NATIVE_ACTIONS: dict[str, str] = {
     # ── Transición de estado del incidente (acciones existentes) ────────────────
     "contain-and-document-incident": "incident.status.transition",
     "automated-enrichment":          "incident.status.transition",
-    "closure-controlled-learning":   "incident.status.transition",
     # ── Notificaciones SMTP (acción existente, mapeo corregido) ─────────────────
     "notify-critical-incident":      "notification.send",
     "escalation-notification":       "notification.send",
@@ -364,7 +354,6 @@ IMPLEMENTED_REAL_PLAYBOOKS = {
     "automated-enrichment",
     "escalation-notification",
     "evidence-preservation",
-    "closure-controlled-learning",
     "simulate-user-block",
     "request-dual-approval",
 }
@@ -405,10 +394,9 @@ PLAYBOOK_GOVERNANCE_TAXONOMY: dict[str, str] = {
     "simulate-itsm-ticket-creation": "SINGLE",
     "phishing-malicious-email": "SINGLE",
     "malicious-indicator": "SINGLE",
-    # ⚡ AUTOMATIC: Tareas transversales de análisis, preservación inmutable y aprendizaje
+    # ⚡ AUTOMATIC: Tareas transversales de análisis y preservación inmutable
     "automated-enrichment": "AUTOMATIC",
     "evidence-preservation": "AUTOMATIC",
-    "closure-controlled-learning": "AUTOMATIC",
 }
 
 

@@ -1,5 +1,6 @@
 import { FormEvent, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Link } from "react-router-dom";
 
 import {
   configureNativeActionBinding,
@@ -363,11 +364,41 @@ export function PlaybookConfigurationModal({
               </label>
 
               {candidates.length === 0 && (
-                <p style={{ margin: 0, fontSize: "0.8rem", color: "var(--warning)" }}>
-                  ⚠️ No hay ninguna conexión {connectorType} activa y verificada. Creála primero en
-                  Integraciones: allí se cargan la URL base y la credencial, y aquí sólo se elige
-                  cuál usar para este paso.
-                </p>
+                <div
+                  style={{
+                    borderRadius: "8px",
+                    border: "1px solid var(--line)",
+                    background: "var(--panel-raised)",
+                    padding: "12px 14px",
+                  }}
+                >
+                  <p style={{ margin: 0, fontSize: "0.8rem", color: "var(--warning)" }}>
+                    ⚠️ No hay ninguna conexión {connectorType} activa y verificada para este paso.
+                  </p>
+                  <p
+                    style={{
+                      margin: "6px 0 10px",
+                      fontSize: "0.78rem",
+                      color: "var(--text-soft)",
+                    }}
+                  >
+                    La URL base y la credencial se cargan una sola vez en Integraciones; aquí sólo
+                    se elige cuál de esas conexiones usa este paso.
+                  </p>
+                  <Link
+                    to={`/integrations?nuevo=${connectorType}&nombre=${encodeURIComponent(actionMeta.title)}`}
+                    className="ghost"
+                    style={{
+                      display: "inline-block",
+                      padding: "6px 12px",
+                      fontSize: "0.8rem",
+                      textDecoration: "none",
+                    }}
+                    onClick={onClose}
+                  >
+                    Crear conexión en Integraciones →
+                  </Link>
+                </div>
               )}
             </div>
           )}

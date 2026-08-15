@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import * as api from "../src/api";
@@ -7,10 +8,14 @@ import "../src/i18n";
 import { VerifiedIntegrationsPage } from "../src/VerifiedIntegrationsPage";
 
 
-function renderPage() {
+// A routed page: it reads the connector to prefill from the query string when
+// a playbook step sends the operator here, so it needs a router in tests too.
+function renderPage(route = "/integrations") {
   return render(
     <QueryClientProvider client={new QueryClient()}>
-      <VerifiedIntegrationsPage />
+      <MemoryRouter initialEntries={[route]}>
+        <VerifiedIntegrationsPage />
+      </MemoryRouter>
     </QueryClientProvider>,
   );
 }
@@ -53,5 +58,27 @@ describe("verified integrations page", () => {
 
     expect(await screen.findByText(/No hay conexiones configuradas/i)).toBeVisible();
     expect(screen.getByText(/Plantilla Wazuh SIEM/i)).toBeVisible();
+  });
+
+  it("opens on the connector a playbook step asked for", async () => {
+    // Arriving from a step with no usable connection: the form has to land on
+    // that connector already named, or the operator restarts the task here.
+    vi.spyOn(api, "getIntegrationConnections").mockResolvedValue([]);
+
+    renderPage("/integrations?nuevo=HTTP_ALLOWLISTED&nombre=Fuente%20de%20Threat%20Intelligence");
+
+    const nameField = await screen.findByDisplayValue("Fuente de Threat Intelligence");
+    expect(nameField).toBeVisible();
+    const connectorField = screen.getByDisplayValue("HTTP_ALLOWLISTED");
+    expect(connectorField).toBeVisible();
+  });
+
+  it("ignores a connector it does not support", async () => {
+    vi.spyOn(api, "getIntegrationConnections").mockResolvedValue([]);
+
+    renderPage("/integrations?nuevo=NOT_A_CONNECTOR&nombre=Cualquiera");
+
+    await screen.findByText(/No hay conexiones configuradas/i);
+    expect(screen.queryByDisplayValue("Cualquiera")).toBeNull();
   });
 });

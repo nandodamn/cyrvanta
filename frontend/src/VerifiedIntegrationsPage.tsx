@@ -1,6 +1,7 @@
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
+import { useSearchParams } from "react-router-dom";
 
 import {
   configureIntegrationConnection,
@@ -41,6 +42,15 @@ const PRESETS: Record<string, { type: ConnectorType; name: string; fields: Recor
     name: "Ollama LLM Engine",
     fields: { base_url: "http://host.docker.internal:11434" },
   },
+  // Left unnamed on purpose: a tenant configures one of these per external
+  // system (mail security, firewall, EDR, evidence vault, threat intel), and
+  // each playbook step picks the one it uses, so a shared default name would
+  // push every step at the same destination.
+  http_allowlisted: {
+    type: "HTTP_ALLOWLISTED",
+    name: "",
+    fields: { base_url: "https://" },
+  },
 };
 
 export function VerifiedIntegrationsPage() {
@@ -50,6 +60,30 @@ export function VerifiedIntegrationsPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [fields, setFields] = useState<Record<string, string>>({});
+  const [searchParams, setSearchParams] = useSearchParams();
+  const requestedType = searchParams.get("nuevo") as ConnectorType | null;
+  const suggestedName = searchParams.get("nombre");
+  const prefillApplied = useRef(false);
+
+  // Arriving from a playbook step that has no connection to use: open the form
+  // on the connector that step needs, with a name naming the system, so the
+  // jump between menus carries its context instead of restarting the task.
+  useEffect(() => {
+    if (prefillApplied.current || !requestedType) return;
+    if (!CONNECTORS.includes(requestedType)) return;
+    prefillApplied.current = true;
+    setEditingId(null);
+    setConnectorType(requestedType);
+    setName(suggestedName ?? "");
+    setFields({});
+    setSearchParams({}, { replace: true });
+    window.setTimeout(() => {
+      // Scrolling is a nicety, and not every environment implements it.
+      document
+        .getElementById("integration-form-section")
+        ?.scrollIntoView?.({ behavior: "smooth" });
+    }, 0);
+  }, [requestedType, suggestedName, setSearchParams]);
 
   const connections = useQuery({
     queryKey: ["integration-connections"],
@@ -202,6 +236,15 @@ export function VerifiedIntegrationsPage() {
               </button>
               <button type="button" className="integration-template-btn" onClick={() => applyPreset("ollama")}>
                 🧠 {i18n.language.startsWith("es") ? "Plantilla Ollama LLM" : "Ollama LLM Preset"}
+              </button>
+              <button
+                type="button"
+                className="integration-template-btn"
+                onClick={() => applyPreset("http_allowlisted")}
+              >
+                🌐 {i18n.language.startsWith("es")
+                  ? "Plantilla Sistema Externo (HTTPS)"
+                  : "External System Preset (HTTPS)"}
               </button>
             </div>
           </div>

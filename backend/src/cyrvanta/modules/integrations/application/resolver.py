@@ -62,12 +62,49 @@ CAPABILITY_POLICIES: dict[str, CapabilityPolicy] = {
         "requires_approval": True,
         "verification_supported": True,
     },
+    # Dependency resolution asks by action code, and the action is named
+    # incident.report.generate: without this entry the resolver answered
+    # capability_not_registered for a report step whose SMTP connection was
+    # configured and verified. The .deliver name stays for connections whose
+    # stored snapshot already declares it.
+    "incident.report.generate": {
+        "connector_type": "SMTP",
+        "requires_approval": True,
+        "verification_supported": True,
+    },
     "ticket.create": {
         "connector_type": "HTTP_ALLOWLISTED",
         "requires_approval": True,
         "verification_supported": True,
     },
     "webhook.invoke_allowlisted": {
+        "connector_type": "HTTP_ALLOWLISTED",
+        "requires_approval": True,
+        "verification_supported": True,
+    },
+    # One policy per external system, mirroring the action codes: each is a
+    # separate destination the tenant configures and approves on its own.
+    "mail_security.invoke_allowlisted": {
+        "connector_type": "HTTP_ALLOWLISTED",
+        "requires_approval": True,
+        "verification_supported": True,
+    },
+    "firewall.invoke_allowlisted": {
+        "connector_type": "HTTP_ALLOWLISTED",
+        "requires_approval": True,
+        "verification_supported": True,
+    },
+    "edr.invoke_allowlisted": {
+        "connector_type": "HTTP_ALLOWLISTED",
+        "requires_approval": True,
+        "verification_supported": True,
+    },
+    "evidence_vault.invoke_allowlisted": {
+        "connector_type": "HTTP_ALLOWLISTED",
+        "requires_approval": True,
+        "verification_supported": True,
+    },
+    "threat_intel.lookup": {
         "connector_type": "HTTP_ALLOWLISTED",
         "requires_approval": True,
         "verification_supported": True,

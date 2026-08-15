@@ -499,8 +499,20 @@ class IntegrationConnectionService:
     @staticmethod
     def _capabilities(connector_type: str) -> list[str]:
         return {
-            "SMTP": ["notification.send", "incident.report.deliver"],
-            "HTTP_ALLOWLISTED": ["ticket.create", "webhook.invoke_allowlisted"],
+            "SMTP": [
+                "notification.send",
+                "incident.report.deliver",
+                "incident.report.generate",
+            ],
+            "HTTP_ALLOWLISTED": [
+                "ticket.create",
+                "webhook.invoke_allowlisted",
+                "mail_security.invoke_allowlisted",
+                "firewall.invoke_allowlisted",
+                "edr.invoke_allowlisted",
+                "evidence_vault.invoke_allowlisted",
+                "threat_intel.lookup",
+            ],
             "N8N": ["playbook.dispatch"],
             "OPENSEARCH": ["telemetry.search"],
             "OLLAMA": ["analysis.ai"],

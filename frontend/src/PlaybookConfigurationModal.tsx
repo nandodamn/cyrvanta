@@ -135,6 +135,10 @@ export function PlaybookConfigurationModal({
     [connections.data, connectorType],
   );
 
+  // Internal actions need no connection; external ones cannot be wired until at
+  // least one usable connection exists.
+  const canSave = connectorType === "INTERNAL" || (!!connectorType && candidates.length > 0);
+
   const save = useMutation({
     mutationFn: async () => {
       if (!connectorType) throw new Error("PLAYBOOK_ACTION_UNAVAILABLE");
@@ -235,9 +239,11 @@ export function PlaybookConfigurationModal({
             >
               {playbook.required_actions.map((item) => {
                 const meta = ACTION_METADATA[item];
+                // No icon here: the box below repeats the same one, and the
+                // selected option sits directly above it.
                 return (
                   <option key={item} value={item}>
-                    {meta ? `${meta.icon} ${meta.title} (${item})` : item}
+                    {meta ? `${meta.title} (${item})` : item}
                   </option>
                 );
               })}
@@ -321,49 +327,9 @@ export function PlaybookConfigurationModal({
           {/* External Connector Form */}
           {connectorType && connectorType !== "INTERNAL" && (
             <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-              <label style={{ fontSize: "0.85rem", fontWeight: 600 }}>
-                Conexión de Seguridad Asociada
-                <select
-                  required
-                  value={connectionId}
-                  style={{ width: "100%", marginTop: "4px", padding: "8px 12px" }}
-                  onChange={(event) => setConnectionId(event.target.value)}
-                >
-                  <option value="">Seleccionar conexión configurada…</option>
-                  {candidates.map((item) => (
-                    <option value={item.id} key={item.id}>
-                      {item.name} ({item.connector_type})
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <label style={{ fontSize: "0.85rem", fontWeight: 600 }}>
-                {connectorType === "SMTP" ? "Destinatario de Correo" : "Ruta relativa del endpoint"}
-                <input
-                  required
-                  type={connectorType === "SMTP" ? "email" : "text"}
-                  placeholder={connectorType === "SMTP" ? "soc-guardia@empresa.com" : "/api/v1/tickets"}
-                  style={{ width: "100%", marginTop: "4px", padding: "8px 12px" }}
-                  value={value}
-                  onChange={(event) => setValue(event.target.value)}
-                />
-                {connectorType !== "SMTP" && (
-                  <span
-                    style={{
-                      display: "block",
-                      marginTop: "4px",
-                      fontWeight: 400,
-                      fontSize: "0.75rem",
-                      color: "var(--text-soft)",
-                    }}
-                  >
-                    Ruta POST relativa a la URL base de la conexión elegida (debe empezar con “/”).
-                  </span>
-                )}
-              </label>
-
-              {candidates.length === 0 && (
+              {/* What this step needs, and how to get it, in one block: the
+                  selector is useless on its own until a connection exists. */}
+              {candidates.length === 0 ? (
                 <div
                   style={{
                     borderRadius: "8px",
@@ -372,15 +338,15 @@ export function PlaybookConfigurationModal({
                     padding: "12px 14px",
                   }}
                 >
-                  <p style={{ margin: 0, fontSize: "0.8rem", color: "var(--warning)" }}>
-                    ⚠️ No hay ninguna conexión {connectorType} activa y verificada para este paso.
+                  <p style={{ margin: 0, fontSize: "0.85rem", fontWeight: 600 }}>
+                    Conexión de Seguridad Asociada
+                  </p>
+                  <p style={{ margin: "6px 0 0", fontSize: "0.8rem", color: "var(--warning)" }}>
+                    ⚠️ Este paso necesita una conexión {connectorType} activa y verificada, y todavía
+                    no hay ninguna.
                   </p>
                   <p
-                    style={{
-                      margin: "6px 0 10px",
-                      fontSize: "0.78rem",
-                      color: "var(--text-soft)",
-                    }}
+                    style={{ margin: "6px 0 10px", fontSize: "0.78rem", color: "var(--text-soft)" }}
                   >
                     La URL base y la credencial se cargan una sola vez en Integraciones; aquí sólo
                     se elige cuál de esas conexiones usa este paso.
@@ -399,6 +365,55 @@ export function PlaybookConfigurationModal({
                     Crear conexión en Integraciones →
                   </Link>
                 </div>
+              ) : (
+                <>
+                  <label style={{ fontSize: "0.85rem", fontWeight: 600 }}>
+                    Conexión de Seguridad Asociada
+                    <select
+                      required
+                      value={connectionId}
+                      style={{ width: "100%", marginTop: "4px", padding: "8px 12px" }}
+                      onChange={(event) => setConnectionId(event.target.value)}
+                    >
+                      <option value="">Seleccionar conexión configurada…</option>
+                      {candidates.map((item) => (
+                        <option value={item.id} key={item.id}>
+                          {item.name} ({item.connector_type})
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label style={{ fontSize: "0.85rem", fontWeight: 600 }}>
+                    {connectorType === "SMTP"
+                      ? "Destinatario de Correo"
+                      : "Ruta relativa del endpoint"}
+                    <input
+                      required
+                      type={connectorType === "SMTP" ? "email" : "text"}
+                      placeholder={
+                        connectorType === "SMTP" ? "soc-guardia@empresa.com" : "/api/v1/tickets"
+                      }
+                      style={{ width: "100%", marginTop: "4px", padding: "8px 12px" }}
+                      value={value}
+                      onChange={(event) => setValue(event.target.value)}
+                    />
+                    {connectorType !== "SMTP" && (
+                      <span
+                        style={{
+                          display: "block",
+                          marginTop: "4px",
+                          fontWeight: 400,
+                          fontSize: "0.75rem",
+                          color: "var(--text-soft)",
+                        }}
+                      >
+                        Ruta POST relativa a la URL base de la conexión elegida (debe empezar con
+                        “/”).
+                      </span>
+                    )}
+                  </label>
+                </>
               )}
             </div>
           )}
@@ -406,20 +421,23 @@ export function PlaybookConfigurationModal({
           {/* Form Actions */}
           <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end", marginTop: "0.5rem" }}>
             <button type="button" className="ghost" onClick={onClose} style={{ padding: "8px 16px" }}>
-              Cancelar
+              {canSave ? "Cancelar" : "Cerrar"}
             </button>
+            {/* Hidden, not just disabled: with nothing to fill in there is
+                nothing to save, and the next step is the link above. */}
+            {canSave && (
             <button
               type="submit"
               className="primary"
               style={{ padding: "8px 18px", fontWeight: 600 }}
               disabled={
-                !connectorType
-                || (connectorType !== "INTERNAL" && (!connectionId || !value))
+                (connectorType !== "INTERNAL" && (!connectionId || !value))
                 || save.isPending
               }
             >
               {save.isPending ? "Guardando..." : "Guardar Configuración"}
             </button>
+            )}
           </div>
 
           {save.isError && (

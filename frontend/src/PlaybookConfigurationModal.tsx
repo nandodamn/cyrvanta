@@ -14,6 +14,21 @@ import {
 // their binding is created from the verified Wazuh connection rather than here.
 const WAZUH_ACTIONS = new Set(["host.isolate", "host.restore"]);
 
+const BLOCKING_REASON_TEXT: Record<string, string> = {
+  ACTION_BINDING_MISSING: "sin configurar",
+  ACTION_UNAVAILABLE: "no disponible en el motor",
+  ACTION_CONFIGURATION_TAMPERED: "configuración alterada",
+  ACTION_CREDENTIAL_MISSING: "sin conexión asociada",
+  ACTION_CREDENTIAL_UNVERIFIED: "conexión sin verificar",
+  ACTION_CREDENTIAL_DISABLED: "conexión deshabilitada",
+  ACTION_CREDENTIAL_FAILING: "conexión con errores",
+  ACTION_CREDENTIAL_OUTDATED: "conexión desactualizada",
+};
+
+function reasonText(reason: string | undefined): string {
+  return reason ? (BLOCKING_REASON_TEXT[reason] ?? "requiere atención") : "requiere atención";
+}
+
 const ACTION_METADATA: Record<string, { title: string; desc: string; icon: string }> = {
   "incident.status.transition": {
     title: "Transición de Estado del Incidente",
@@ -135,6 +150,25 @@ export function PlaybookConfigurationModal({
     [connections.data, connectorType],
   );
 
+  // The backend already reports which step blocks the playbook and why, so the
+  // modal can say whether the selected step is the one that needs attention
+  // instead of describing every step as if it were pending.
+  //
+  // Any ACTION_*:<code> reason counts as blocking rather than a list of the
+  // ones known today: a reason this file had not heard of would otherwise mark
+  // a blocked step as ready, which is the failure being fixed here.
+  const blockedActions = useMemo(() => {
+    const blocked = new Map<string, string>();
+    for (const reason of playbook.blocking_reasons) {
+      const separator = reason.indexOf(":");
+      if (separator < 0 || !reason.startsWith("ACTION_")) continue;
+      const target = reason.slice(separator + 1);
+      if (target) blocked.set(target, reason.slice(0, separator));
+    }
+    return blocked;
+  }, [playbook.blocking_reasons]);
+  const actionIsBlocked = blockedActions.has(action);
+
   // Internal actions need no connection; external ones cannot be wired until at
   // least one usable connection exists.
   const canSave = connectorType === "INTERNAL" || (!!connectorType && candidates.length > 0);
@@ -223,6 +257,34 @@ export function PlaybookConfigurationModal({
         </div>
 
         <form onSubmit={submit} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+          {/* Which step is holding the playbook back, before the selector: a
+              multi-step playbook otherwise has to be opened step by step to
+              find the one that is not ready. */}
+          {blockedActions.size > 0 && (
+            <p
+              style={{
+                margin: 0,
+                padding: "10px 12px",
+                borderRadius: "8px",
+                background: "var(--panel-raised)",
+                border: "1px solid var(--line)",
+                fontSize: "0.8rem",
+                color: "var(--text-soft)",
+              }}
+            >
+              {blockedActions.size === 1 ? "Falta un paso" : `Faltan ${blockedActions.size} pasos`}:{" "}
+              <strong style={{ color: "var(--text)" }}>
+                {[...blockedActions.entries()]
+                  .map(
+                    ([code, reason]) =>
+                      `${ACTION_METADATA[code]?.title ?? code} (${reasonText(reason)})`,
+                  )
+                  .join(" · ")}
+              </strong>
+              . Los demás ya están operativos.
+            </p>
+          )}
+
           {/* Action Selector */}
           <div>
             <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, marginBottom: "6px" }}>
@@ -239,11 +301,13 @@ export function PlaybookConfigurationModal({
             >
               {playbook.required_actions.map((item) => {
                 const meta = ACTION_METADATA[item];
-                // No icon here: the box below repeats the same one, and the
-                // selected option sits directly above it.
+                // Marked per step so the one holding the playbook back is
+                // visible without opening each in turn. No icon: the box below
+                // repeats the same one, and the selected option sits above it.
+                const mark = blockedActions.has(item) ? "⚠" : "✓";
                 return (
                   <option key={item} value={item}>
-                    {meta ? `${meta.title} (${item})` : item}
+                    {`${mark} ${meta ? `${meta.title} (${item})` : item}`}
                   </option>
                 );
               })}
@@ -284,12 +348,22 @@ export function PlaybookConfigurationModal({
                 fontSize: "0.85rem",
               }}
             >
-              <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "var(--accent)", fontWeight: 600 }}>
-                <span>✓</span>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  fontWeight: 600,
+                  color: actionIsBlocked ? "var(--warning)" : "var(--accent)",
+                }}
+              >
+                <span>{actionIsBlocked ? "⚠️" : "✓"}</span>
                 <span>Acción Nativa Interna de Cyrvanta</span>
               </div>
               <p style={{ margin: "6px 0 0", color: "var(--text-soft)", fontSize: "0.8rem" }}>
-                Esta acción se ejecuta de forma segura y directa por el motor nativo del SOC. No requiere credenciales externas de terceros.
+                {actionIsBlocked
+                  ? "Esta acción la ejecuta el motor nativo y no requiere credenciales externas, pero todavía no está habilitada para este tenant."
+                  : "Esta acción ya está operativa: la ejecuta de forma directa el motor nativo del SOC y no requiere credenciales externas de terceros."}
               </p>
             </div>
           )}
@@ -305,13 +379,26 @@ export function PlaybookConfigurationModal({
                 fontSize: "0.85rem",
               }}
             >
-              <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "var(--accent)", fontWeight: 600 }}>
-                <span>✓</span>
-                <span>Acción gestionada por la conexión Wazuh</span>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  fontWeight: 600,
+                  color: actionIsBlocked ? "var(--warning)" : "var(--accent)",
+                }}
+              >
+                <span>{actionIsBlocked ? "⚠️" : "✓"}</span>
+                <span>
+                  {actionIsBlocked
+                    ? "Falta la conexión Wazuh"
+                    : "Listo mediante la conexión Wazuh"}
+                </span>
               </div>
               <p style={{ margin: "6px 0 0", color: "var(--text-soft)", fontSize: "0.8rem" }}>
-                No se configura aquí: se habilita sola cuando la conexión Wazuh está activa y
-                verificada en el menú de Integraciones.
+                {actionIsBlocked
+                  ? "Este paso no se configura aquí: se habilita solo cuando la conexión Wazuh está activa y verificada en el menú de Integraciones."
+                  : "Este paso no se configura aquí y ya está operativo: la conexión Wazuh está activa y verificada."}
               </p>
             </div>
           )}

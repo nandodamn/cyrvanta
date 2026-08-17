@@ -26,6 +26,8 @@ import {
   executeAuthorizedResponse,
   generateIncidentExplanation,
   getAlerts,
+  AlertSeverity,
+  AlertSort,
   getAuditEvents,
   getClaims,
   getCorrelations,
@@ -595,14 +597,26 @@ function AlertsPage() {
   const controls = useListControls();
   const me = useQuery({ queryKey: ["me"], queryFn: getMe, retry: false });
 
+  const [alertSort, setAlertSort] = useState<AlertSort>("recent");
+  const [alertSeverity, setAlertSeverity] = useState<AlertSeverity[]>([]);
+
   const alerts = useQuery({
-    queryKey: ["alerts", controls.query, controls.page, controls.pageSize],
+    queryKey: [
+      "alerts",
+      controls.query,
+      controls.page,
+      controls.pageSize,
+      alertSort,
+      alertSeverity.join(","),
+    ],
     queryFn: () =>
       getAlerts({
         query: controls.query,
         page: controls.page,
         pageSize: controls.pageSize,
         includeLookahead: true,
+        sort: alertSort,
+        severity: alertSeverity,
       }),
   });
 
@@ -660,6 +674,59 @@ function AlertsPage() {
           visibleCount={items.length}
           hasNext={(alerts.data?.length ?? 0) > controls.pageSize}
         />
+        {/* Newest-first buries a critical alert under routine volume, so the
+            order is selectable and severity can be narrowed. */}
+        <div
+          style={{
+            display: "flex",
+            flexWrap: "wrap",
+            gap: "1rem",
+            alignItems: "center",
+            padding: "0 0 0.75rem",
+          }}
+        >
+          <label style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "0.85rem" }}>
+            {t("alertSort.label")}
+            <select
+              value={alertSort}
+              onChange={(event) => {
+                setAlertSort(event.target.value as AlertSort);
+                controls.setPage(0);
+              }}
+              style={{ padding: "4px 8px" }}
+            >
+              <option value="recent">{t("alertSort.recent")}</option>
+              <option value="severity">{t("alertSort.severity")}</option>
+            </select>
+          </label>
+          <span style={{ display: "flex", flexWrap: "wrap", gap: "8px", alignItems: "center" }}>
+            <span style={{ fontSize: "0.85rem" }}>{t("alertSeverityFilter")}</span>
+            {(["critical", "high", "medium", "low", "informational"] as AlertSeverity[]).map(
+              (level) => {
+                const active = alertSeverity.includes(level);
+                return (
+                  <button
+                    key={level}
+                    type="button"
+                    className={active ? "primary" : "ghost"}
+                    style={{ padding: "3px 10px", fontSize: "0.78rem" }}
+                    aria-pressed={active}
+                    onClick={() => {
+                      setAlertSeverity((current) =>
+                        current.includes(level)
+                          ? current.filter((item) => item !== level)
+                          : [...current, level],
+                      );
+                      controls.setPage(0);
+                    }}
+                  >
+                    {t(`severity.${level}`)}
+                  </button>
+                );
+              },
+            )}
+          </span>
+        </div>
         <div className="data-list">
           {items.map((alert) => {
             const isExpanded = expandedId === alert.id;

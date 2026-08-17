@@ -1,7 +1,9 @@
+from collections.abc import Sequence
 from datetime import UTC, datetime
+from typing import Literal
 from uuid import UUID, uuid4
 
-from sqlalchemy import or_, select
+from sqlalchemy import case, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from cyrvanta.modules.identity.infrastructure.models import AuditEventModel, UserModel
@@ -13,6 +15,7 @@ from cyrvanta.modules.incident.application.schemas import (
     IncidentResponse,
     IncidentTransition,
     IncidentUpdate,
+    Severity,
     TimelineCreate,
 )
 from cyrvanta.modules.incident.infrastructure.models import (
@@ -46,10 +49,33 @@ TRANSITIONS: dict[str, set[str]] = {
     "reopened": {"investigating", "contained", "resolved", "closed"},
 }
 
+AlertSort = Literal["recent", "severity"]
+
+# Severity is stored as a word, so ordering by the column sorts alphabetically:
+# "critical" would land between "low" and "medium". Rank it explicitly instead.
+SEVERITY_ORDER: dict[str, int] = {
+    "critical": 5,
+    "high": 4,
+    "medium": 3,
+    "low": 2,
+    "informational": 1,
+}
+SEVERITY_RANK = case(
+    SEVERITY_ORDER,
+    value=AlertReferenceModel.severity,
+    else_=0,
+)
+
 
 class IncidentService:
     async def list_alerts(
-        self, tenant_id: UUID, limit: int, offset: int = 0, search: str | None = None
+        self,
+        tenant_id: UUID,
+        limit: int,
+        offset: int = 0,
+        search: str | None = None,
+        sort: AlertSort = "recent",
+        severity: Sequence[Severity] | None = None,
     ) -> list[AlertResponse]:
         async with tenant_session(tenant_id) as session:
             statement = select(
@@ -67,12 +93,20 @@ class IncidentService:
                         AlertReferenceModel.external_id.ilike(pattern, escape="\\"),
                     )
                 )
+            if severity:
+                statement = statement.where(AlertReferenceModel.severity.in_(list(severity)))
+            # Newest first is the right default for a feed, but it buries a
+            # critical alert under any volume of routine ones, so severity is
+            # orderable too. Both break ties on the other key: equal severity
+            # reads newest first, and equal timestamps read most severe first.
+            order = (
+                (SEVERITY_RANK.desc(), AlertReferenceModel.observed_at.desc())
+                if sort == "severity"
+                else (AlertReferenceModel.observed_at.desc(), SEVERITY_RANK.desc())
+            )
             rows = (
                 await session.execute(
-                    statement.order_by(
-                        AlertReferenceModel.observed_at.desc(),
-                        AlertReferenceModel.id.desc(),
-                    )
+                    statement.order_by(*order, AlertReferenceModel.id.desc())
                     .offset(offset)
                     .limit(limit)
                 )

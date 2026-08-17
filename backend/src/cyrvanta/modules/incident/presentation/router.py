@@ -11,10 +11,12 @@ from cyrvanta.modules.incident.application.schemas import (
     IncidentResponse,
     IncidentTransition,
     IncidentUpdate,
+    Severity,
     TimelineCreate,
     TimelineResponse,
 )
 from cyrvanta.modules.incident.application.service import (
+    AlertSort,
     IncidentConflict,
     IncidentNotFound,
     IncidentService,
@@ -62,10 +64,14 @@ async def list_alerts(
     limit: Annotated[int, Query(ge=1, le=100)] = 25,
     offset: Annotated[int, Query(ge=0, le=10000)] = 0,
     q: Annotated[str | None, Query(max_length=100)] = None,
+    sort: Annotated[AlertSort, Query()] = "recent",
+    severity: Annotated[list[Severity] | None, Query()] = None,
 ) -> list[AlertResponse]:
     return [
         AlertResponse.model_validate(item)
-        for item in await service.list_alerts(context.tenant_id, limit, offset, q)
+        for item in await service.list_alerts(
+            context.tenant_id, limit, offset, q, sort, severity
+        )
     ]
 
 

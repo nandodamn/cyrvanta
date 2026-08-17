@@ -781,8 +781,20 @@ export async function disableDirectoryConfiguration(): Promise<DirectoryConfigur
   );
 }
 
-export async function getAlerts(options?: ListQuery): Promise<Alert[]> {
-  return z.array(alertSchema).parse(await authorized(listPath("/api/v1/alerts", options)));
+export type AlertSort = "recent" | "severity";
+export type AlertSeverity = Alert["severity"];
+
+export async function getAlerts(
+  options?: ListQuery & { sort?: AlertSort; severity?: AlertSeverity[] },
+): Promise<Alert[]> {
+  let path = listPath("/api/v1/alerts", options);
+  if (options?.sort && options.sort !== "recent") path += `&sort=${options.sort}`;
+  // Repeated key, not a comma list: that is the shape FastAPI parses back into
+  // a list, and an empty selection is left off so it does not read as "none".
+  for (const level of options?.severity ?? []) {
+    path += `&severity=${encodeURIComponent(level)}`;
+  }
+  return z.array(alertSchema).parse(await authorized(path));
 }
 
 export async function updateAlertTriage(

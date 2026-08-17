@@ -255,6 +255,48 @@ services:
       retries: 20
     restart: unless-stopped
 
+  # Lab stand-ins for the third-party systems a tenant configures. They make an
+  # end-to-end run perform a real delivery inside the lab network instead of
+  # depending on an internet service. Both are lab-only: never a demo of a
+  # genuine threat intelligence assessment.
+  mailpit:
+    image: axllent/mailpit:v1.21.8
+    profiles: [live-demo]
+    environment:
+      MP_SMTP_AUTH_ACCEPT_ANY: "true"
+      MP_SMTP_AUTH_ALLOW_INSECURE: "true"
+    # Only the inbox is published, and only to the loopback interface; SMTP
+    # itself stays inside the internal network like every other dependency.
+    # host-access is what makes a published port reachable, since `internal` is
+    # declared internal-only.
+    ports: ["127.0.0.1:8025:8025"]
+    networks: [internal, host-access]
+    healthcheck:
+      test: ["CMD", "/mailpit", "readyz"]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  lab-endpoint:
+    image: python:3.12-alpine
+    profiles: [live-demo]
+    command: ["python", "/srv/server.py"]
+    volumes:
+      - ./infrastructure/lab-endpoint/server.py:/srv/server.py:ro
+    environment:
+      LAB_ENDPOINT_PORT: "8081"
+    networks: [internal]
+    mem_limit: 128m
+    healthcheck:
+      test:
+        ["CMD", "python", "-c",
+         "import urllib.request;urllib.request.urlopen('http://127.0.0.1:8081/health').read()"]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
 volumes:
   postgres_data:
   redis_data:

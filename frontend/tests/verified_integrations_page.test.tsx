@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -71,6 +71,44 @@ describe("verified integrations page", () => {
     expect(nameField).toBeVisible();
     const connectorField = screen.getByDisplayValue("HTTP_ALLOWLISTED");
     expect(connectorField).toBeVisible();
+  });
+
+  it("can save an SMTP relay that does not offer STARTTLS", async () => {
+    // use_starttls was hardcoded to true, so a server without the extension --
+    // a lab mail catcher, or an internal relay -- failed its probe with no way
+    // to correct it from the form.
+    vi.spyOn(api, "getIntegrationConnections").mockResolvedValue([]);
+    const configure = vi
+      .spyOn(api, "configureIntegrationConnection")
+      .mockResolvedValue({} as api.IntegrationConnection);
+
+    renderPage();
+
+    fireEvent.change(await screen.findByLabelText(/^HOST$/i), {
+      target: { value: "mailpit" },
+    });
+    fireEvent.change(screen.getByLabelText(/^PORT$/i), { target: { value: "1025" } });
+    fireEvent.change(screen.getByLabelText(/^FROM ADDRESS$/i), {
+      target: { value: "cyrvanta@lab.test" },
+    });
+
+    const starttls = screen.getByRole("checkbox");
+    expect(starttls).toBeChecked(); // encrypted unless said otherwise
+    fireEvent.click(starttls);
+    // Turning it off has to be visibly a downgrade, not a silent toggle.
+    expect(screen.getByText(/viajar[aá]n sin cifrar/i)).toBeVisible();
+
+    fireEvent.submit(starttls.closest("form")!);
+
+    // The mutation runs asynchronously, so the call lands after this tick.
+    await waitFor(() =>
+      expect(configure).toHaveBeenCalledWith(
+        "new",
+        expect.objectContaining({
+          configuration: expect.objectContaining({ use_starttls: false }),
+        }),
+      ),
+    );
   });
 
   it("ignores a connector it does not support", async () => {

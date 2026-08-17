@@ -60,6 +60,8 @@ export function VerifiedIntegrationsPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [fields, setFields] = useState<Record<string, string>>({});
+  // Encrypted unless the operator turns it off deliberately.
+  const [startTls, setStartTls] = useState(true);
   const [searchParams, setSearchParams] = useSearchParams();
   const requestedType = searchParams.get("nuevo") as ConnectorType | null;
   const suggestedName = searchParams.get("nombre");
@@ -76,6 +78,7 @@ export function VerifiedIntegrationsPage() {
     setConnectorType(requestedType);
     setName(suggestedName ?? "");
     setFields({});
+    setStartTls(true);
     setSearchParams({}, { replace: true });
     window.setTimeout(() => {
       // Scrolling is a nicety, and not every environment implements it.
@@ -106,6 +109,7 @@ export function VerifiedIntegrationsPage() {
     onSuccess: () => {
       setName("");
       setFields({});
+      setStartTls(true);
       setEditingId(null);
       queryClient.invalidateQueries({ queryKey: ["integration-connections"] });
       queryClient.invalidateQueries({ queryKey: ["playbook-definitions"] });
@@ -161,6 +165,11 @@ export function VerifiedIntegrationsPage() {
       }
     }
     setFields(prefilled);
+    // Reflect what is stored: defaulting to on would silently re-enable
+    // STARTTLS on a plaintext relay the next time it is saved.
+    setStartTls(
+      String(item.sanitized_parameters?.use_starttls ?? "true").toLowerCase() !== "false",
+    );
     const formEl = document.getElementById("integration-form-section");
     formEl?.scrollIntoView({ behavior: "smooth" });
   }
@@ -173,7 +182,7 @@ export function VerifiedIntegrationsPage() {
       if (!value) continue;
       configuration[key] = key === "port" ? Number(value) : value;
     }
-    if (connectorType === "SMTP") configuration.use_starttls = true;
+    if (connectorType === "SMTP") configuration.use_starttls = startTls;
     configure.mutate({
       connectionId: editingId ?? "new",
       payload: {
@@ -377,6 +386,7 @@ export function VerifiedIntegrationsPage() {
                 setEditingId(null);
                 setName("");
                 setFields({});
+                setStartTls(true);
               }}
             >
               ✕ {t("integrationConnections.cancelReplace")}
@@ -396,6 +406,7 @@ export function VerifiedIntegrationsPage() {
               onChange={(event) => {
                 setConnectorType(event.target.value as ConnectorType);
                 setFields({});
+                setStartTls(true);
               }}
             >
               {CONNECTORS.map((item) => <option key={item}>{item}</option>)}
@@ -439,6 +450,43 @@ export function VerifiedIntegrationsPage() {
               </label>
             );
           })}
+          {/* STARTTLS is a property of the server, not of every SMTP server.
+              Forcing it on made any relay without it impossible to configure,
+              so it stays on by default and turning it off is deliberate. */}
+          {connectorType === "SMTP" && (
+            <label>
+              {/* Same casing as the generated field labels above. */}
+              <span>USE STARTTLS</span>
+              <span style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "4px" }}>
+                <input
+                  type="checkbox"
+                  style={{ width: "auto" }}
+                  checked={startTls}
+                  onChange={(event) => setStartTls(event.target.checked)}
+                />
+                <span style={{ fontSize: "0.85rem" }}>
+                  {i18n.language.startsWith("es")
+                    ? "Cifrar la conexión con STARTTLS"
+                    : "Encrypt the connection with STARTTLS"}
+                </span>
+              </span>
+              {!startTls && (
+                <span
+                  style={{
+                    display: "block",
+                    marginTop: "6px",
+                    fontSize: "0.78rem",
+                    color: "var(--warning)",
+                  }}
+                >
+                  ⚠️{" "}
+                  {i18n.language.startsWith("es")
+                    ? "El correo y las credenciales viajarán sin cifrar. Usalo sólo con un servidor de laboratorio o un relay interno de confianza."
+                    : "Mail and credentials will travel unencrypted. Use only with a lab server or a trusted internal relay."}
+                </span>
+              )}
+            </label>
+          )}
           <div className="integrations-form-actions">
             {editingId && (
               <button
@@ -448,6 +496,7 @@ export function VerifiedIntegrationsPage() {
                   setEditingId(null);
                   setName("");
                   setFields({});
+                  setStartTls(true);
                 }}
               >
                 {t("integrationConnections.cancelReplace")}

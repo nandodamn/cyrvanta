@@ -729,15 +729,26 @@ export function SecurityTopologyPanel() {
               {selectedNode.active_alerts && selectedNode.active_alerts.length > 0 && (
                 <div style={{ marginTop: "12px", paddingTop: "10px", borderTop: "1px solid var(--line)" }}>
                   <strong style={{ fontSize: "0.82rem", color: "var(--warning)" }}>
-                    ⚠️ {i18n.language.startsWith("es") ? "Alertas de Seguridad Asociadas" : "Associated Security Alerts"} ({selectedNode.active_alerts.length}):
+                    ⚠️ {i18n.language.startsWith("es") ? "Alertas de Seguridad Asociadas" : "Associated Security Alerts"}{" "}
+                    {/* The total, not the number of lines: repeated titles are
+                        collapsed, so counting lines would understate it. */}
+                    ({selectedNode.active_alerts_count}):
                   </strong>
                   <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginTop: "6px" }}>
                     {selectedNode.active_alerts.map((al) => (
                       <span key={al.id} className="status warning" style={{ fontSize: "0.75rem" }}>
                         {al.title} ({al.severity})
+                        {(al.occurrences ?? 1) > 1 && ` ×${al.occurrences}`}
                       </span>
                     ))}
                   </div>
+                  {selectedNode.active_alerts_count > selectedNode.active_alerts.length && (
+                    <small className="muted" style={{ display: "block", marginTop: "6px" }}>
+                      {i18n.language.startsWith("es")
+                        ? "Se muestran los tipos más recientes. Descartar una alerta en la lista de alertas la quita de este recuento."
+                        : "Showing the most recent types. Discarding an alert in the alert list removes it from this count."}
+                    </small>
+                  )}
                 </div>
               )}
             </div>

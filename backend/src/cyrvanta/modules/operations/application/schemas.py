@@ -68,6 +68,9 @@ class TopologyNodeAlert(BaseModel):
     severity: Literal["critical", "high", "medium", "low", "informational"]
     category: str
     observed_at: str
+    # How many alerts this line stands for. A host repeating one routine event
+    # filled the panel with identical rows, hiding whatever else it reported.
+    occurrences: int = 1
 
 
 class TopologyNodeService(BaseModel):

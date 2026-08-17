@@ -38,6 +38,14 @@ _DEFAULT_WAZUH_TIMEOUT_SECONDS = 10
 _MIN_WAZUH_TIMEOUT_SECONDS = 1
 _MAX_WAZUH_TIMEOUT_SECONDS = 30
 _VALID_SEVERITIES = ("critical", "high", "medium", "low", "informational")
+
+# How far back the map looks. One noisy host can produce hundreds of alerts in
+# a row, so a small window would attribute everything to it and report zero for
+# every other asset -- the map would show quiet hosts that are not quiet.
+_ALERT_SCAN_LIMIT = 1000
+
+# Distinct titles listed per node. The count above the list is not capped by it.
+_ALERTS_PER_NODE = 5
 # Connectors this platform runs as its own dependency and already probes in
 # _core_nodes. They are not detection sources, so the security-feed zone must
 # not list them: n8n executes playbooks and Ollama drafts wording, neither
@@ -563,9 +571,15 @@ class NetworkTopologyService:
                         .where(
                             AlertReferenceModel.tenant_id == tenant_id,
                             AlertReferenceModel.is_simulated.is_(False),
+                            # Dismissing an alert has to remove it from the map,
+                            # or the badge only ever grows and triage changes
+                            # nothing an operator can see. Alerts confirmed
+                            # RELEVANT stay: deciding a threat is real does not
+                            # resolve it.
+                            AlertReferenceModel.triage_status != "DISCARDED",
                         )
                         .order_by(desc(AlertReferenceModel.observed_at))
-                        .limit(100)
+                        .limit(_ALERT_SCAN_LIMIT)
                     )
                 ).all()
             )
@@ -576,6 +590,10 @@ class NetworkTopologyService:
             for address in node.ip_addresses:
                 by_identity[address] = node
 
+        # Repeated titles collapse into one line carrying a count: a host that
+        # logs the same routine event dozens of times used to fill every slot
+        # with identical rows, so anything else it reported was never shown.
+        grouped: dict[int, dict[str, TopologyNodeAlert]] = {}
         for alert in alerts:
             raw = (alert.asset_summary or alert.indicator_summary or "").strip()
             if not raw:
@@ -588,20 +606,25 @@ class NetworkTopologyService:
             if severity not in _VALID_SEVERITIES:
                 severity = "medium"
             node.active_alerts_count += 1
-            if len(node.active_alerts) < 5:
-                node.active_alerts.append(
-                    TopologyNodeAlert(
-                        id=str(alert.id),
-                        title=alert.title,
-                        severity=severity,  # type: ignore[arg-type]
-                        category=alert.category or "security",
-                        observed_at=(
-                            alert.observed_at.isoformat() if alert.observed_at else now_iso
-                        ),
-                    )
-                )
             if severity in ("critical", "high") and node.status == "ONLINE":
                 node.status = "WARNING"
+
+            seen = grouped.setdefault(id(node), {})
+            existing = seen.get(alert.title)
+            if existing is not None:
+                existing.occurrences += 1
+                continue
+            if len(seen) >= _ALERTS_PER_NODE:
+                continue
+            entry = TopologyNodeAlert(
+                id=str(alert.id),
+                title=alert.title,
+                severity=severity,  # type: ignore[arg-type]
+                category=alert.category or "security",
+                observed_at=(alert.observed_at.isoformat() if alert.observed_at else now_iso),
+            )
+            seen[alert.title] = entry
+            node.active_alerts.append(entry)
 
     # ── Real relationships only ────────────────────────────────────────────────
 

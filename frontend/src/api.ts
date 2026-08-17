@@ -1293,6 +1293,8 @@ export interface TopologyNodeAlert {
   severity: "critical" | "high" | "medium" | "low" | "informational";
   category: string;
   observed_at: string;
+  /** Alerts this line stands for; repeated titles collapse into one. */
+  occurrences?: number;
 }
 
 export interface TopologyNodeService {

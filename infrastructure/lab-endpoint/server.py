@@ -81,8 +81,19 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def do_GET(self) -> None:  # noqa: N802 - BaseHTTPRequestHandler API
-        if self.path == "/health":
-            self._respond(200, {"status": "ok", "request_id": "health"})
+        # Cyrvanta probes an allowlisted connection by requesting the base URL
+        # itself and requires a 2xx, so the root has to answer like a reachable
+        # API rather than 404 the way an unknown path does.
+        if self.path in ("/", "/health"):
+            self._respond(
+                200,
+                {
+                    "status": "ok",
+                    "service": "Cyrvanta Lab Endpoint",
+                    "paths": ["/threat-intel", "/threat-intel/indicators", "/tickets"],
+                    "request_id": "health",
+                },
+            )
             return
         if self.path.startswith("/threat-intel/indicators"):
             # The table is readable at runtime so a demo can show what the

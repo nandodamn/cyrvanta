@@ -220,6 +220,9 @@ services:
       WAZUH_MANAGER_SERVER: wazuh-manager
       WAZUH_AGENT_NAME: lab-server-01
       WAZUH_AGENT_GROUP: default
+      # Target of the credential-attack scenario: real logins, real source IPs.
+      LAB_SSH_ENABLED: "1"
+      LAB_SSH_USER: analista
     cap_add: [NET_ADMIN]
     mem_limit: 128m
     cpus: 0.25

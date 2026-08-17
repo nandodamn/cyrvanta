@@ -1,0 +1,53 @@
+<!--
+  Cyrvanta noise filter.
+
+  Silences events that carry no security meaning for a SOC. Level 0 stops the
+  alert at the manager, so it never reaches the indexer and never becomes a
+  finding: the cheapest place to drop noise is where it is produced.
+
+  Filtering is by rule identity, never by severity. Severity is the wrong axis
+  here -- a successful logon is level 3 and is exactly what credential-attack
+  correlation needs, while a file added to a system directory is level 5 and is
+  the signal a file integrity scenario is built on. Dropping "low" wholesale
+  would remove the detections this platform depends on.
+
+  What is deliberately NOT filtered, and why:
+    - Windows logon success (60118): authentication telemetry; correlation
+      groups on it.
+    - Special privileges assigned (67028): privilege escalation signal.
+    - Registry integrity changes (594, 598, 750, 751, 752): persistence vector
+      (Run keys, service entries) -- noisy, but genuinely security relevant.
+    - CVE detections (23504, 23505): vulnerability findings.
+    - User account changed (60110): account manipulation.
+-->
+<group name="cyrvanta,noise_filter,">
+
+  <!-- Windows licensing housekeeping. No security meaning in any context. -->
+  <rule id="100010" level="0">
+    <if_sid>60642</if_sid>
+    <description>Cyrvanta: servicio de licencias de Windows (ruido operativo)</description>
+  </rule>
+
+  <!-- Logoffs. The logon is the security event; its matching logoff is not,
+       and it doubles the volume of every session. -->
+  <rule id="100011" level="0">
+    <if_sid>67023</if_sid>
+    <description>Cyrvanta: cierre de sesion rutinario (ruido operativo)</description>
+  </rule>
+
+  <!-- MSI reconfiguration during routine updates. Software installation worth
+       investigating surfaces through other rules. -->
+  <rule id="100012" level="0">
+    <if_sid>60635</if_sid>
+    <description>Cyrvanta: reconfiguracion de instalador de Windows (ruido operativo)</description>
+  </rule>
+
+  <!-- Configuration assessment results. These describe compliance posture, are
+       re-reported in full on every scan, and are not incidents; they belong in
+       a compliance view rather than an alert stream. -->
+  <rule id="100013" level="0">
+    <if_group>sca</if_group>
+    <description>Cyrvanta: resultado de evaluacion de configuracion (postura, no incidente)</description>
+  </rule>
+
+</group>

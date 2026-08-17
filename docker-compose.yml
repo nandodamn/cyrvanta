@@ -147,6 +147,9 @@ services:
     volumes:
       - wazuh_data:/var/ossec/data
       - ./infrastructure/wazuh/manager/ossec.conf:/wazuh-config-mount/etc/ossec.conf:ro
+      # Silences events with no security meaning at the manager, before they
+      # reach the indexer or become findings.
+      - ./infrastructure/wazuh/manager/rules/cyrvanta_noise_filter.xml:/wazuh-config-mount/etc/rules/cyrvanta_noise_filter.xml:ro
       - ./infrastructure/wazuh/manager/certs/server.crt:/wazuh-config-mount/api/configuration/ssl/server.crt:ro
       - ./infrastructure/wazuh/manager/certs/server.key:/wazuh-config-mount/api/configuration/ssl/server.key:ro
     depends_on:

@@ -21,6 +21,10 @@ class Settings(BaseSettings):
     redis_url: str = "redis://redis:6379/0"
     rabbitmq_url: str = "amqp://cyrvanta:change-me@rabbitmq:5672/"
     event_max_payload_bytes: int = Field(default=262_144, ge=1024, le=1_048_576)
+    # How long a finding waits before Cyrvanta records it. Tunable because the
+    # right value depends on alert volume: too low and most cycles query the
+    # indexer for nothing, too high and an active intrusion goes unrecorded.
+    scheduler_interval_seconds: int = Field(default=15, ge=5, le=300)
     outbox_batch_size: int = Field(default=50, ge=1, le=500)
     outbox_lease_seconds: int = Field(default=60, ge=1, le=3600)
     outbox_poll_interval_seconds: float = Field(default=1.0, ge=0.1, le=60)

@@ -53,7 +53,14 @@ async def run() -> None:
                 "governed_memory_expirations_materialized",
                 extra={"count": expired_memories},
             )
-        await asyncio.sleep(60)
+        # Detection already happened seconds ago at the manager; this interval is
+        # only how long a finding waits before Cyrvanta records it, so a minute
+        # was a minute of blindness during an active intrusion. Fifteen seconds
+        # keeps that short without polling the indexer for nothing most cycles.
+        # Removing the delay entirely needs Wazuh to push instead of Cyrvanta
+        # asking -- an inbound endpoint with its own authentication, not a
+        # smaller number here.
+        await asyncio.sleep(settings.scheduler_interval_seconds)
 
 
 if __name__ == "__main__":

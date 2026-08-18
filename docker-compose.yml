@@ -226,6 +226,9 @@ services:
       # Target of the credential-attack scenario: real logins, real source IPs.
       LAB_SSH_ENABLED: "1"
       LAB_SSH_USER: analista
+      # Shared with demo-console via the same .env value, so the console can
+      # render a working login command without reaching into this container.
+      LAB_SSH_PASSWORD: ${LAB_SSH_PASSWORD:?Set LAB_SSH_PASSWORD}
     cap_add: [NET_ADMIN]
     mem_limit: 128m
     cpus: 0.25
@@ -300,6 +303,10 @@ services:
       DEMO_TENANT_ID: ${DEMO_TENANT_ID:-}
       DEMO_TARGET_HOST: lab-server-01
       DEMO_TARGET_PORT: "22"
+      DEMO_SSH_USER: analista
+      # env_file already loads LAB_SSH_PASSWORD from .env; declared here too so
+      # it is visible next to what actually uses it.
+      LAB_SSH_PASSWORD: ${LAB_SSH_PASSWORD:?Set LAB_SSH_PASSWORD}
     ports: ["127.0.0.1:8090:8090"]
     networks: [internal, host-access]
     healthcheck:

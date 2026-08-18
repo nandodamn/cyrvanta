@@ -31,6 +31,10 @@ LOG = logging.getLogger("demo-console")
 TENANT_ID = os.environ.get("DEMO_TENANT_ID", "")
 TARGET_HOST = os.environ.get("DEMO_TARGET_HOST", "lab-server-01")
 TARGET_PORT = int(os.environ.get("DEMO_TARGET_PORT", "22"))
+SSH_USER = os.environ.get("DEMO_SSH_USER", "analista")
+# Shared with lab-server-01 via the same .env value: both containers read it,
+# so the console never needs to reach into lab-server-01 to learn it.
+SSH_PASSWORD = os.environ.get("LAB_SSH_PASSWORD", "")
 
 
 def _dsn() -> str:
@@ -63,6 +67,34 @@ async def _query(sql: str, *args: object) -> list[dict[str, object]]:
 
 def _run(coro):
     return asyncio.run(coro)
+
+
+def _login_command() -> dict[str, object]:
+    """The successful-login command, with the real current password.
+
+    The page's static command had no password anywhere in it: sshd would
+    prompt for one interactively, and nothing on screen said what to type.
+    The value here is never queried from lab-server-01 -- it is the same
+    LAB_SSH_PASSWORD both containers read from .env, so a rebuild of either
+    one cannot leave them out of sync.
+    """
+    if not SSH_PASSWORD:
+        return {
+            "available": False,
+            "reason": "LAB_SSH_PASSWORD no esta definida en este contenedor.",
+        }
+    # The password is generated alphanumeric-only (see lab-sshd-entrypoint.sh),
+    # so it needs no shell quoting of its own inside the outer single-quoted
+    # `sh -c '...'` -- an unquoted alnum value is already valid POSIX syntax.
+    if not SSH_PASSWORD.isalnum():
+        return {"available": False, "reason": "LAB_SSH_PASSWORD contiene caracteres no soportados."}
+    command = (
+        f"docker compose exec lab-workstation-01 sh -c "
+        f"'SSHPASS={SSH_PASSWORD} sshpass -e ssh -o StrictHostKeyChecking=accept-new "
+        f"-o PreferredAuthentications=password -o PubkeyAuthentication=no "
+        f"{SSH_USER}@{TARGET_HOST} \"echo acceso-exitoso\"'"
+    )
+    return {"available": True, "command": command, "user": SSH_USER, "password": SSH_PASSWORD}
 
 
 def _checks() -> dict[str, object]:
@@ -179,7 +211,12 @@ small{color:var(--soft)}
   el atacante finalmente entra. Los dos patrones juntos &mdash; muchos fallos y luego un
   exito, todo contra la misma cuenta y desde la misma IP &mdash; son lo que convierte esto
   en un incidente.</p>
-  <pre id="cmd2"></pre>
+  <p class="param">La contrasena de <b>analista</b> se genera al levantar el laboratorio y no
+  esta escrita en esta pagina. El boton la trae de la variable que comparten
+  <code>lab-server-01</code> y esta consola &mdash; ninguno de los dos se la pide al otro
+  por red.</p>
+  <button onclick="loadLoginCommand()">Obtener comando con la contrasena actual</button>
+  <pre id="cmd2">Toca el boton para generar este comando.</pre>
 </div>
 
 <div class="card">
@@ -208,9 +245,23 @@ small{color:var(--soft)}
 
 <script>
 const CMD1 = `docker compose exec lab-workstation-01 sh -c 'for i in 1 2 3 4 5; do SSHPASS="clave-incorrecta-$i" sshpass -e ssh -o StrictHostKeyChecking=accept-new -o ConnectTimeout=5 -o PreferredAuthentications=password -o PubkeyAuthentication=no analista@lab-server-01 true 2>/dev/null; done; echo "intentos fallidos enviados"'`;
-const CMD2 = `docker compose exec -it lab-workstation-01 ssh -o StrictHostKeyChecking=accept-new analista@lab-server-01`;
 document.getElementById('cmd1').textContent = CMD1;
-document.getElementById('cmd2').textContent = CMD2;
+
+async function loadLoginCommand(){
+  const out = document.getElementById('cmd2');
+  out.textContent = 'Consultando...';
+  try{
+    const r = await fetch('/api/login-command');
+    const d = await r.json();
+    if(!d.available){
+      out.textContent = `No disponible: ${d.reason}`;
+      return;
+    }
+    out.textContent = d.command;
+  }catch(e){
+    out.textContent = `Error: ${e}`;
+  }
+}
 
 function rows(list, cols){
   if(!list || !list.length) return '<p><small>Sin registros.</small></p>';
@@ -261,6 +312,10 @@ class Handler(BaseHTTPRequestHandler):
             return
         if self.path == "/api/checks":
             payload = json.dumps(_checks(), default=str, ensure_ascii=False).encode("utf-8")
+            self._send(200, payload, "application/json; charset=utf-8")
+            return
+        if self.path == "/api/login-command":
+            payload = json.dumps(_login_command(), ensure_ascii=False).encode("utf-8")
             self._send(200, payload, "application/json; charset=utf-8")
             return
         self._send(404, b'{"error":"not_found"}', "application/json")

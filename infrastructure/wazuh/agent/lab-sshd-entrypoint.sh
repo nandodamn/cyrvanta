@@ -27,9 +27,12 @@ SSHCONF
 
   if ! id "$LAB_USER" >/dev/null 2>&1; then
     useradd -m -s /bin/bash "$LAB_USER"
-    # Generated here and written to a file inside the container: a password in
-    # the image or in compose would be a secret committed to the repository.
-    password="$(head -c 18 /dev/urandom | base64 | tr -d '/+=' | cut -c1-16)"
+    # LAB_SSH_PASSWORD lets the demo console render a working login command
+    # without ever reaching into this container: both read the same value from
+    # .env, so there is nothing to query across the network. Falls back to a
+    # generated one so the scenario still works if that variable is unset.
+    # Either way the value lives in .env, never in the image or in compose.
+    password="${LAB_SSH_PASSWORD:-$(head -c 18 /dev/urandom | base64 | tr -d '/+=' | cut -c1-16)}"
     printf '%s:%s\n' "$LAB_USER" "$password" | chpasswd
     printf 'usuario=%s\npassword=%s\n' "$LAB_USER" "$password" > "$CREDENTIALS_FILE"
     chmod 600 "$CREDENTIALS_FILE"

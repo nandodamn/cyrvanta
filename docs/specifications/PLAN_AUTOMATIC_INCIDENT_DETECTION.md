@@ -1,6 +1,6 @@
 # Plan: ampliar la deteccion automatica de incidentes
 
-Estado: PROPUESTA — requiere aprobacion antes de implementar.
+Estado: EN IMPLEMENTACION — aprobado 2026-08-18. Fase 1 completa.
 
 ## Contexto
 
@@ -48,6 +48,14 @@ commit + push.
 ---
 
 ## Fase 1 — Agrupar tambien por activo
+
+**Estado: COMPLETA** (commit `c2f6efb`, 2026-08-18). `grouping` implementado en
+`CorrelationRule`/`CorrelationCandidate`/`evaluate_rule()`, parseo y validacion
+en `_rule()`. 4 tests nuevos en `test_correlation.py` (asset-match,
+asset-no-cruza-hosts, regresion explicita de `credential-attack` sin
+`grouping`, valor desconocido rechazado). Suite completa: 299/299 backend en
+verde, ruff/mypy limpios, imagen reconstruida y desplegada, `/api/v1/ready`
+verificado post-deploy.
 
 **Objetivo:** que la deteccion basada en host pueda correlacionar.
 

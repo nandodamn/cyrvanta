@@ -35,6 +35,9 @@ class SignalSelector:
         return observed == self.value
 
 
+GROUPING_KINDS = frozenset({"source_ip", "asset"})
+
+
 @dataclass(frozen=True, slots=True)
 class CorrelationRule:
     code: str
@@ -45,12 +48,20 @@ class CorrelationRule:
     threshold: int = 85
     max_candidates: int = MAX_CANDIDATES
     max_members: int = MAX_MEMBERS
+    # What "the same thing happening again" means for this rule. Defaults to
+    # source_ip, which is what every rule seeded before this field existed
+    # already assumes -- adding it changes nothing for them. Host-based
+    # detection (file integrity, rootcheck) carries no source IP and can only
+    # ever correlate by asset.
+    grouping: str = "source_ip"
 
     def __post_init__(self) -> None:
         if not self.code or not self.version or len(self.definition_sha256) != 64:
             raise ValueError("correlation rule identity is invalid")
         if not self.selectors or not 0 <= self.threshold <= 100:
             raise ValueError("correlation rule definition is invalid")
+        if self.grouping not in GROUPING_KINDS:
+            raise ValueError("correlation rule grouping is invalid")
 
 
 @dataclass(frozen=True, slots=True)
@@ -93,6 +104,21 @@ class CorrelationCandidate:
                 if entity.kind == "IP_ADDRESS" and entity.namespace == "source" and entity.value
             )
         )
+
+    def asset_keys(self) -> tuple[str, ...]:
+        # Unlike source_ip, "asset" has no source/destination role to filter
+        # on -- it is just the host the finding is about -- so only kind is
+        # checked, not a specific namespace.
+        return tuple(
+            sorted(
+                entity.key for entity in self.entities if entity.kind == "ASSET" and entity.value
+            )
+        )
+
+    def grouping_keys(self, rule: CorrelationRule) -> tuple[str, ...]:
+        if rule.grouping == "asset":
+            return self.asset_keys()
+        return self.source_ip_keys()
 
     def selector_code(self, rule: CorrelationRule) -> str | None:
         return next(
@@ -160,7 +186,7 @@ def evaluate_rule(
         raise CorrelationLimitExceeded("candidate_limit_exceeded")
     if not trigger.eligible_for(rule) or trigger.selector_code(rule) is None:
         return None
-    trigger_keys = trigger.source_ip_keys()
+    trigger_keys = trigger.grouping_keys(rule)
     if not trigger_keys:
         return None
     window_start, window_end = bucket_bounds(trigger.effective_at)
@@ -174,7 +200,7 @@ def evaluate_rule(
                     if item.eligible_for(rule)
                     and item.is_simulated == trigger.is_simulated
                     and window_start <= item.effective_at < window_end
-                    and entity_key in item.source_ip_keys()
+                    and entity_key in item.grouping_keys(rule)
                     and item.selector_code(rule) is not None
                 ),
                 key=lambda item: (
@@ -201,14 +227,18 @@ def evaluate_rule(
     revision_ids = tuple(item.revision_id for item in selected)
     distinct_selectors = len(set(selector_codes.values()))
     distinct_sources = len({item.source_system for item in selected})
+    # Named after the dimension this rule actually grouped on. Unchanged for
+    # every rule seeded before `grouping` existed, since their definitions
+    # default to "source_ip" and therefore still produce "exact_source_ip".
+    grouping_factor_code = "exact_asset" if rule.grouping == "asset" else "exact_source_ip"
     factors = (
         FactorResult(
-            "exact_source_ip",
+            grouping_factor_code,
             bool(selected),
             40,
             40 if selected else 0,
             revision_ids,
-            "correlation.factor.exact_source_ip",
+            f"correlation.factor.{grouping_factor_code}",
         ),
         FactorResult(
             "distinct_signal_pattern",

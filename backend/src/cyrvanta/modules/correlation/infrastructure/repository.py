@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from cyrvanta.modules.correlation.application.ports import ReservedMatch
 from cyrvanta.modules.correlation.domain.models import (
     ACTIVE_INCIDENT_STATES,
+    GROUPING_KINDS,
     CorrelationCandidate,
     CorrelationMatch,
     CorrelationRule,
@@ -223,6 +224,14 @@ class SqlCorrelationRepository:
                 raise ValueError(f"correlation rule {name} is invalid")
             return value
 
+        # Absent means source_ip: every rule persisted before this key existed
+        # is read back with the grouping it already assumed. A present but
+        # unrecognised value fails loudly rather than silently falling back,
+        # since it would otherwise misgroup findings without warning.
+        grouping = definition.get("grouping", "source_ip")
+        if not isinstance(grouping, str) or grouping not in GROUPING_KINDS:
+            raise ValueError("correlation rule grouping is invalid")
+
         return CorrelationRule(
             code=model.rule_code,
             version=model.version,
@@ -232,6 +241,7 @@ class SqlCorrelationRepository:
             threshold=integer("threshold", 85),
             max_candidates=integer("candidate_limit", 500),
             max_members=integer("member_limit", 32),
+            grouping=grouping,
         )
 
     @staticmethod

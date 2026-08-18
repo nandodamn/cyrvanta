@@ -162,6 +162,73 @@ def test_candidate_and_member_limits_never_correlate_partial_sets() -> None:
         evaluate_rule(constrained, trigger, (trigger, failed))
 
 
+def asset_candidate(
+    selector: str,
+    *,
+    asset: str = "lab-server-01",
+    minute: int = 1,
+    source_system: str = "source-a",
+    simulated: bool = False,
+) -> CorrelationCandidate:
+    return CorrelationCandidate(
+        finding_id=uuid4(),
+        revision_id=uuid4(),
+        integration_id=uuid4(),
+        source_system=source_system,
+        effective_at=BASE_TIME.replace(minute=minute),
+        effective_time_basis="SOURCE",
+        severity_score=70,
+        category="host-integrity",
+        rule_reference=selector,
+        normalization_status="VALID",
+        issue_codes=(),
+        entities=(EntityReference("ASSET", asset, "wazuh-agent"),),
+        is_simulated=simulated,
+    )
+
+
+def test_grouping_defaults_to_source_ip_for_rules_seeded_before_it_existed() -> None:
+    """Regression anchor: a rule that never declares `grouping` in its stored
+    definition must keep grouping by IP, with the same factor name and the
+    same score it produced before this field existed.
+    """
+    assert rule().grouping == "source_ip"
+    trigger = candidate("success", minute=4)
+    failed = candidate("failed", minute=2)
+    match = evaluate_rule(rule(), trigger, (trigger, failed))
+    assert match is not None
+    assert match.score == 85
+    exact = next(factor for factor in match.factors if factor.code == "exact_source_ip")
+    assert exact.matched is True
+
+
+def test_asset_grouping_correlates_findings_with_no_source_ip() -> None:
+    """File integrity and rootcheck findings carry no source IP: grouping by
+    asset is the only way they can ever correlate at all.
+    """
+    asset_grouped = replace(rule(), grouping="asset")
+    trigger = asset_candidate("success", minute=4)
+    failed = asset_candidate("failed", minute=2)
+    match = evaluate_rule(asset_grouped, trigger, (failed, trigger))
+    assert match is not None
+    assert match.score == 85
+    exact = next(factor for factor in match.factors if factor.code == "exact_asset")
+    assert exact.matched is True
+    assert exact.explanation_code == "correlation.factor.exact_asset"
+
+
+def test_asset_grouping_does_not_cross_different_hosts() -> None:
+    asset_grouped = replace(rule(), grouping="asset")
+    trigger = asset_candidate("success", minute=4, asset="lab-server-01")
+    other_host = asset_candidate("failed", minute=2, asset="lab-workstation-01")
+    assert evaluate_rule(asset_grouped, trigger, (other_host, trigger)) is None
+
+
+def test_unknown_grouping_is_rejected() -> None:
+    with pytest.raises(ValueError, match="grouping"):
+        replace(rule(), grouping="asset_owner")
+
+
 def test_correlation_domain_does_not_import_wazuh() -> None:
     module_names = (
         CorrelationCandidate.__module__,

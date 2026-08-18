@@ -124,7 +124,8 @@ a {
 }
 
 input,
-select {
+select,
+textarea {
   width: 100%;
   min-height: 42px;
   padding: 10px 12px;
@@ -132,20 +133,33 @@ select {
   background: var(--surface);
   border: 1px solid var(--line-strong);
   border-radius: 5px;
+  font: inherit;
+}
+
+/* A plain <textarea rows={n}> otherwise keeps the browser's native size and
+   never picks up the width/color rules above -- it was the only form control
+   missing from that shared selector list, which is what made it render as a
+   tiny, unstyled box wherever a label wrapped one instead of an input/select. */
+textarea {
+  min-height: 64px;
+  resize: vertical;
 }
 
 input:hover,
-select:hover {
+select:hover,
+textarea:hover {
   border-color: var(--muted);
 }
 
 input:focus,
-select:focus {
+select:focus,
+textarea:focus {
   border-color: var(--accent);
 }
 
 input:disabled,
-select:disabled {
+select:disabled,
+textarea:disabled {
   color: var(--muted);
   background: var(--bg);
   cursor: not-allowed;

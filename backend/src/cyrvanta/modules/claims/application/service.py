@@ -552,15 +552,20 @@ class ClaimService:
         )
         if isinstance(existing, UUID):
             return existing
+        statement_es = (
+            f"La regla {rule_code} version {rule_version} correlaciono "
+            f"{len(revision_ids)} revisiones de hallazgos con score {score}."
+        )
+        statement_en = (
+            f"Rule {rule_code} version {rule_version} correlated "
+            f"{len(revision_ids)} finding revisions with score {score}."
+        )
         claim = Claim(
             claim_id=uuid4(),
             tenant_id=tenant_id,
             incident_id=incident_id,
             claim_type=ClaimType.DERIVED_FACT,
-            statement=(
-                f"Rule {rule_code} version {rule_version} correlated "
-                f"{len(revision_ids)} finding revisions with score {score}."
-            ),
+            statement=statement_en,
             language_code="und",
             confidence=None,
             origin_type=ClaimOriginType.RULE,
@@ -596,6 +601,25 @@ class ClaimService:
             ],
             actor_user_id=None,
         )
+        # Both texts are generated here, not left for a human to translate: the
+        # statement is entirely deterministic (rule code, version, count, score),
+        # so requiring a manual "add presentation" per claim per locale would
+        # leave every correlation claim in English until someone did that by
+        # hand -- on a platform where bilingual is a first-class requirement.
+        for locale, text in (("es", statement_es), ("en", statement_en)):
+            session.add(
+                ClaimPresentationModel(
+                    tenant_id=tenant_id,
+                    claim_id=model.id,
+                    locale=locale,
+                    text=text,
+                    version=1,
+                    origin_type=ClaimOriginType.RULE.value,
+                    origin_actor_user_id=None,
+                    correlation_id=correlation_id,
+                )
+            )
+        await session.flush()
         return model.id
 
     async def record_threat_intel_lookup(
@@ -633,12 +657,28 @@ class ClaimService:
             return existing
         attribution = f"Source {source} " if source else "The configured source "
         measured = f" with score {score}" if score is not None else ""
+        statement_en = f"{attribution}returned reputation verdict {verdict}{measured}."
+        # verdict is one of the four validated codes, not provider prose, so
+        # translating it here does not risk carrying untrusted text into the
+        # Spanish presentation.
+        verdict_es = {
+            "malicious": "malicioso",
+            "suspicious": "sospechoso",
+            "benign": "benigno",
+            "unknown": "desconocido",
+        }.get(verdict, verdict)
+        attribution_es = f"La fuente {source} " if source else "La fuente configurada "
+        measured_es = f" con score {score}" if score is not None else ""
+        statement_es = (
+            f"{attribution_es}devolvio el veredicto de reputacion "
+            f"{verdict_es}{measured_es}."
+        )
         claim = Claim(
             claim_id=uuid4(),
             tenant_id=tenant_id,
             incident_id=incident_id,
             claim_type=ClaimType.DERIVED_FACT,
-            statement=f"{attribution}returned reputation verdict {verdict}{measured}.",
+            statement=statement_en,
             language_code="und",
             confidence=None,
             origin_type=ClaimOriginType.SYSTEM,
@@ -674,6 +714,29 @@ class ClaimService:
             ],
             actor_user_id=None,
         )
+        # Both texts are generated here, not left for a human to translate: the
+        # statement is entirely deterministic (verdict, score, source), so
+        # requiring a manual "add presentation" per claim per locale would leave
+        # every threat-intel claim in English until someone did that by hand --
+        # on a platform where bilingual is a first-class requirement.
+        #
+        # claim_presentations only accepts HUMAN/RULE/AI (not SYSTEM, which the
+        # claim itself uses), so this is filed as RULE: it is a deterministic
+        # rendering, not a person's account.
+        for locale, text in (("es", statement_es), ("en", statement_en)):
+            session.add(
+                ClaimPresentationModel(
+                    tenant_id=tenant_id,
+                    claim_id=model.id,
+                    locale=locale,
+                    text=text,
+                    version=1,
+                    origin_type=ClaimOriginType.RULE.value,
+                    origin_actor_user_id=None,
+                    correlation_id=correlation_id,
+                )
+            )
+        await session.flush()
         return model.id
 
     async def _insert_claim(

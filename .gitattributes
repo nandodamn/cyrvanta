@@ -1,0 +1,6 @@
+
+# Lab shell scripts run inside Linux containers: they must stay LF, or the
+# kernel looks for an interpreter path ending in \r and the container crashloops.
+infrastructure/wazuh/agent/*.sh text eol=lf
+infrastructure/lab-endpoint/*.py text eol=lf
+infrastructure/demo-console/*.py text eol=lf

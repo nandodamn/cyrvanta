@@ -14,7 +14,11 @@ USER root
 # required, not cosmetic: sshd's own -E output has no syslog prefix, and the
 # Wazuh sshd decoders match on that prefix, so authentication lines written
 # without it are read and then silently discarded.
-RUN dnf install -y iptables openssh-server openssh-clients rsyslog && dnf clean all
+# sshpass is what lets the scenario attack the account it later breaks into.
+# Without it the failures have to target a user that does not exist, and the
+# story stops being a credential attack: failing as one user and succeeding as
+# another are two unrelated events that merely share a source address.
+RUN dnf install -y iptables openssh-server openssh-clients rsyslog sshpass && dnf clean all
 
 COPY cyrvanta-network-isolate.sh /var/ossec/active-response/bin/cyrvanta-network-isolate
 RUN chown root:wazuh /var/ossec/active-response/bin/cyrvanta-network-isolate \

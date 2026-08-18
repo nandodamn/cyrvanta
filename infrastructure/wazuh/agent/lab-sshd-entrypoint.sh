@@ -16,6 +16,15 @@ LAB_USER="${LAB_SSH_USER:-analista}"
 if [ -n "${LAB_SSH_ENABLED:-}" ] && command -v /usr/sbin/sshd >/dev/null 2>&1; then
   ssh-keygen -A >/dev/null 2>&1 || true
 
+  # The image ships with password auth disabled, so every password attempt is
+  # rejected before it is evaluated and never produces "Failed password" -- the
+  # line the Wazuh brute-force rules match on. A credential attack has to be
+  # able to try passwords, so the lab enables it. Lab only.
+  cat > /etc/ssh/sshd_config.d/00-cyrvanta-lab.conf <<'SSHCONF'
+PasswordAuthentication yes
+KbdInteractiveAuthentication no
+SSHCONF
+
   if ! id "$LAB_USER" >/dev/null 2>&1; then
     useradd -m -s /bin/bash "$LAB_USER"
     # Generated here and written to a file inside the container: a password in

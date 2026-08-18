@@ -5,7 +5,11 @@ from uuid import UUID, uuid4
 import httpx
 from sqlalchemy import delete, select, text
 
-from cyrvanta.modules.claims.infrastructure.models import ClaimEvidenceLinkModel, ClaimModel
+from cyrvanta.modules.claims.infrastructure.models import (
+    ClaimEvidenceLinkModel,
+    ClaimModel,
+    ClaimPresentationModel,
+)
 from cyrvanta.modules.incident.infrastructure.models import IncidentModel
 from cyrvanta.modules.integrations.application.connection_service import (
     StoredIntegrationCredential,
@@ -78,15 +82,20 @@ async def _incident(tenant_id: UUID):
         yield incident_id
     finally:
         async with tenant_session(tenant_id) as session:
+            claim_ids = select(ClaimModel.id).where(
+                ClaimModel.tenant_id == tenant_id,
+                ClaimModel.incident_id == incident_id,
+            )
             await session.execute(
                 delete(ClaimEvidenceLinkModel).where(
                     ClaimEvidenceLinkModel.tenant_id == tenant_id,
-                    ClaimEvidenceLinkModel.claim_id.in_(
-                        select(ClaimModel.id).where(
-                            ClaimModel.tenant_id == tenant_id,
-                            ClaimModel.incident_id == incident_id,
-                        )
-                    ),
+                    ClaimEvidenceLinkModel.claim_id.in_(claim_ids),
+                )
+            )
+            await session.execute(
+                delete(ClaimPresentationModel).where(
+                    ClaimPresentationModel.tenant_id == tenant_id,
+                    ClaimPresentationModel.claim_id.in_(claim_ids),
                 )
             )
             await session.execute(
@@ -244,3 +253,50 @@ async def test_lookup_without_a_credential_never_calls_out(monkeypatch) -> None:
     assert result.succeeded is False
     assert result.error_code == "PLAYBOOK_CREDENTIAL_UNAVAILABLE"
     assert calls == []
+
+
+async def test_lookup_files_both_locales_without_a_human_translating(monkeypatch) -> None:
+    """The claim must be readable in Spanish immediately, not after manual work.
+
+    The statement is entirely deterministic (verdict, score, source), so
+    requiring an analyst to open the claim and add a bilingual presentation by
+    hand would leave every one of these claims in English until someone did
+    that -- on a platform where bilingual is a first-class requirement.
+    """
+    tenant_id = await _existing_tenant_id()
+    connector = ActionRegistry().get("threat_intel.lookup", "1.0.0")
+    _patch_httpx(
+        monkeypatch, _responding({"verdict": "malicious", "score": 90, "source": "OpenCTI"})
+    )
+
+    async with _incident(tenant_id) as incident_id:
+        await connector.execute(
+            _context(tenant_id),
+            _action_input(incident_id),
+            {"path": "/api/reputation"},
+            f"ti-locale-{incident_id}",
+            _credential(),
+        )
+        async with tenant_session(tenant_id) as session:
+            claim = await session.scalar(
+                select(ClaimModel).where(
+                    ClaimModel.tenant_id == tenant_id, ClaimModel.incident_id == incident_id
+                )
+            )
+            assert claim is not None
+            presentations = list(
+                (
+                    await session.scalars(
+                        select(ClaimPresentationModel).where(
+                            ClaimPresentationModel.tenant_id == tenant_id,
+                            ClaimPresentationModel.claim_id == claim.id,
+                        )
+                    )
+                ).all()
+            )
+        by_locale = {item.locale: item.text for item in presentations}
+        assert set(by_locale) == {"es", "en"}
+        assert "malicioso" in by_locale["es"]
+        assert "malicious" in by_locale["en"]
+        # A rendering, not a person's account of what happened.
+        assert all(item.origin_type == "RULE" for item in presentations)

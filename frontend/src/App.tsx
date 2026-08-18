@@ -2125,7 +2125,7 @@ function IncidentDetailPage() {
               </div>
 
               <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-                <label>
+                <label style={{ maxWidth: "320px" }}>
                   {t("targetStatus")}
                   <select value={transitionTarget} onChange={(event) => setTransitionTarget(event.target.value)}>
                     {transitionTargets.map((target) => (
@@ -2136,7 +2136,7 @@ function IncidentDetailPage() {
                   </select>
                 </label>
                 {transitionTarget === "closed" && (
-                  <label>
+                  <label style={{ maxWidth: "320px" }}>
                     {t("closeReason")}
                     <select value={closeReason} onChange={(event) => setCloseReason(
                       event.target.value as typeof closeReason,

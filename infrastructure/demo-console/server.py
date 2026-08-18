@@ -162,19 +162,23 @@ small{color:var(--soft)}
 <div class="card">
   <h2><span class="step">1</span>La inyeccion</h2>
   <p>Un ataque de credenciales real desde <b>lab-workstation-01</b> hacia
-  <b>lab-server-01</b>. No se fabrica ningun evento: se intentan accesos que
-  <code>sshd</code> registra y Wazuh detecta.</p>
+  <b>lab-server-01</b>, contra la cuenta <b>analista</b>. No se fabrica ningun
+  evento: se intentan accesos que <code>sshd</code> registra y Wazuh detecta.</p>
+  <p>Primero, varios intentos con <b>contrasenas incorrectas</b> &mdash; el atacante
+  probando a ciegas:</p>
   <pre id="cmd1"></pre>
-  <div class="param"><b>atacante-demo</b> &mdash; usuario inexistente a proposito: genera el
-  fallo de autenticacion sin poder bloquear ninguna cuenta real.</div>
-  <div class="param"><b>6 intentos</b> &mdash; repeticion suficiente para el patron de fuerza bruta.</div>
-  <div class="param"><b>PubkeyAuthentication=no</b> &mdash; fuerza autenticacion por clave, que es
-  la que deja el registro de fallo.</div>
+  <div class="param"><b>analista</b> &mdash; una cuenta real del servidor. El atacante intenta
+  adivinar su contrasena, que es el ataque de credenciales de manual.</div>
+  <div class="param"><b>5 contrasenas incorrectas</b> &mdash; los intentos fallidos que Wazuh
+  cuenta como fuerza bruta.</div>
+  <div class="param"><b>sshpass -p</b> &mdash; entrega cada contrasena de forma no interactiva,
+  como lo haria una herramienta de ataque.</div>
   <div class="param"><b>lab-server-01</b> &mdash; el objetivo. La IP de origen que queda registrada
   es la de la workstation, y es la clave por la que el motor agrupa los eventos.</div>
-  <p style="margin-top:14px">Despues, un acceso <b>exitoso</b> con el usuario real. Los dos
-  patrones juntos &mdash; fallos y luego exito desde la misma IP &mdash; son lo que convierte
-  esto en un incidente.</p>
+  <p style="margin-top:14px">Despues, el acceso <b>exitoso</b> con la contrasena correcta:
+  el atacante finalmente entra. Los dos patrones juntos &mdash; muchos fallos y luego un
+  exito, todo contra la misma cuenta y desde la misma IP &mdash; son lo que convierte esto
+  en un incidente.</p>
   <pre id="cmd2"></pre>
 </div>
 
@@ -203,8 +207,8 @@ small{color:var(--soft)}
 </div>
 
 <script>
-const CMD1 = `docker compose exec lab-workstation-01 sh -c 'for i in 1 2 3 4 5 6; do ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 -o PubkeyAuthentication=no atacante-demo@lab-server-01 true 2>/dev/null; done; echo listo'`;
-const CMD2 = `docker compose exec -it lab-workstation-01 ssh -o StrictHostKeyChecking=no analista@lab-server-01`;
+const CMD1 = `docker compose exec lab-workstation-01 sh -c 'for i in 1 2 3 4 5; do SSHPASS="clave-incorrecta-$i" sshpass -e ssh -o StrictHostKeyChecking=accept-new -o ConnectTimeout=5 -o PreferredAuthentications=password -o PubkeyAuthentication=no analista@lab-server-01 true 2>/dev/null; done; echo "intentos fallidos enviados"'`;
+const CMD2 = `docker compose exec -it lab-workstation-01 ssh -o StrictHostKeyChecking=accept-new analista@lab-server-01`;
 document.getElementById('cmd1').textContent = CMD1;
 document.getElementById('cmd2').textContent = CMD2;
 

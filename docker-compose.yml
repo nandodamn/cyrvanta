@@ -284,6 +284,33 @@ services:
       retries: 20
     restart: unless-stopped
 
+  # Guided walkthrough for the end-to-end scenarios. Lives outside the product
+  # on purpose: it never ships with a Cyrvanta deployment, and it observes
+  # rather than acts -- no command execution, no docker socket, read-only
+  # queries and a TCP connect.
+  demo-console:
+    build: {context: ., dockerfile: backend/Dockerfile}
+    profiles: [live-demo]
+    env_file: .env
+    command: ["python", "/srv/server.py"]
+    volumes:
+      - ./infrastructure/demo-console/server.py:/srv/server.py:ro
+    environment:
+      DEMO_CONSOLE_PORT: "8090"
+      DEMO_TENANT_ID: ${DEMO_TENANT_ID:-}
+      DEMO_TARGET_HOST: lab-server-01
+      DEMO_TARGET_PORT: "22"
+    ports: ["127.0.0.1:8090:8090"]
+    networks: [internal, host-access]
+    healthcheck:
+      test:
+        ["CMD", "python", "-c",
+         "import urllib.request;urllib.request.urlopen('http://127.0.0.1:8090/health').read()"]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
   lab-endpoint:
     image: python:3.12-alpine
     profiles: [live-demo]

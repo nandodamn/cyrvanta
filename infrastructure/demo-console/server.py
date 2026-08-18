@@ -21,6 +21,7 @@ import json
 import logging
 import os
 import socket
+import urllib.request
 from datetime import UTC, datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
@@ -35,6 +36,13 @@ SSH_USER = os.environ.get("DEMO_SSH_USER", "analista")
 # Shared with lab-server-01 via the same .env value: both containers read it,
 # so the console never needs to reach into lab-server-01 to learn it.
 SSH_PASSWORD = os.environ.get("LAB_SSH_PASSWORD", "")
+# Caso 2 -- the account compromised-account/compromised-endpoint's sibling
+# playbook disables. A fixed, documented lab identity, not a guess.
+DEMO_ACCOUNT_EMAIL = os.environ.get(
+    "DEMO_ACCOUNT_EMAIL", "synthetic-demo-user@cyrvanta.uy"
+)
+MAIL_HOST = os.environ.get("DEMO_MAIL_HOST", "mailpit")
+MAIL_PORT = int(os.environ.get("DEMO_MAIL_PORT", "8025"))
 
 
 def _dsn() -> str:
@@ -141,8 +149,74 @@ def _checks() -> dict[str, object]:
                 TENANT_ID,
             )
         )
+        # Caso 2 -- compromised-account: the account this playbook disables.
+        account_rows = _run(
+            _query(
+                """
+                SELECT email, display_name, is_active
+                FROM users
+                WHERE tenant_id = $1::uuid AND email = $2
+                """,
+                TENANT_ID,
+                DEMO_ACCOUNT_EMAIL,
+            )
+        )
+        result["account"] = account_rows[0] if account_rows else None
+        # Caso 3 -- automated-enrichment: the most recent threat-intel claim,
+        # in Spanish if a presentation exists for it (see claims service fix).
+        result["threat_intel"] = _run(
+            _query(
+                """
+                SELECT COALESCE(cp.text, c.statement) AS statement, c.created_at
+                FROM claims c
+                LEFT JOIN claim_presentations cp
+                       ON cp.claim_id = c.id AND cp.locale = 'es'
+                WHERE c.tenant_id = $1::uuid AND c.origin_code = 'threat_intel.lookup'
+                ORDER BY c.created_at DESC
+                LIMIT 1
+                """,
+                TENANT_ID,
+            )
+        )
+        # Caso 4a -- create-security-ticket: the receipt Cyrvanta recorded for
+        # its own execution, not a claim about what lab-endpoint did with it.
+        ticket_rows = _run(
+            _query(
+                """
+                SELECT pe.status, pe.result, pe.created_at
+                FROM playbook_executions pe
+                JOIN playbook_versions pv ON pv.id = pe.playbook_version_id
+                WHERE pe.tenant_id = $1::uuid AND pv.workflow_code = 'create-security-ticket'
+                ORDER BY pe.created_at DESC
+                LIMIT 1
+                """,
+                TENANT_ID,
+            )
+        )
+        result["ticket"] = ticket_rows[0] if ticket_rows else None
     except Exception as exc:  # pragma: no cover - surfaced to the operator
         result["database_error"] = f"{type(exc).__name__}: {exc}"
+    # Caso 4b -- notify-critical-incident: read Mailpit's own inbox API. This
+    # is the only check here that is not a docker-exec observation, but it is
+    # still a network read of a system's own state, same as the TCP connect
+    # for isolation -- never a claim taken from Cyrvanta's side about what it
+    # sent.
+    try:
+        req = urllib.request.Request(f"http://{MAIL_HOST}:{MAIL_PORT}/api/v1/messages?limit=3")
+        with urllib.request.urlopen(req, timeout=3) as response:
+            inbox = json.loads(response.read())
+        result["mail"] = [
+            {
+                "subject": item.get("Subject"),
+                "to": ", ".join(
+                    f"{addr.get('Address')}" for addr in item.get("To", []) if addr.get("Address")
+                ),
+                "created": item.get("Created"),
+            }
+            for item in inbox.get("messages", [])
+        ]
+    except Exception as exc:  # pragma: no cover - surfaced to the operator
+        result["mail_error"] = f"{type(exc).__name__}: {exc}"
     return result
 
 
@@ -184,7 +258,8 @@ small{color:var(--soft)}
 </style></head><body><div class="wrap">
 
 <h1>Consola de demostracion</h1>
-<p class="lead">Caso 1 &mdash; Endpoint comprometido: contencion con doble aprobacion y reversion.</p>
+<p class="lead">Una sola inyeccion, cuatro tratamientos: el mismo incidente de credenciales
+se puede responder con distintos playbooks, y cada uno deja una evidencia distinta.</p>
 
 <div class="banner">
   Entorno de laboratorio. Esta consola <b>no ejecuta comandos ni modifica nada</b>:
@@ -220,27 +295,42 @@ small{color:var(--soft)}
 </div>
 
 <div class="card">
-  <h2><span class="step">2</span>Estado antes de contener</h2>
-  <p>Se prueba la conectividad <b>desde fuera del host</b>. Es la evidencia que importa:
-  no se lee la configuracion del propio servidor, se comprueba si responde.</p>
+  <h2><span class="step">2</span>Verificar el efecto de cada tratamiento</h2>
+  <p>Un solo boton consulta las cuatro senales a la vez. Corre esto <b>antes</b> de tratar
+  el incidente para ver la linea base, y de nuevo <b>despues</b> de cada aprobacion.</p>
   <button onclick="check()">Verificar estado</button>
   <button class="ghost" onclick="check()">Actualizar</button>
   <div id="out"></div>
 </div>
 
 <div class="card">
-  <h2><span class="step">3</span>El tratamiento</h2>
-  <p>En Cyrvanta: abrir el incidente, proponer <b>compromised-endpoint</b>, aprobar con
-  <b>dos usuarios distintos</b> y ejecutar. Luego volver aqui y verificar de nuevo:
-  el host debe dejar de responder.</p>
-  <p><small>El canal con el SIEM se preserva a proposito: se contiene el host sin perder
-  visibilidad sobre el.</small></p>
+  <h2><span class="step">3</span>Caso 1 &mdash; Endpoint comprometido (4 ojos)</h2>
+  <p>Proponer <b>compromised-endpoint</b>, aprobar con <b>dos usuarios distintos</b> y
+  ejecutar. La seccion "Conectividad" de arriba debe pasar a <i>contencion aplicada</i>.
+  El canal con el SIEM se preserva a proposito: se contiene el host sin perder
+  visibilidad sobre el. Revertir desde Cyrvanta debe devolver la conectividad.</p>
 </div>
 
 <div class="card">
-  <h2><span class="step">4</span>La reversion</h2>
-  <p>Revertir la ejecucion desde Cyrvanta y verificar una vez mas: la conectividad
-  vuelve. La contencion es reversible y queda registrada.</p>
+  <h2><span class="step">4</span>Caso 2 &mdash; Cuenta comprometida (4 ojos)</h2>
+  <p>Proponer <b>compromised-account</b> sobre la misma cuenta atacada, aprobar con dos
+  usuarios distintos y ejecutar. La seccion "Cuenta" debe pasar a <b>inactiva</b>.
+  Revertir debe reactivarla.</p>
+</div>
+
+<div class="card">
+  <h2><span class="step">5</span>Caso 3 &mdash; Enriquecimiento automatico (sin aprobacion)</h2>
+  <p>Este se dispara sin pedir aprobacion humana &mdash; es lo que distingue "automatico"
+  de "sin control": agrega contexto, nunca toca un sistema. La seccion "Threat Intel"
+  debe mostrar el veredicto registrado como contexto del incidente, no como una accion.</p>
+</div>
+
+<div class="card">
+  <h2><span class="step">6</span>Caso 4 &mdash; Ticket o notificacion (una firma)</h2>
+  <p>Proponer <b>create-security-ticket</b> o <b>notify-critical-incident</b>, aprobar
+  con un solo usuario y ejecutar. La seccion "Ticket" o "Correo" debe mostrar la entrega
+  real. Ninguno de los dos tiene reversion: no hay forma honesta de deshacer un ticket
+  ya creado o un correo ya entregado.</p>
 </div>
 
 <script>
@@ -270,21 +360,62 @@ function rows(list, cols){
   return `<table><tr>${head}</tr>${body}</table>`;
 }
 
+function section(title, body){
+  return `<h3 style="font-size:.9rem;margin:18px 0 0">${title}</h3>${body}`;
+}
+
 async function check(){
   const out = document.getElementById('out');
   out.innerHTML = '<p><small>Consultando...</small></p>';
   try{
     const r = await fetch('/api/checks');
     const d = await r.json();
+    let html = '';
+
+    // Caso 1 -- host isolation, verified by trying to reach it, not by
+    // reading the host's own firewall rules.
     const c = d.connectivity;
-    let html = `<div class="verdict ${c.reachable?'v-bad':'v-ok'}">${c.reading}</div>`;
-    html += `<p class="param">Destino <b>${c.target}</b> &mdash; ${c.detail}</p>`;
-    html += '<h3 style="font-size:.9rem;margin:16px 0 0">Incidentes recientes</h3>';
-    html += rows(d.incidents, [['code','Codigo'],['title','Titulo'],['status','Estado'],['severity','Severidad']]);
-    html += '<h3 style="font-size:.9rem;margin:16px 0 0">Ejecuciones de playbook</h3>';
-    html += rows(d.executions, [['workflow_code','Playbook'],['status','Estado'],['revertida','Revertida']]);
+    html += section('Caso 1 &mdash; Conectividad del host',
+      `<div class="verdict ${c.reachable?'v-bad':'v-ok'}">${c.reading}</div>
+       <p class="param">Destino <b>${c.target}</b> &mdash; ${c.detail}</p>`);
+
+    // Caso 2 -- account status.
+    const acc = d.account;
+    html += section('Caso 2 &mdash; Cuenta',
+      acc
+        ? `<div class="verdict ${acc.is_active?'v-bad':'v-ok'}">
+             ${acc.email} esta ${acc.is_active ? 'ACTIVA: no esta deshabilitada.' : 'INACTIVA: la contencion esta aplicada.'}
+           </div>`
+        : '<p><small>Cuenta de laboratorio no encontrada.</small></p>');
+
+    // Caso 3 -- threat intel context. Never an action, so no before/after
+    // verdict -- only whether the claim exists yet.
+    const ti = (d.threat_intel && d.threat_intel[0]) || null;
+    html += section('Caso 3 &mdash; Enriquecimiento por Threat Intel',
+      ti
+        ? `<p class="param">${ti.statement}</p><p><small>Registrado ${new Date(ti.created_at).toLocaleString('es')}</small></p>`
+        : '<p><small>Sin claim de threat intel todavia.</small></p>');
+
+    // Caso 4a -- the receipt Cyrvanta recorded for its own execution.
+    const ticket = d.ticket;
+    html += section('Caso 4 &mdash; Ticket',
+      ticket
+        ? `<p class="param">Estado <b>${ticket.status}</b> &mdash; ${new Date(ticket.created_at).toLocaleString('es')}</p>
+           <pre style="margin-top:6px">${typeof ticket.result === 'string' ? ticket.result : JSON.stringify(ticket.result, null, 2)}</pre>`
+        : '<p><small>Sin ejecucion de create-security-ticket todavia.</small></p>');
+
+    // Caso 4b -- Mailpit's own inbox, not a claim from Cyrvanta's side.
+    html += section('Caso 4 &mdash; Correo (bandeja de Mailpit)',
+      rows(d.mail, [['subject','Asunto'],['to','Para'],['created','Fecha']]));
+    if(d.mail_error) html += `<p class="param" style="color:var(--bad)">Mailpit: ${d.mail_error}</p>`;
+
+    html += section('Incidentes recientes',
+      rows(d.incidents, [['code','Codigo'],['title','Titulo'],['status','Estado'],['severity','Severidad']]));
+    html += section('Ejecuciones de playbook',
+      rows(d.executions, [['workflow_code','Playbook'],['status','Estado'],['revertida','Revertida']]));
+
     if(d.database_error) html += `<p class="param" style="color:var(--bad)">Base: ${d.database_error}</p>`;
-    html += `<p><small>Verificado ${new Date(d.checked_at).toLocaleString('es')}</small></p>`;
+    html += `<p style="margin-top:14px"><small>Verificado ${new Date(d.checked_at).toLocaleString('es')}</small></p>`;
     out.innerHTML = html;
   }catch(e){ out.innerHTML = `<p style="color:var(--bad)">Error: ${e}</p>`; }
 }

@@ -442,6 +442,8 @@ const resources = {
       activityEmpty: "Sin actividad registrada",
       activityUpdated: "Última actualización: {{time}}",
       activityPeak: "pico: {{count}}",
+      activityWindowStart: "hace 24 h",
+      activityWindowEnd: "ahora",
       activityLegend: "Cada barra son 2 horas de actividad (alertas + incidentes)",
       activityBucket: "{{time}} · {{alerts}} alertas · {{incidents}} incidentes",
       activitySource: {
@@ -1071,6 +1073,8 @@ const resources = {
       activityEmpty: "No activity recorded",
       activityUpdated: "Last updated: {{time}}",
       activityPeak: "peak: {{count}}",
+      activityWindowStart: "24 h ago",
+      activityWindowEnd: "now",
       activityLegend: "Each bar is 2 hours of activity (alerts + incidents)",
       activityBucket: "{{time}} · {{alerts}} alerts · {{incidents}} incidents",
       activitySource: {

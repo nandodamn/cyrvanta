@@ -89,20 +89,13 @@ export function OperationalPulse() {
               scale and every other bar shrinks against a maximum the reader
               cannot see. Naming the peak and the span makes the chart mean
               something instead of being decoration. */}
+          {/* Both ends of a 24h window fall on the same clock time, so showing
+              the hour at each end printed "15:20" twice and told the reader
+              nothing. Relative labels cannot collide. */}
           <div className="activity-scale">
-            <span>
-              {new Date(activity.data.window_start).toLocaleTimeString([], {
-                hour: "2-digit",
-                minute: "2-digit",
-              })}
-            </span>
+            <span>{t("activityWindowStart")}</span>
             <span className="activity-peak">{t("activityPeak", { count: maximum })}</span>
-            <span>
-              {new Date(activity.data.window_end).toLocaleTimeString([], {
-                hour: "2-digit",
-                minute: "2-digit",
-              })}
-            </span>
+            <span>{t("activityWindowEnd")}</span>
           </div>
           <p className="activity-updated">
             {t("activityUpdated", {

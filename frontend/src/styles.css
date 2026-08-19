@@ -1080,7 +1080,12 @@ details > .admin-list {
   min-width: 260px;
   height: 200px;
   display: flex;
-  flex: 1;
+  /* Deliberately not `flex: 1`. The panel that holds this is a column flex
+     container, where `flex: 1` means `flex-basis: 0%` on the *height* and so
+     silently beats the height above. The container collapsed, percentage bar
+     heights resolved against zero, and the chart rendered as a row of stubs
+     with no bars at all. */
+  flex: none;
   align-items: end;
   gap: 7px;
 }

@@ -20,16 +20,42 @@ class CorrelationLimitExceeded(Exception):
     pass
 
 
+SELECTOR_FIELDS = frozenset({"rule_reference", "category", "severity"})
+
+
 @dataclass(frozen=True, slots=True)
 class SignalSelector:
+    """One kind of signal a rule reacts to.
+
+    `field` is usually `rule_reference` or `category`, compared for equality.
+    `severity` is different: it matches everything at or above a floor, which
+    is the only way to express "anything this source considers serious".
+
+    That matters more than it sounds. With equality alone, covering a source
+    means enumerating its rule IDs by hand -- Cyrvanta's four rules name 13 of
+    the ~70 IDs this Wazuh actually emits, and level-13 alerts were passing
+    unseen simply because nobody had written them down. A list like that also
+    rots: every ruleset update adds detections it does not know about. A
+    severity floor covers what exists now and what arrives later, without
+    anyone remembering to maintain it.
+    """
+
     code: str
     source_system: str
     field: str
     value: str
 
+    def __post_init__(self) -> None:
+        if self.field not in SELECTOR_FIELDS:
+            raise ValueError("correlation selector field is invalid")
+        if self.field == "severity" and not self.value.lstrip("-").isdigit():
+            raise ValueError("correlation selector severity must be an integer")
+
     def matches(self, candidate: CorrelationCandidate) -> bool:
         if candidate.source_system != self.source_system:
             return False
+        if self.field == "severity":
+            return candidate.severity_score >= int(self.value)
         observed = (
             candidate.rule_reference if self.field == "rule_reference" else candidate.category
         )

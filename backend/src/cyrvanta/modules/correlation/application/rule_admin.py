@@ -39,13 +39,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from cyrvanta.modules.correlation.domain.models import (
     GROUPING_KINDS,
     MAX_WINDOW_MINUTES,
+    SELECTOR_FIELDS,
     WINDOW_MINUTES,
 )
 from cyrvanta.modules.correlation.infrastructure.models import CorrelationRuleVersionModel
 from cyrvanta.modules.correlation.infrastructure.repository import SqlCorrelationRepository
 from cyrvanta.modules.identity.infrastructure.models import AuditEventModel
 
-SELECTOR_FIELDS = frozenset({"rule_reference", "category"})
 DRAFT = "DRAFT"
 ACTIVE = "ACTIVE"
 RETIRED = "RETIRED"
@@ -105,6 +105,8 @@ def validate_definition(definition: Any) -> None:
                 raise RuleDefinitionInvalid(f"selector {key} must be a non-empty string")
         if selector["field"] not in SELECTOR_FIELDS:
             raise RuleDefinitionInvalid(f"selector field must be one of {sorted(SELECTOR_FIELDS)}")
+        if selector["field"] == "severity" and not selector["value"].lstrip("-").isdigit():
+            raise RuleDefinitionInvalid("selector severity must be an integer")
         codes.append(selector["code"])
 
     grouping = definition.get("grouping", "source_ip")

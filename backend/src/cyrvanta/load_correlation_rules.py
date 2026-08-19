@@ -111,6 +111,37 @@ RULES: dict[str, dict[str, Any]] = {
             ],
         },
     },
+    # Everything this Wazuh considers serious, without naming any of it.
+    #
+    # The enumerated rules above cover 13 of the ~70 IDs this deployment
+    # actually emits, and a list like that rots: every ruleset update adds
+    # detections nobody wrote down. In this data, 23506 (level 13) and 61061
+    # (level 10) were passing unseen for exactly that reason.
+    #
+    # 84 is Wazuh level 12 (the normalizer maps level * 7), the point at which
+    # Wazuh itself is claiming something serious rather than notable. Historic
+    # volume at that level is 13 events, all one CVE, so this is not a flood --
+    # but it is the rule most worth re-checking against `preview` after a
+    # ruleset upgrade, since its whole purpose is to catch what nobody listed.
+    "wazuh-critical-severity": {
+        "version": "1",
+        "why": "any alert Wazuh itself rates level 12 or higher",
+        "verified": "level 12 = severity 84 via normalizer (level * 7); only 23506 "
+        "(level 13, 13 events) currently qualifies in this deployment",
+        "definition": {
+            **_COMMON,
+            "grouping": "asset",
+            "min_severity": 84,
+            "selectors": [
+                {
+                    "code": "wazuh_critical",
+                    "field": "severity",
+                    "value": "84",
+                    "source_system": "wazuh",
+                }
+            ],
+        },
+    },
     # A remote login followed by escalation to root on the same host.
     #
     # The plan specified this rule over Windows logon events grouped by source

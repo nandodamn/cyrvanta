@@ -395,3 +395,38 @@ def test_wazuh_and_synthetic_inputs_use_the_same_rule_engine_contract() -> None:
         "auth_failure",
         "auth_success",
     }
+
+
+def test_a_severity_selector_matches_anything_grave_enough() -> None:
+    """Covering a source by enumerating its rule IDs rots: every ruleset
+    update adds detections the list does not know about. A severity floor
+    covers what exists now and what arrives later.
+    """
+    floor = SignalSelector("wazuh_critical", "source-a", "severity", "84")
+    assert floor.matches(candidate("anything-at-all", severity=91)) is True
+    assert floor.matches(candidate("anything-at-all", severity=84)) is True
+    assert floor.matches(candidate("anything-at-all", severity=83)) is False
+
+
+def test_a_severity_selector_still_respects_its_source() -> None:
+    floor = SignalSelector("wazuh_critical", "source-a", "severity", "50")
+    assert floor.matches(candidate("x", source_system="source-b", severity=100)) is False
+
+
+def test_a_severity_selector_can_open_an_incident_on_its_own() -> None:
+    graded = replace(
+        rule(),
+        min_severity=84,
+        selectors=(SignalSelector("wazuh_critical", "source-a", "severity", "84"),),
+    )
+    trigger = candidate("some-rule-nobody-listed", minute=4, severity=91)
+    match = evaluate_rule(graded, trigger, (trigger,))
+    assert match is not None
+    assert match.score == 85
+
+
+def test_selector_fields_are_checked_when_the_selector_is_built() -> None:
+    with pytest.raises(ValueError, match="field"):
+        SignalSelector("x", "source-a", "hostname", "value")
+    with pytest.raises(ValueError, match="severity"):
+        SignalSelector("x", "source-a", "severity", "not-a-number")

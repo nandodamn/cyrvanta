@@ -25,6 +25,20 @@ class Settings(BaseSettings):
     # right value depends on alert volume: too low and most cycles query the
     # indexer for nothing, too high and an active intrusion goes unrecorded.
     scheduler_interval_seconds: int = Field(default=15, ge=5, le=300)
+    # Off by default: enabling it changes what opens incidents in a live
+    # tenant, and the right threshold depends on how noisy that estate is.
+    # Look at real scores with `python -m cyrvanta.preview_entity_risk` and
+    # pick a threshold before turning this on.
+    entity_risk_enabled: bool = Field(default=False)
+    entity_risk_threshold: int = Field(default=70, ge=1, le=100)
+    entity_risk_window_hours: int = Field(default=6, ge=1, le=168)
+    entity_risk_half_life_hours: float = Field(default=2.0, gt=0, le=168)
+    # How much history defines "normal" for an entity. Without this the score
+    # is driven by how varied a machine's routine is, not by anything wrong.
+    entity_risk_baseline_days: int = Field(default=7, ge=1, le=90)
+    # A sweep re-reads every alarm in the window, so it runs on its own slower
+    # cadence instead of on every scheduler tick.
+    entity_risk_interval_seconds: int = Field(default=300, ge=30, le=3600)
     outbox_batch_size: int = Field(default=50, ge=1, le=500)
     outbox_lease_seconds: int = Field(default=60, ge=1, le=3600)
     outbox_poll_interval_seconds: float = Field(default=1.0, ge=0.1, le=60)

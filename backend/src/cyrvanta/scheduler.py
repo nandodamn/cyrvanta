@@ -1,6 +1,8 @@
 import asyncio
 import logging
+import time
 
+from cyrvanta.modules.correlation.application.entity_risk_service import sweep_all_tenants
 from cyrvanta.modules.decision.application.service import DecisionService
 from cyrvanta.modules.governed_memory.application.service import GovernedMemoryService
 from cyrvanta.modules.integrations.application.automatic_wazuh_ingestion import (
@@ -21,6 +23,10 @@ async def run() -> None:
     decisions = DecisionService()
     memory = GovernedMemoryService()
     wazuh_ingestion = AutomaticWazuhIngestionService(settings)
+    # Tracked separately from the loop interval: a sweep re-reads every alarm
+    # in its window, which is far more work than the rest of this cycle and
+    # does not need doing every fifteen seconds.
+    last_risk_sweep = 0.0
     while True:
         logger.info("scheduler_heartbeat")
         dispatched = await dispatcher.dispatch_pending()
@@ -35,9 +41,7 @@ async def run() -> None:
             logger.exception("wazuh_ingestion_cycle_failed")
         else:
             if synced_tenants:
-                logger.info(
-                    "wazuh_ingestion_cycle_completed", extra={"tenants": synced_tenants}
-                )
+                logger.info("wazuh_ingestion_cycle_completed", extra={"tenants": synced_tenants})
         expired_requests, expired_authorizations = await decisions.expire_due()
         if expired_requests or expired_authorizations:
             logger.info(
@@ -47,6 +51,19 @@ async def run() -> None:
                     "authorizations": expired_authorizations,
                 },
             )
+        if (
+            settings.entity_risk_enabled
+            and time.monotonic() - last_risk_sweep >= settings.entity_risk_interval_seconds
+        ):
+            last_risk_sweep = time.monotonic()
+            try:
+                risky_tenants = await sweep_all_tenants(settings)
+            except Exception:
+                logger.exception("entity_risk_sweep_cycle_failed")
+            else:
+                if risky_tenants:
+                    logger.info("entity_risk_sweep_completed", extra={"tenants": risky_tenants})
+
         expired_memories = await memory.expire_due()
         if expired_memories:
             logger.info(

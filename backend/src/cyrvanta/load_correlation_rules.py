@@ -23,16 +23,20 @@ audit record, not to scope the rule.
 
 import argparse
 import asyncio
-import json
-from hashlib import sha256
 from typing import Any
-from uuid import UUID, uuid4
+from uuid import UUID
 
-from sqlalchemy import select, update
+from sqlalchemy import select
 
+from cyrvanta.modules.correlation.application.rule_admin import (
+    CorrelationRuleAdminService,
+    canonical,
+)
 from cyrvanta.modules.correlation.infrastructure.models import CorrelationRuleVersionModel
-from cyrvanta.modules.identity.infrastructure.models import AuditEventModel, UserModel
+from cyrvanta.modules.identity.infrastructure.models import UserModel
 from cyrvanta.shared.database import tenant_session
+
+__all__ = ["RULES", "canonical"]
 
 # `window_minutes` is carried for shape consistency with the rules already
 # stored, but the engine windows on a fixed 10-minute UTC bucket
@@ -141,11 +145,6 @@ RULES: dict[str, dict[str, Any]] = {
 }
 
 
-def canonical(definition: dict[str, Any]) -> tuple[str, str]:
-    text = json.dumps(definition, separators=(",", ":"), ensure_ascii=False, sort_keys=True)
-    return text, sha256(text.encode("utf-8")).hexdigest()
-
-
 async def load(tenant_id: UUID, code: str, *, apply: bool) -> None:
     entry = RULES[code]
     definition = entry["definition"]
@@ -187,46 +186,18 @@ async def load(tenant_id: UUID, code: str, *, apply: bool) -> None:
         if actor_id is None:
             raise SystemExit("No hay usuarios en el tenant; no se puede atribuir la operacion.")
 
-        # Retiring and inserting in one transaction is not optional: the table
-        # carries a partial unique index over rule_code WHERE status='ACTIVE',
-        # so a half-applied change fails loudly rather than leaving two active.
-        await session.execute(
-            update(CorrelationRuleVersionModel)
-            .where(
-                CorrelationRuleVersionModel.rule_code == code,
-                CorrelationRuleVersionModel.status == "ACTIVE",
-            )
-            .values(status="RETIRED")
-        )
-        inserted = CorrelationRuleVersionModel(
+        # The service owns validation, the canonical hash, the transactional
+        # retire-then-activate and the audit trail. This script only decides
+        # which catalogue entry to publish.
+        service = CorrelationRuleAdminService(session)
+        draft = await service.create_draft(
+            tenant_id=tenant_id,
+            actor_user_id=actor_id,
             rule_code=code,
             version=entry["version"],
-            status="ACTIVE",
             definition=definition,
-            definition_sha256=digest,
         )
-        session.add(inserted)
-        await session.flush()
-        session.add(
-            AuditEventModel(
-                tenant_id=tenant_id,
-                actor_user_id=actor_id,
-                action="correlation.rule.activated",
-                resource_type="correlation_rule_version",
-                resource_id=inserted.id,
-                correlation_id=uuid4(),
-                outcome="success",
-                details={
-                    "rule_code": code,
-                    "version": entry["version"],
-                    "definition_sha256": digest,
-                    "grouping": definition["grouping"],
-                    "selectors": [s["value"] for s in definition["selectors"]],
-                    "retired": [row.version for row in active],
-                    "scope": "global",
-                },
-            )
-        )
+        await service.activate(tenant_id=tenant_id, actor_user_id=actor_id, version_id=draft.id)
         print(f"\nActivada {code} v{entry['version']}. Registrado en auditoria.")
 
 

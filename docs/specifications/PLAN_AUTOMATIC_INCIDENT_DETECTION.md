@@ -147,6 +147,25 @@ recorre exactamente el mismo camino que hoy.
 
 ## Fase 3 — Reglas nuevas (datos, no codigo)
 
+**Estado: COMPLETA en configuracion** (commits `26ffb43`, `a7eac04`, 2026-08-19).
+Las tres reglas estan ACTIVE y el motor real las carga; queda pendiente el
+disparo en vivo, que lo ejecuta el usuario.
+
+```
+credential-attack            v3 grouping=source_ip min_sev=None   (intacta)
+critical-single-signal       v1 grouping=asset     min_sev=70
+host-integrity-compromise    v1 grouping=asset     min_sev=None
+privilege-escalation         v1 grouping=asset     min_sev=None
+```
+
+Cargadas con `python -m cyrvanta.load_correlation_rules`, cada activacion con
+registro de auditoria (`correlation.rule.activated`). Suite 317/317. Incidentes
+del tenant demo tras activar: 1 — el original `CORR-C3710199`, sin inundacion.
+
+`lab-server-01` se reconstruyo con sudo: reregistrado como **ID 007** tras
+`manage_agents -r 006`, y se limpio la clave SSH obsoleta en
+`lab-workstation-01`.
+
 **Objetivo:** cobertura real usando las dos capacidades anteriores.
 
 Cada regla se escribe **verificando primero contra el Wazuh real** que
@@ -219,6 +238,43 @@ entonces se pasa a la siguiente.
 ---
 
 ## Fase 4 — Administracion de reglas
+
+**Estado: COMPLETA en servicio; endpoints DETENIDOS por aislamiento.**
+
+Implementado en `correlation/application/rule_admin.py`: listar versiones, crear
+borrador, activar (retirando la anterior en la misma transaccion) y retirar.
+`definition_sha256` se calcula en el servicio. Validacion doble antes de tocar
+la base: campo por campo, y ademas se parsea con el **mismo** codigo que usa el
+worker (`SqlCorrelationRepository._rule`), de modo que si valida, el motor la
+puede cargar. Auditoria por operacion (`drafted` / `activated` / `retired`).
+`load_correlation_rules.py` ya no escribe SQL: delega en el servicio.
+
+### Contradiccion de multitenencia — requiere decision
+
+Los endpoints **no se expusieron**, y no por falta de tiempo:
+
+- `correlation_rule_versions` **no tiene `tenant_id`**. Una regla es global:
+  publicarla cambia la deteccion de todos los tenants.
+- Los unicos roles que existen son `tenant-admin` y `viewer`, ambos por tenant.
+  No hay rol de plataforma (verificado: la tabla `roles` solo tiene esos dos).
+
+Exponer escritura bajo un permiso `correlation.manage` otorgado a
+`tenant-admin` dejaria que el administrador de un tenant cambie la deteccion de
+los demas. Segun la precedencia de `CLAUDE.md`, aislamiento multitenant gana
+sobre cualquier spec posterior, incluida esta, asi que se detuvo y se registra
+en vez de implementarse.
+
+**Las dos salidas posibles** (decision pendiente del usuario):
+
+1. **Reglas por tenant.** Agregar `tenant_id` a `correlation_rule_versions`,
+   al indice unico parcial y al repositorio. Es lo correcto a largo plazo y lo
+   mas invasivo: toca el motor y exige migrar las reglas existentes.
+2. **Rol de operador de plataforma.** Crear un rol fuera del alcance de tenant
+   y otorgarle `correlation.manage`. Mas barato, pero introduce un concepto de
+   autorizacion que el sistema hoy no tiene.
+
+Mientras tanto la operacion se hace con el script, que es auditado y
+reproducible.
 
 **Objetivo:** dejar de insertar reglas con SQL.
 

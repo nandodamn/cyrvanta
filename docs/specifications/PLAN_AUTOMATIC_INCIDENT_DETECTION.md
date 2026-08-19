@@ -156,7 +156,57 @@ Cada regla se escribe **verificando primero contra el Wazuh real** que
 |---|---|---|
 | `host-integrity-compromise` | `asset` | FIM + rootcheck en el mismo host |
 | `critical-single-signal` | `asset` | Una alerta de severidad alta (malware, ransomware) |
-| `privilege-escalation` | `source_ip` | Login exitoso + asignacion de privilegios |
+| `privilege-escalation` | ~~`source_ip`~~ → `asset` | Login exitoso + escalada de privilegios |
+
+### Verificacion contra el Wazuh real (2026-08-19)
+
+Se agrego contra los datos y el ruleset de este despliegue, sin suponer ningun
+ID. Definiciones y justificacion en `backend/src/cyrvanta/load_correlation_rules.py`.
+
+**IDs confirmados y usados**
+
+| ID | Nivel | Severidad | Que es |
+|---|---|---|---|
+| 550 / 553 / 554 | 7 / 7 / 5 | 49 / 49 / 35 | syscheck de archivo: modificado, borrado, agregado |
+| 592 | 8 | 56 | log truncado (anti-forense) |
+| 5763 / 5712 | 10 | 70 | fuerza bruta sshd (usuario real / inexistente), `frequency=8 timeframe=120` |
+| 5551 | 10 | 70 | PAM: multiples fallos, `frequency=8 timeframe=180` |
+| 5404 | 10 | 70 | tres intentos fallidos de sudo |
+| 5401 / 5402 / 5403 | 5 / 3 / 4 | 35 / 21 / 28 | sudo fallido / sudo a root / primer sudo del usuario |
+| 5715 | 3 | 21 | sshd: autenticacion exitosa (ya emitido por `lab-server-01`) |
+
+**Excluidos a proposito**
+
+- **Syscheck de registro (594/597/598/750/751/752).** Pertenecen todos a
+  `CYRVANTA-WINDOWS-LAB` y suman miles de eventos (750 solo: 2057). Agrupados
+  por activo abririan incidente en casi toda ventana. Hay un test que lo impide
+  (`test_host_integrity_rule_excludes_windows_registry_noise`).
+- **CVE (23503-23508).** Una vulnerabilidad detectada no es un incidente en
+  curso; 23505 solo tiene 278 eventos recurrentes.
+
+**Correccion a la especificacion de `privilege-escalation`**
+
+La tabla original pedia agrupar por `source_ip` sobre eventos de logon de
+Windows. No es implementable y no conviene implementarlo:
+
+1. **No hay IP.** `60118`, `67028` y `60110` no traen `data.srcip` en **ningun**
+   evento (0 de 3194 verificados). Agrupar por `source_ip` nunca podria
+   coincidir: la regla quedaria cargada y muerta — exactamente el defecto que
+   este plan nacio para corregir.
+2. **No significa ataque.** `67028` es el evento 4672 de Windows, "privilegios
+   especiales asignados", que dispara en **todo** inicio de sesion de
+   administrador. Emparejarlo con un logon exitoso detecta administracion
+   normal, no escalada.
+
+Se implementa el mismo comportamiento de atacante con senales que existen y
+significan algo: login remoto (`5715`) mas escalada por sudo (`5402`/`5403`/
+`5401`) agrupados por **activo**. Requiere `sudo` en la imagen del agente de
+laboratorio (`LAB_SUDO_ENABLED`), agregado en esta fase.
+
+Advertencia honesta: la regla es sensible por diseno. Un administrador que
+legitimamente entre por SSH y ejecute sudo la dispara. En el laboratorio no hay
+trafico sudo legitimo, pero un tenant productivo deberia excluir antes a sus
+usuarios administrativos.
 
 **Comprobaciones intermedias**
 

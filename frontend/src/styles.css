@@ -1090,12 +1090,68 @@ details > .admin-list {
   gap: 7px;
 }
 
-.signal-grid i {
-  min-width: 8px;
+/* One full-height column per bucket. It is the hover target, so the values
+   stay reachable for a bucket that draws four pixels or nothing at all. */
+.signal-slot {
+  position: relative;
   flex: 1;
+  min-width: 8px;
+  height: 100%;
+  display: flex;
+  align-items: flex-end;
+}
+
+.signal-grid i {
+  width: 100%;
   background: linear-gradient(var(--accent), var(--cyan));
   opacity: 0.82;
   border-radius: 2px 2px 0 0;
+}
+
+.signal-slot:hover i {
+  opacity: 1;
+}
+
+/* Anchored to the top of the column rather than to the top of the bar, so it
+   lands in the same place whatever the bar's height and never covers the
+   neighbouring bars. */
+.signal-slot::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-bottom: 8px;
+  padding: 6px 9px;
+  white-space: nowrap;
+  color: var(--text);
+  background: var(--panel-raised);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 18%);
+  font:
+    400 11px "Space Mono",
+    monospace;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 120ms ease;
+  z-index: 5;
+}
+
+.signal-slot:hover::after {
+  opacity: 1;
+}
+
+/* The end columns would push their tooltip past the panel edge. */
+.signal-slot:first-child::after {
+  left: 0;
+  transform: none;
+}
+
+.signal-slot:last-child::after {
+  left: auto;
+  right: 0;
+  transform: none;
 }
 
 /* An empty bucket shows a baseline tick, not a short bar. Before this it
@@ -1121,10 +1177,7 @@ details > .admin-list {
     monospace;
 }
 
-.activity-scale .activity-peak {
-  color: var(--text);
-  font-weight: 700;
-}
+
 
 .center {
   min-height: 100vh;

@@ -88,8 +88,9 @@ describe("operational pulse readability", () => {
     vi.spyOn(api, "getOperationalActivity24h").mockResolvedValue(skewed());
     renderPulse();
 
-    const bars = await screen.findAllByRole("listitem");
-    expect(bars).toHaveLength(12);
+    const slots = await screen.findAllByRole("listitem");
+    expect(slots).toHaveLength(12);
+    const bars = slots.map((slot) => slot.querySelector("i") as HTMLElement);
 
     const empty = bars.filter((bar) => bar.className.includes("is-empty"));
     const active = bars.filter((bar) => !bar.className.includes("is-empty"));
@@ -100,11 +101,23 @@ describe("operational pulse readability", () => {
     active.forEach((bar) => expect(bar.style.height).toContain("max("));
   });
 
-  it("states the scale, because one busy bucket sets it for all the others", async () => {
+  it("carries each bucket's own counts, so hovering can show them", async () => {
     vi.spyOn(api, "getOperationalActivity24h").mockResolvedValue(skewed());
     renderPulse();
 
-    expect(await screen.findByText(/1034/)).toBeVisible();
+    const slots = await screen.findAllByRole("listitem");
+    // The tooltip is now the only place a value is readable, so every column
+    // has to carry its own numbers -- not just the ones with a visible bar.
+    expect(slots[10].getAttribute("data-tooltip")).toMatch(/1034/);
+    slots.forEach((slot) => expect(slot.getAttribute("data-tooltip")).toBeTruthy());
+  });
+
+  it("no longer prints the peak as static text", async () => {
+    vi.spyOn(api, "getOperationalActivity24h").mockResolvedValue(skewed());
+    renderPulse();
+
+    await screen.findAllByRole("listitem");
+    expect(screen.queryByText(/pico:|peak:/i)).toBeNull();
   });
 
   it("does not label the bars with categories they never encoded", async () => {

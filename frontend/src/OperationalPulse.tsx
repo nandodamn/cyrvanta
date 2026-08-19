@@ -74,27 +74,30 @@ export function OperationalPulse() {
                 incidents: bucket.incidents,
               });
               return (
-                <i
+                // The hover target is the whole column, not the bar. A quiet
+                // bucket draws four pixels or none at all, so anchoring the
+                // tooltip to the bar itself would make the values unreachable
+                // for exactly the buckets whose size is hardest to read.
+                <span
                   key={bucket.bucket_start}
                   role="listitem"
                   aria-label={label}
-                  title={label}
-                  className={total === 0 ? "is-empty" : undefined}
-                  style={{ height: barHeight(total) }}
-                />
+                  data-tooltip={label}
+                  className="signal-slot"
+                >
+                  <i
+                    className={total === 0 ? "is-empty" : undefined}
+                    style={{ height: barHeight(total) }}
+                  />
+                </span>
               );
             })}
           </div>
-          {/* Without this the bars are unreadable: one busy bucket sets the
-              scale and every other bar shrinks against a maximum the reader
-              cannot see. Naming the peak and the span makes the chart mean
-              something instead of being decoration. */}
           {/* Both ends of a 24h window fall on the same clock time, so showing
               the hour at each end printed "15:20" twice and told the reader
               nothing. Relative labels cannot collide. */}
           <div className="activity-scale">
             <span>{t("activityWindowStart")}</span>
-            <span className="activity-peak">{t("activityPeak", { count: maximum })}</span>
             <span>{t("activityWindowEnd")}</span>
           </div>
           <p className="activity-updated">

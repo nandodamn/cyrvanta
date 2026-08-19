@@ -95,6 +95,24 @@ hacer sin cambiar el comportamiento de ninguna regla existente.
 
 ## Fase 2 — Incidente desde una sola senal critica
 
+**Estado: COMPLETA** (2026-08-19). `min_severity: int | None` en
+`CorrelationRule`, rama separada en `evaluate_rule()`, parseo en `_rule()`.
+Se agrego el factor `critical_severity` (peso 45): 40 + 45 = 85, el mismo
+umbral por defecto, y el maximo sigue siendo 100 como en el modo multi-senal.
+En modo de senal unica `distinct_signal_pattern` y `same_time_bucket` **no se
+emiten**, en vez de emitirse en cero: informar un factor fallido que la regla
+nunca pidio explicaria mal la decision al analista.
+
+**Correccion estructural incluida:** los factores obligatorios ya no se
+determinan por la posicion `factors[:3]` sino por una tupla `required`
+construida junto a `factors` en cada rama. Era el riesgo que este mismo
+documento senalaba ("cualquier cambio en el orden de la tupla cambia en
+silencio que factores son obligatorios") y quedaba activo mientras la Fase 3
+agrega reglas.
+
+Verificado: 304/304 backend, 31/31 frontend, ruff y mypy limpios, claves i18n
+`exact_asset` y `critical_severity` agregadas en es/en.
+
 **Objetivo:** que una alerta suficientemente grave abra incidente por si sola.
 
 **Cambios**
@@ -230,8 +248,30 @@ Frontend: `cd frontend && npm run typecheck && npm test`.
 No hay CI/CD y el backend **no monta el codigo**: corre lo que quedo horneado en
 la imagen. Un cambio en Python no se ve hasta reconstruir:
 
+**`worker` y `scheduler` NO comparten la imagen del backend.** Cada uno declara
+su propio `build:` en `docker-compose.yml` (mismo Dockerfile, imagen distinta),
+asi que `docker compose build backend` **no los toca** y siguen corriendo codigo
+viejo sin ningun aviso. Esto es especialmente peligroso para este plan: el
+worker es quien ejecuta el motor de correlacion, de modo que una regla nueva
+puede parecer que "no funciona" cuando en realidad el motor desplegado ni
+siquiera tiene el cambio. Verificado el 2026-08-19: tras la Fase 1 el worker
+seguia con la imagen anterior.
+
+Comando correcto para cualquier cambio en Python:
+
 ```bash
-docker compose build backend && docker compose up -d backend
+docker compose build backend worker scheduler
+docker compose up -d backend worker scheduler
+```
+
+Comprobar que quedo desplegado de verdad, no solo que la imagen se construyo:
+
+```bash
+docker inspect -f '{{.Image}}' cyrvanta-worker-1
+docker compose exec -T worker python -c \
+  "from cyrvanta.modules.correlation.domain.models import CorrelationRule; \
+   import dataclasses; \
+   print({f.name: f.default for f in dataclasses.fields(CorrelationRule)})"
 ```
 
 Excepcion: `demo-console` y `lab-endpoint` montan su `server.py` por volumen,

@@ -54,6 +54,11 @@ class CorrelationRule:
     # detection (file integrity, rootcheck) carries no source IP and can only
     # ever correlate by asset.
     grouping: str = "source_ip"
+    # When set, this rule can open an incident from a single finding whose
+    # severity reaches this minimum, instead of requiring a pattern of two
+    # different signals. Absent means the multi-signal behavior that every
+    # rule has had until now.
+    min_severity: int | None = None
 
     def __post_init__(self) -> None:
         if not self.code or not self.version or len(self.definition_sha256) != 64:
@@ -62,6 +67,8 @@ class CorrelationRule:
             raise ValueError("correlation rule definition is invalid")
         if self.grouping not in GROUPING_KINDS:
             raise ValueError("correlation rule grouping is invalid")
+        if self.min_severity is not None and not 0 <= self.min_severity <= 100:
+            raise ValueError("correlation rule min_severity is invalid")
 
 
 @dataclass(frozen=True, slots=True)
@@ -231,42 +238,74 @@ def evaluate_rule(
     # every rule seeded before `grouping` existed, since their definitions
     # default to "source_ip" and therefore still produce "exact_source_ip".
     grouping_factor_code = "exact_asset" if rule.grouping == "asset" else "exact_source_ip"
-    factors = (
-        FactorResult(
-            grouping_factor_code,
-            bool(selected),
-            40,
-            40 if selected else 0,
-            revision_ids,
-            f"correlation.factor.{grouping_factor_code}",
-        ),
-        FactorResult(
-            "distinct_signal_pattern",
-            distinct_selectors >= 2,
-            25,
-            25 if distinct_selectors >= 2 else 0,
-            revision_ids,
-            "correlation.factor.distinct_signal_pattern",
-        ),
-        FactorResult(
-            "same_time_bucket",
-            len(selected) >= 2,
-            20,
-            20 if len(selected) >= 2 else 0,
-            revision_ids,
-            "correlation.factor.same_time_bucket",
-        ),
-        FactorResult(
-            "source_diversity",
-            distinct_sources >= 2,
-            15,
-            15 if distinct_sources >= 2 else 0,
-            revision_ids,
-            "correlation.factor.source_diversity",
-        ),
+    grouping_factor = FactorResult(
+        grouping_factor_code,
+        bool(selected),
+        40,
+        40 if selected else 0,
+        revision_ids,
+        f"correlation.factor.{grouping_factor_code}",
     )
+    diversity_factor = FactorResult(
+        "source_diversity",
+        distinct_sources >= 2,
+        15,
+        15 if distinct_sources >= 2 else 0,
+        revision_ids,
+        "correlation.factor.source_diversity",
+    )
+    # `required` is carried alongside `factors` instead of being a positional
+    # slice of it, so that adding or reordering a factor can never silently
+    # change which ones are mandatory.
+    factors: tuple[FactorResult, ...]
+    required: tuple[FactorResult, ...]
+    minimum_severity = rule.min_severity
+    if minimum_severity is not None:
+        # One alert grave enough stands on its own, so the two factors that
+        # demand a *pattern* are not evaluated at all -- waiving them is the
+        # entire point of this mode. Severity takes their place as the second
+        # mandatory factor. 40 + 45 still sums to the default threshold of 85,
+        # and the maximum stays 100, so scores remain comparable across modes.
+        # Severity is read from the trigger, not from the group: the claim
+        # being made is "this alert is serious by itself".
+        severe = trigger.severity_score >= minimum_severity
+        factors = (
+            grouping_factor,
+            FactorResult(
+                "critical_severity",
+                severe,
+                45,
+                45 if severe else 0,
+                revision_ids,
+                "correlation.factor.critical_severity",
+            ),
+            diversity_factor,
+        )
+        required = factors[:2]
+    else:
+        factors = (
+            grouping_factor,
+            FactorResult(
+                "distinct_signal_pattern",
+                distinct_selectors >= 2,
+                25,
+                25 if distinct_selectors >= 2 else 0,
+                revision_ids,
+                "correlation.factor.distinct_signal_pattern",
+            ),
+            FactorResult(
+                "same_time_bucket",
+                len(selected) >= 2,
+                20,
+                20 if len(selected) >= 2 else 0,
+                revision_ids,
+                "correlation.factor.same_time_bucket",
+            ),
+            diversity_factor,
+        )
+        required = factors[:3]
     score = sum(factor.contribution for factor in factors)
-    if score < rule.threshold or any(not factor.matched for factor in factors[:3]):
+    if score < rule.threshold or any(not factor.matched for factor in required):
         return None
     grouping_material = "|".join(
         (

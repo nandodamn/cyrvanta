@@ -381,9 +381,11 @@ const resources = {
       legacyCorrelation: "Registro legado simulado, conservado sin evidencia inventada.",
       correlationFactors: {
         exact_source_ip: "IP de origen exacta",
+        exact_asset: "Mismo activo",
         distinct_signal_pattern: "Patrón de señales distintas",
         same_time_bucket: "Misma ventana temporal",
         source_diversity: "Diversidad de fuentes",
+        critical_severity: "Severidad crítica",
       },
       claimTypes: {
         FACT: "Hecho",
@@ -1005,9 +1007,11 @@ const resources = {
       legacyCorrelation: "Legacy simulated record retained without invented evidence.",
       correlationFactors: {
         exact_source_ip: "Exact source IP",
+        exact_asset: "Same asset",
         distinct_signal_pattern: "Distinct signal pattern",
         same_time_bucket: "Same time window",
         source_diversity: "Source diversity",
+        critical_severity: "Critical severity",
       },
       claimTypes: {
         FACT: "Fact",

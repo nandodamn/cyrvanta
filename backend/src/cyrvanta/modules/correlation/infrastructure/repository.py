@@ -232,6 +232,17 @@ class SqlCorrelationRepository:
         if not isinstance(grouping, str) or grouping not in GROUPING_KINDS:
             raise ValueError("correlation rule grouping is invalid")
 
+        # Absent means multi-signal, which is what every rule persisted before
+        # this key existed already required. `integer()` is not reused here
+        # because it cannot express "optional": the difference between absent
+        # and present is what selects the mode.
+        raw_min_severity = definition.get("min_severity")
+        min_severity: int | None = None
+        if raw_min_severity is not None:
+            if not isinstance(raw_min_severity, int) or isinstance(raw_min_severity, bool):
+                raise ValueError("correlation rule min_severity is invalid")
+            min_severity = raw_min_severity
+
         return CorrelationRule(
             code=model.rule_code,
             version=model.version,
@@ -242,6 +253,7 @@ class SqlCorrelationRepository:
             max_candidates=integer("candidate_limit", 500),
             max_members=integer("member_limit", 32),
             grouping=grouping,
+            min_severity=min_severity,
         )
 
     @staticmethod

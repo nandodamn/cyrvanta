@@ -72,6 +72,7 @@ def candidate(
     basis: str = "SOURCE",
     status: str = "VALID",
     issues: tuple[str, ...] = (),
+    severity: int = 70,
 ) -> CorrelationCandidate:
     return CorrelationCandidate(
         finding_id=uuid4(),
@@ -80,7 +81,7 @@ def candidate(
         source_system=source_system,
         effective_at=BASE_TIME.replace(minute=minute),
         effective_time_basis=basis,
-        severity_score=70,
+        severity_score=severity,
         category="credential-access",
         rule_reference=selector,
         normalization_status=status,
@@ -227,6 +228,55 @@ def test_asset_grouping_does_not_cross_different_hosts() -> None:
 def test_unknown_grouping_is_rejected() -> None:
     with pytest.raises(ValueError, match="grouping"):
         replace(rule(), grouping="asset_owner")
+
+
+def test_single_signal_rule_opens_on_one_finding_grave_enough() -> None:
+    """Wazuh level 12 normalises to severity 84 (level * 7). One ransomware
+    or malware hit of that weight is an incident on its own -- no second
+    signal exists to pair it with, and waiting for one loses the case.
+    """
+    single = replace(rule(), min_severity=80)
+    trigger = candidate("success", minute=4, severity=84)
+    match = evaluate_rule(single, trigger, (trigger,))
+    assert match is not None
+    assert match.score == 85
+    assert len(match.members) == 1
+    severity_factor = next(f for f in match.factors if f.code == "critical_severity")
+    assert severity_factor.matched is True
+    assert severity_factor.contribution == 45
+
+
+def test_single_signal_rule_stays_shut_below_its_minimum() -> None:
+    single = replace(rule(), min_severity=80)
+    trigger = candidate("success", minute=4, severity=79)
+    assert evaluate_rule(single, trigger, (trigger,)) is None
+
+
+def test_single_signal_mode_does_not_emit_the_factors_it_waives() -> None:
+    """The pattern factors are not scored as zero in this mode, they are not
+    evaluated at all: reporting a failed `distinct_signal_pattern` on a rule
+    that never asked for one would misexplain the decision to the analyst.
+    """
+    single = replace(rule(), min_severity=80)
+    trigger = candidate("success", minute=4, severity=84)
+    match = evaluate_rule(single, trigger, (trigger,))
+    assert match is not None
+    codes = {factor.code for factor in match.factors}
+    assert codes == {"exact_source_ip", "critical_severity", "source_diversity"}
+
+
+def test_multi_signal_rule_still_refuses_a_lone_severe_finding() -> None:
+    """Regression: `credential-attack` declares no min_severity, so a single
+    failed login must not open an incident no matter how severe it is.
+    """
+    assert rule().min_severity is None
+    lone = candidate("failed", minute=4, severity=100)
+    assert evaluate_rule(rule(), lone, (lone,)) is None
+
+
+def test_min_severity_outside_the_severity_range_is_rejected() -> None:
+    with pytest.raises(ValueError, match="min_severity"):
+        replace(rule(), min_severity=101)
 
 
 def test_correlation_domain_does_not_import_wazuh() -> None:

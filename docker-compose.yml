@@ -229,6 +229,9 @@ services:
       # Shared with demo-console via the same .env value, so the console can
       # render a working login command without reaching into this container.
       LAB_SSH_PASSWORD: ${LAB_SSH_PASSWORD:?Set LAB_SSH_PASSWORD}
+      # Lets the scenario continue past the login into privilege escalation,
+      # which is what the privilege-escalation correlation rule detects.
+      LAB_SUDO_ENABLED: "1"
     cap_add: [NET_ADMIN]
     mem_limit: 128m
     cpus: 0.25

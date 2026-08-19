@@ -18,7 +18,11 @@ USER root
 # Without it the failures have to target a user that does not exist, and the
 # story stops being a credential attack: failing as one user and succeeding as
 # another are two unrelated events that merely share a source address.
-RUN dnf install -y iptables openssh-server openssh-clients rsyslog sshpass && dnf clean all
+# sudo is what makes privilege escalation observable. Wazuh recognises the
+# escalation from sudo's own authpriv log lines (rules 5401/5402/5403/5404);
+# with no sudo installed those lines never exist, so a rule selecting them
+# would load cleanly and then detect nothing.
+RUN dnf install -y iptables openssh-server openssh-clients rsyslog sshpass sudo && dnf clean all
 
 COPY cyrvanta-network-isolate.sh /var/ossec/active-response/bin/cyrvanta-network-isolate
 RUN chown root:wazuh /var/ossec/active-response/bin/cyrvanta-network-isolate \

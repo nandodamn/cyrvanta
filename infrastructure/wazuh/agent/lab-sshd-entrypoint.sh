@@ -38,6 +38,16 @@ SSHCONF
     chmod 600 "$CREDENTIALS_FILE"
   fi
 
+  # The account can escalate, so the scenario can show what an attacker does
+  # after the login succeeds rather than stopping at the door. sudo is asked
+  # for the password so a wrong one produces a real failed-escalation line
+  # (Wazuh 5401) instead of silently succeeding. Lab only: this is an account
+  # that exists to be taken over.
+  if [ -n "${LAB_SUDO_ENABLED:-}" ] && command -v sudo >/dev/null 2>&1; then
+    printf '%s ALL=(ALL) ALL\n' "$LAB_USER" > /etc/sudoers.d/cyrvanta-lab
+    chmod 440 /etc/sudoers.d/cyrvanta-lab
+  fi
+
   # Syslog first, then sshd with no -E, so authentication lines land in
   # /var/log/secure carrying the prefix the Wazuh decoders match on.
   touch "$LOG_FILE"

@@ -8,7 +8,8 @@ from hashlib import sha256
 from types import MappingProxyType
 from uuid import UUID
 
-BUCKET_MINUTES = 10
+WINDOW_MINUTES = 10
+MAX_WINDOW_MINUTES = 1440
 MAX_CANDIDATES = 500
 MAX_MEMBERS = 32
 MAX_RULES_PER_TRIGGER = 8
@@ -59,6 +60,10 @@ class CorrelationRule:
     # different signals. Absent means the multi-signal behavior that every
     # rule has had until now.
     min_severity: int | None = None
+    # How far back a trigger looks. Rules already carried this field in their
+    # stored definition, but the engine ignored it and windowed on a fixed
+    # 10-minute UTC bucket instead; it is now the real window length.
+    window_minutes: int = WINDOW_MINUTES
 
     def __post_init__(self) -> None:
         if not self.code or not self.version or len(self.definition_sha256) != 64:
@@ -69,6 +74,8 @@ class CorrelationRule:
             raise ValueError("correlation rule grouping is invalid")
         if self.min_severity is not None and not 0 <= self.min_severity <= 100:
             raise ValueError("correlation rule min_severity is invalid")
+        if not 1 <= self.window_minutes <= MAX_WINDOW_MINUTES:
+            raise ValueError("correlation rule window_minutes is invalid")
 
 
 @dataclass(frozen=True, slots=True)
@@ -177,11 +184,21 @@ class CorrelationMatch:
         return any(member.is_simulated for member in self.members)
 
 
-def bucket_bounds(value: datetime) -> tuple[datetime, datetime]:
-    utc = value.astimezone(UTC)
-    minute = (utc.minute // BUCKET_MINUTES) * BUCKET_MINUTES
-    start = utc.replace(minute=minute, second=0, microsecond=0)
-    return start, start + timedelta(minutes=BUCKET_MINUTES)
+def window_bounds(value: datetime, minutes: int = WINDOW_MINUTES) -> tuple[datetime, datetime]:
+    """The window a trigger looks back over, ending at the trigger itself.
+
+    This replaced fixed UTC buckets, which were blind at their own edges: two
+    halves of one attack landing at 12:09 and 12:11 fell in different buckets
+    and could never correlate, no matter how obviously related they were. The
+    window now travels with the trigger, so what matters is how far apart two
+    findings are, not which arbitrary box they happened to land in.
+
+    It looks backward only. A finding cannot be correlated against evidence
+    that has not arrived yet; when that later evidence does arrive it becomes
+    the trigger and looks back over this one.
+    """
+    end = value.astimezone(UTC)
+    return end - timedelta(minutes=minutes), end
 
 
 def evaluate_rule(
@@ -196,7 +213,7 @@ def evaluate_rule(
     trigger_keys = trigger.grouping_keys(rule)
     if not trigger_keys:
         return None
-    window_start, window_end = bucket_bounds(trigger.effective_at)
+    window_start, window_end = window_bounds(trigger.effective_at, rule.window_minutes)
     possible: list[tuple[int, int, str, tuple[CorrelationCandidate, ...]]] = []
     for entity_key in trigger_keys:
         selected = tuple(
@@ -206,7 +223,7 @@ def evaluate_rule(
                     for item in candidates
                     if item.eligible_for(rule)
                     and item.is_simulated == trigger.is_simulated
-                    and window_start <= item.effective_at < window_end
+                    and window_start <= item.effective_at <= window_end
                     and entity_key in item.grouping_keys(rule)
                     and item.selector_code(rule) is not None
                 ),
@@ -294,12 +311,12 @@ def evaluate_rule(
                 "correlation.factor.distinct_signal_pattern",
             ),
             FactorResult(
-                "same_time_bucket",
+                "same_time_window",
                 len(selected) >= 2,
                 20,
                 20 if len(selected) >= 2 else 0,
                 revision_ids,
-                "correlation.factor.same_time_bucket",
+                "correlation.factor.same_time_window",
             ),
             diversity_factor,
         )
@@ -307,11 +324,20 @@ def evaluate_rule(
     score = sum(factor.contribution for factor in factors)
     if score < rule.threshold or any(not factor.matched for factor in required):
         return None
+    # Deliberately free of any timestamp. With fixed buckets the window start
+    # was a stable label shared by every trigger in the same box, so it could
+    # sit in this key; a sliding window start moves with every trigger, and
+    # keeping it here would give each match its own grouping key and so its own
+    # incident -- one attack would arrive as a stream of separate incidents.
+    #
+    # Dropping it also states the intent better: this identifies "the same rule
+    # firing on the same entity", and how long that stays one incident is
+    # decided by whether the incident is still open (see `prior_incident`),
+    # which is the analyst's decision rather than a clock's.
     grouping_material = "|".join(
         (
             rule.code,
             rule.version,
-            window_start.isoformat(),
             entity_key,
             "simulated" if trigger.is_simulated else "real",
         )

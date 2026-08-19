@@ -512,6 +512,16 @@ docker compose exec lab-workstation-01 sh -c 'for i in 1 2 3 4 5; do \
 curl -s http://localhost:8090/api/login-command
 ```
 
-Un incidente nuevo e independiente requiere **otra IP de origen** o esperar a
-que pase la ventana de 10 minutos: el agrupamiento es
-`(regla, version, clave de agrupacion, ventana)`.
+Un incidente nuevo e independiente requiere **otra clave de agrupacion** (otra
+IP de origen, u otro activo segun la regla), o que el incidente anterior de esa
+entidad este **cerrado**.
+
+> **Cambio desde la ventana deslizante (2026-08-19).** Antes el agrupamiento
+> era `(regla, version, clave, ventana)` y bastaba esperar 10 minutos para
+> obtener un incidente separado. Ya no: la clave **no lleva tiempo**. Mientras
+> siga abierto el incidente de esa entidad, la evidencia nueva se **adjunta** a
+> el en vez de abrir uno paralelo. Esperar ya no separa; cerrar si.
+>
+> El motivo es que con ventana deslizante el inicio de ventana cambia en cada
+> disparo, asi que dejarlo en la clave habria hecho que un mismo ataque llegara
+> como una ristra de incidentes distintos.

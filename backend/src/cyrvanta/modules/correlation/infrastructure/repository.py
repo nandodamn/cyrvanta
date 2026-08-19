@@ -11,6 +11,7 @@ from cyrvanta.modules.correlation.application.ports import ReservedMatch
 from cyrvanta.modules.correlation.domain.models import (
     ACTIVE_INCIDENT_STATES,
     GROUPING_KINDS,
+    WINDOW_MINUTES,
     CorrelationCandidate,
     CorrelationMatch,
     CorrelationRule,
@@ -72,7 +73,9 @@ class SqlCorrelationRepository:
                     AlertReferenceModel.id == FindingRevisionModel.alert_reference_id,
                 )
                 .where(FindingRevisionModel.effective_at >= window_start)
-                .where(FindingRevisionModel.effective_at < window_end)
+                # Inclusive: the window ends at the trigger itself, so an
+                # exclusive bound would drop the very finding being evaluated.
+                .where(FindingRevisionModel.effective_at <= window_end)
                 .order_by(
                     FindingRevisionModel.effective_at,
                     FindingRevisionModel.alert_reference_id,
@@ -254,6 +257,7 @@ class SqlCorrelationRepository:
             max_members=integer("member_limit", 32),
             grouping=grouping,
             min_severity=min_severity,
+            window_minutes=integer("window_minutes", WINDOW_MINUTES),
         )
 
     @staticmethod

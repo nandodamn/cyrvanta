@@ -5,6 +5,7 @@ from uuid import uuid4
 import pytest
 
 from cyrvanta.modules.correlation.domain.models import (
+    MAX_WINDOW_MINUTES,
     CorrelationCandidate,
     CorrelationLimitExceeded,
     CorrelationRule,
@@ -144,15 +145,69 @@ def test_partial_allowlist_and_ingested_time_are_explicit() -> None:
     assert evaluate_rule(rule(), ingested, (allowed, ingested)) is None
 
 
-def test_bucket_boundary_is_fixed_utc_and_non_overlapping() -> None:
+def test_the_window_travels_with_the_trigger_instead_of_snapping_to_a_box() -> None:
+    """This is the case fixed UTC buckets got wrong. A failure at 12:09 and a
+    success at 12:10 are one minute apart, but they fell either side of a
+    bucket edge and so could never correlate. What matters is the distance
+    between them, not which box they landed in.
+    """
     trigger = candidate("success", minute=10)
-    previous = candidate("failed", minute=9)
-    same_bucket = candidate("failed", minute=11)
-    assert evaluate_rule(rule(), trigger, (previous, trigger)) is None
-    match = evaluate_rule(rule(), trigger, (trigger, same_bucket))
+    one_minute_earlier = candidate("failed", minute=9)
+    match = evaluate_rule(rule(), trigger, (one_minute_earlier, trigger))
     assert match is not None
-    assert match.window_start == datetime(2026, 7, 28, 12, 10, tzinfo=UTC)
-    assert match.window_end == datetime(2026, 7, 28, 12, 20, tzinfo=UTC)
+    assert match.window_start == datetime(2026, 7, 28, 12, 0, tzinfo=UTC)
+    assert match.window_end == datetime(2026, 7, 28, 12, 10, tzinfo=UTC)
+
+
+def test_the_window_only_looks_backward() -> None:
+    """Evidence that has not arrived yet cannot support a match. When it does
+    arrive it becomes the trigger and looks back over this one.
+    """
+    trigger = candidate("success", minute=10)
+    later = candidate("failed", minute=11)
+    assert evaluate_rule(rule(), trigger, (trigger, later)) is None
+    assert evaluate_rule(rule(), later, (trigger, later)) is not None
+
+
+def test_findings_further_apart_than_the_window_do_not_correlate() -> None:
+    trigger = candidate("success", minute=25)
+    too_old = candidate("failed", minute=10)
+    assert evaluate_rule(rule(), trigger, (too_old, trigger)) is None
+
+
+def test_the_window_length_is_the_rule_s_to_choose() -> None:
+    """Low-and-slow attacks are the ones worth catching, and ten minutes is
+    not a law of nature -- a rule can widen its own window.
+    """
+    patient = replace(rule(), window_minutes=60)
+    trigger = candidate("success", minute=55)
+    early = candidate("failed", minute=5)
+    assert evaluate_rule(rule(), trigger, (early, trigger)) is None
+    assert evaluate_rule(patient, trigger, (early, trigger)) is not None
+
+
+def test_repeated_matches_on_one_entity_share_a_grouping_key() -> None:
+    """The grouping key carries no timestamp, so a second burst against the
+    same entity attaches to the incident already open for it instead of
+    opening a parallel one. With fixed buckets the window start sat in this
+    key, which made one slow attack arrive as a stream of incidents.
+    """
+    first = evaluate_rule(
+        rule(),
+        candidate("success", minute=5),
+        (candidate("failed", minute=4),) + (candidate("success", minute=5),),
+    )
+    trigger = candidate("success", minute=40)
+    second = evaluate_rule(rule(), trigger, (candidate("failed", minute=39), trigger))
+    assert first is not None and second is not None
+    assert first.grouping_key_hash == second.grouping_key_hash
+
+
+def test_window_length_is_bounded() -> None:
+    with pytest.raises(ValueError, match="window_minutes"):
+        replace(rule(), window_minutes=0)
+    with pytest.raises(ValueError, match="window_minutes"):
+        replace(rule(), window_minutes=MAX_WINDOW_MINUTES + 1)
 
 
 def test_candidate_and_member_limits_never_correlate_partial_sets() -> None:

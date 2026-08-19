@@ -36,7 +36,11 @@ from uuid import UUID, uuid4
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from cyrvanta.modules.correlation.domain.models import GROUPING_KINDS
+from cyrvanta.modules.correlation.domain.models import (
+    GROUPING_KINDS,
+    MAX_WINDOW_MINUTES,
+    WINDOW_MINUTES,
+)
 from cyrvanta.modules.correlation.infrastructure.models import CorrelationRuleVersionModel
 from cyrvanta.modules.correlation.infrastructure.repository import SqlCorrelationRepository
 from cyrvanta.modules.identity.infrastructure.models import AuditEventModel
@@ -131,6 +135,13 @@ def validate_definition(definition: Any) -> None:
 
     for name in ("candidate_limit", "member_limit", "window_minutes"):
         _positive_int(definition, name)
+
+    window = definition.get("window_minutes", WINDOW_MINUTES)
+    if isinstance(window, int) and not isinstance(window, bool) and window > MAX_WINDOW_MINUTES:
+        # An unbounded window is not a better detection, it is a slower one:
+        # every trigger would scan further back until candidate_limit trips
+        # and the rule raises instead of matching.
+        raise RuleDefinitionInvalid(f"window_minutes must not exceed {MAX_WINDOW_MINUTES}")
 
 
 def _parses_in_the_engine(rule_code: str, version: str, definition: Mapping[str, Any]) -> None:

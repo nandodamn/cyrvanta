@@ -11,8 +11,8 @@ from cyrvanta.modules.correlation.application.ports import (
 from cyrvanta.modules.correlation.domain.models import (
     MAX_RULES_PER_TRIGGER,
     CorrelationLimitExceeded,
-    bucket_bounds,
     evaluate_rule,
+    window_bounds,
 )
 from cyrvanta.shared.application.messaging import EventRecorder
 from cyrvanta.shared.domain.events import DomainEvent
@@ -49,7 +49,7 @@ class CorrelationService:
             raise CorrelationLimitExceeded("rule_limit_exceeded")
         created_ids: list[UUID] = []
         for rule in rules:
-            window_start, window_end = bucket_bounds(trigger.effective_at)
+            window_start, window_end = window_bounds(trigger.effective_at, rule.window_minutes)
             candidates = await self._repository.candidates(
                 window_start, window_end, rule.max_candidates + 1
             )

@@ -8,7 +8,6 @@ from cyrvanta.modules.correlation.application.query_service import (
     CorrelationQueryService,
 )
 from cyrvanta.modules.correlation.application.schemas import (
-    CanonicalDemoResponse,
     CorrelationResponse,
 )
 from cyrvanta.shared.dependencies import SecurityContext, require_permission

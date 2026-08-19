@@ -441,6 +441,8 @@ const resources = {
       operationalPulseTitle: "Actividad de seguridad en las últimas 24 horas",
       activityEmpty: "Sin actividad registrada",
       activityUpdated: "Última actualización: {{time}}",
+      activityPeak: "pico: {{count}}",
+      activityLegend: "Cada barra son 2 horas de actividad (alertas + incidentes)",
       activityBucket: "{{time}} · {{alerts}} alertas · {{incidents}} incidentes",
       activitySource: {
         simulated: "Fuente simulada",
@@ -1068,6 +1070,8 @@ const resources = {
       operationalPulseTitle: "Security activity over the last 24 hours",
       activityEmpty: "No activity recorded",
       activityUpdated: "Last updated: {{time}}",
+      activityPeak: "peak: {{count}}",
+      activityLegend: "Each bar is 2 hours of activity (alerts + incidents)",
       activityBucket: "{{time}} · {{alerts}} alerts · {{incidents}} incidents",
       activitySource: {
         simulated: "Simulated source",

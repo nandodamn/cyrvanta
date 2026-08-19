@@ -1090,6 +1090,35 @@ details > .admin-list {
   flex: 1;
   background: linear-gradient(var(--accent), var(--cyan));
   opacity: 0.82;
+  border-radius: 2px 2px 0 0;
+}
+
+/* An empty bucket shows a baseline tick, not a short bar. Before this it
+   rendered as a 2px stub identical to a bucket with real but small activity,
+   so "nothing happened" and "something happened" looked the same. */
+.signal-grid i.is-empty {
+  align-self: end;
+  height: 0;
+  border-bottom: 1px dashed var(--line);
+  background: none;
+  opacity: 1;
+}
+
+.activity-scale {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  margin-top: 6px;
+  color: var(--text-soft);
+  font:
+    400 11px "Space Mono",
+    monospace;
+}
+
+.activity-scale .activity-peak {
+  color: var(--text);
+  font-weight: 700;
 }
 
 .center {

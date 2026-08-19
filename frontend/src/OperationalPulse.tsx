@@ -17,6 +17,13 @@ export function OperationalPulse() {
     1,
   );
 
+  // A bar that is one pixel tall reads as "nothing happened", which is a lie
+  // when something did. Real activity always gets a visible bar, and an empty
+  // bucket gets no bar at all -- the two must never look alike.
+  const MINIMUM_VISIBLE = 4;
+  const barHeight = (total: number) =>
+    total === 0 ? "0" : `max(${MINIMUM_VISIBLE}px, ${(total / maximum) * 100}%)`;
+
   return (
     <article className="panel pulse-panel">
       <div className="panel-heading">
@@ -72,10 +79,30 @@ export function OperationalPulse() {
                   role="listitem"
                   aria-label={label}
                   title={label}
-                  style={{ height: total === 0 ? "2px" : `${(total / maximum) * 100}%` }}
+                  className={total === 0 ? "is-empty" : undefined}
+                  style={{ height: barHeight(total) }}
                 />
               );
             })}
+          </div>
+          {/* Without this the bars are unreadable: one busy bucket sets the
+              scale and every other bar shrinks against a maximum the reader
+              cannot see. Naming the peak and the span makes the chart mean
+              something instead of being decoration. */}
+          <div className="activity-scale">
+            <span>
+              {new Date(activity.data.window_start).toLocaleTimeString([], {
+                hour: "2-digit",
+                minute: "2-digit",
+              })}
+            </span>
+            <span className="activity-peak">{t("activityPeak", { count: maximum })}</span>
+            <span>
+              {new Date(activity.data.window_end).toLocaleTimeString([], {
+                hour: "2-digit",
+                minute: "2-digit",
+              })}
+            </span>
           </div>
           <p className="activity-updated">
             {t("activityUpdated", {
@@ -85,10 +112,12 @@ export function OperationalPulse() {
         </>
       )}
 
+      {/* These used to read INGESTA / DETECCIONES / RESPUESTA, which implied
+          the bars were split into three categories. They never were, so the
+          labels invited exactly the wrong reading. The legend now says what a
+          bar actually is. */}
       <div className="pulse-legend">
-        <span>{t("telemetryIngestion")}</span>
-        <span>{t("detections")}</span>
-        <span>{t("incidentResponse")}</span>
+        <span>{t("activityLegend")}</span>
       </div>
     </article>
   );

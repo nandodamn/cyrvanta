@@ -62,3 +62,57 @@ describe("operational pulse", () => {
     expect(screen.getByText("1")).toBeVisible();
   });
 });
+
+describe("operational pulse readability", () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  function skewed() {
+    // The real shape of this data: one ingestion burst holding 94% of the day.
+    const volumes = [0, 5, 14, 0, 0, 0, 0, 6, 0, 0, 1034, 41];
+    return {
+      window_start: "2026-08-18T15:00:00Z",
+      window_end: "2026-08-19T15:00:00Z",
+      updated_at: "2026-08-19T15:02:51Z",
+      source_mode: "LIVE" as const,
+      totals: { alerts: 1100, incidents: 0 },
+      series: volumes.map((alerts, index) => ({
+        bucket_start: new Date(Date.UTC(2026, 7, 18, 15 + index * 2)).toISOString(),
+        bucket_end: new Date(Date.UTC(2026, 7, 18, 17 + index * 2)).toISOString(),
+        alerts,
+        incidents: 0,
+      })),
+    };
+  }
+
+  it("never draws a bar for a quiet bucket that could pass for activity", async () => {
+    vi.spyOn(api, "getOperationalActivity24h").mockResolvedValue(skewed());
+    renderPulse();
+
+    const bars = await screen.findAllByRole("listitem");
+    expect(bars).toHaveLength(12);
+
+    const empty = bars.filter((bar) => bar.className.includes("is-empty"));
+    const active = bars.filter((bar) => !bar.className.includes("is-empty"));
+    expect(empty).toHaveLength(7);
+    expect(active).toHaveLength(5);
+    // A quiet bucket has no bar at all; every real one keeps a visible floor,
+    // so the smallest bucket of the day cannot be mistaken for silence.
+    active.forEach((bar) => expect(bar.style.height).toContain("max("));
+  });
+
+  it("states the scale, because one busy bucket sets it for all the others", async () => {
+    vi.spyOn(api, "getOperationalActivity24h").mockResolvedValue(skewed());
+    renderPulse();
+
+    expect(await screen.findByText(/1034/)).toBeVisible();
+  });
+
+  it("does not label the bars with categories they never encoded", async () => {
+    vi.spyOn(api, "getOperationalActivity24h").mockResolvedValue(skewed());
+    renderPulse();
+
+    await screen.findAllByRole("listitem");
+    expect(screen.queryByText(/^detecciones$|^detections$/i)).toBeNull();
+    expect(screen.getByText(/2 horas de actividad|2 hours of activity/i)).toBeVisible();
+  });
+});

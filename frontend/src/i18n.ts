@@ -32,6 +32,15 @@ const resources = {
       rememberSession: "Recordar sesión en este equipo",
       securityOperations: "Operaciones de seguridad",
       noRoleAssigned: "Sin rol asignado",
+      resolutionReview: "Revision de la resolucion",
+      resolutionReviewBy:
+        "Resuelto por {{who}} el {{when}}. Estas por aceptar o rechazar ese trabajo.",
+      resolutionReviewUnknown:
+        "Este caso figura resuelto pero el registro no dice quien lo resolvio. Reviselo con mas cuidado antes de cerrarlo.",
+      resolutionReviewOptions:
+        "Cerrar es aceptar la resolucion. Reabrir es rechazarla: el motivo que escriba vuelve al analista y queda en el registro.",
+      resolutionReviewNotYours:
+        "Usted no puede cerrar este caso: quien lo resolvio, o quien lo tiene a cargo, no puede aceptar su propio trabajo. Debe revisarlo otra persona.",
       collaborators: "Colaboradores",
       collaboratorsIntro:
         "Gente que trabaja en el caso sin quedar a cargo de el. Pueden aportar notas y evidencia; no pueden darlo por resuelto, cerrarlo ni reasignarlo, porque eso no es aportar al caso sino juzgarlo, y de eso responde el responsable.",
@@ -820,6 +829,15 @@ const resources = {
       rememberSession: "Remember session on this device",
       securityOperations: "Security operations",
       noRoleAssigned: "No role assigned",
+      resolutionReview: "Resolution review",
+      resolutionReviewBy:
+        "Resolved by {{who}} on {{when}}. You are about to accept or reject that work.",
+      resolutionReviewUnknown:
+        "This case is marked resolved but the record does not say who resolved it. Look more closely before closing it.",
+      resolutionReviewOptions:
+        "Closing accepts the resolution. Reopening rejects it: the reason you write goes back to the analyst and stays in the record.",
+      resolutionReviewNotYours:
+        "You cannot close this case: whoever resolved it, or owns it, cannot accept their own work. Someone else has to review it.",
       collaborators: "Collaborators",
       collaboratorsIntro:
         "People working on the case without becoming accountable for it. They can add notes and evidence; they cannot resolve, close or reassign it, because those are judgements about the case rather than contributions to it, and the owner answers for those.",

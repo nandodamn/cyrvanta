@@ -786,6 +786,43 @@ const REQUIRED_SLOTS = [
   { slot: "resolution", requirement: "resolution", claimType: "FACT" as const },
 ];
 
+function ResolutionReview({ incidentId, mayClose }: { incidentId: string; mayClose: boolean }) {
+  const { t } = useTranslation();
+  // The audit tab asks for the same thing under the same key, so this costs
+  // no extra request.
+  const history = useQuery({
+    queryKey: ["incident-history", incidentId],
+    queryFn: () => getIncidentHistory(incidentId),
+  });
+
+  // Read from the record rather than from a name looked up in a page of
+  // users: the person who resolved a case need not be in the first hundred.
+  const resolution = history.data?.find(
+    (entry) => entry.action === "incident.status.changed" && entry.after.status === "resolved",
+  );
+
+  return (
+    <div className="review-banner">
+      <p className="eyebrow">{t("resolutionReview")}</p>
+      <p>
+        {resolution
+          ? t("resolutionReviewBy", {
+              who: resolution.actor_name || resolution.actor_email || t("automaticActor"),
+              when: new Date(resolution.occurred_at).toLocaleString(),
+            })
+          : t("resolutionReviewUnknown")}
+      </p>
+      {resolution?.reason && <p className="review-reason">{resolution.reason}</p>}
+      <p className="review-guidance">
+        {/* Two outcomes, both of which have to be said out loud: accepting the
+            work closes the case, refusing it sends the case back with a reason
+            the analyst can act on. */}
+        {mayClose ? t("resolutionReviewOptions") : t("resolutionReviewNotYours")}
+      </p>
+    </div>
+  );
+}
+
 function Collaborators({ incidentId, mayManage }: { incidentId: string; mayManage: boolean }) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
@@ -3239,6 +3276,9 @@ function IncidentDetailPage() {
                 </p>
               </div>
 
+              {incident.data.status === "resolved" && (
+                <ResolutionReview incidentId={id} mayClose={permitted.has("transition:closed")} />
+              )}
               {transitionTargets.length === 0 && (
                 // An empty picker reads as a bug. This says the move is not
                 // available to this person on this incident, which is a fact

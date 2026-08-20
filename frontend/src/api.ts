@@ -106,6 +106,7 @@ const incidentSchema = z.object({
   is_simulated: z.boolean().nullable().optional().default(false),
   detected_at: z.string().nullable().optional().default(""),
   acknowledged_at: z.string().nullable().optional(),
+  resolved_by_user_id: z.string().uuid().nullable().optional(),
   resolved_at: z.string().nullable().optional(),
   closed_at: z.string().nullable().optional(),
   close_reason: z.string().nullable().optional(),

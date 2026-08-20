@@ -135,6 +135,9 @@ class IncidentResponse(BaseModel):
     priority: int
     classification: str
     assignee_user_id: UUID | None
+    # Whose work a reviewer is being asked to accept. Recorded since 0028 and
+    # of no use to anyone while it stayed inside the database.
+    resolved_by_user_id: UUID | None = None
     version: int
     is_simulated: bool
     detected_at: datetime

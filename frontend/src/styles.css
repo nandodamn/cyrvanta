@@ -2842,3 +2842,30 @@ details > .admin-list {
   margin: 0.2rem 0 0;
   font-size: 0.88rem;
 }
+
+/* A review is a decision about someone else's work, so the screen says whose
+   before offering the buttons that accept or refuse it. */
+.review-banner {
+  border: 1px solid var(--border, #1f2937);
+  border-left: 3px solid #f59e0b;
+  border-radius: 6px;
+  padding: 0.85rem 1rem;
+  margin-bottom: 1rem;
+}
+
+.review-banner p {
+  margin: 0.3rem 0 0;
+  font-size: 0.92rem;
+}
+
+.review-banner .eyebrow {
+  margin: 0;
+}
+
+.review-reason {
+  font-style: italic;
+}
+
+.review-guidance {
+  color: var(--text-muted, #94a3b8);
+}

@@ -2816,3 +2816,29 @@ details > .admin-list {
 .technical-file-entries p:last-child {
   margin: 0.15rem 0 0;
 }
+
+.collaborator-list {
+  list-style: none;
+  margin: 1rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.6rem;
+}
+
+.collaborator-list li {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.collaborator-meta {
+  display: block;
+  font-size: 0.82rem;
+  color: var(--text-muted, #94a3b8);
+}
+
+.collaborator-reason {
+  margin: 0.2rem 0 0;
+  font-size: 0.88rem;
+}

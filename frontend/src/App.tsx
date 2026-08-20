@@ -39,6 +39,9 @@ import {
   getIncidentActions,
   getIncidentAlerts,
   getIncidentHistory,
+  getCollaborators,
+  addCollaborator,
+  removeCollaborator,
   getResolutionReadiness,
   getIncidentEnrichment,
   getIncidents,
@@ -782,6 +785,99 @@ const REQUIRED_SLOTS = [
   },
   { slot: "resolution", requirement: "resolution", claimType: "FACT" as const },
 ];
+
+function Collaborators({ incidentId, mayManage }: { incidentId: string; mayManage: boolean }) {
+  const { t } = useTranslation();
+  const queryClient = useQueryClient();
+  const [userId, setUserId] = useState("");
+  const [reason, setReason] = useState("");
+
+  const collaborators = useQuery({
+    queryKey: ["incident-collaborators", incidentId],
+    queryFn: () => getCollaborators(incidentId),
+  });
+
+  const refresh = async () => {
+    setUserId("");
+    setReason("");
+    await queryClient.invalidateQueries({ queryKey: ["incident-collaborators", incidentId] });
+  };
+  const add = useMutation({
+    mutationFn: () => addCollaborator(incidentId, userId, reason.trim() || null),
+    onSuccess: refresh,
+  });
+  const remove = useMutation({
+    mutationFn: (id: string) => removeCollaborator(incidentId, id),
+    onSuccess: refresh,
+  });
+
+  return (
+    <section className="panel">
+      <div>
+        <p className="eyebrow">{t("securityOperations")}</p>
+        <h2>{t("collaborators")}</h2>
+        <p>{t("collaboratorsIntro")}</p>
+      </div>
+      <PageState
+        loading={collaborators.isLoading}
+        error={collaborators.isError}
+        empty={!collaborators.isLoading && !collaborators.isError && !collaborators.data?.length}
+      />
+      <ul className="collaborator-list">
+        {collaborators.data?.map((person) => (
+          <li key={person.user_id}>
+            <div>
+              <strong>{person.display_name || person.email}</strong>
+              <span className="collaborator-meta">
+                {person.email} · {new Date(person.added_at).toLocaleDateString()}
+              </span>
+              {person.reason && <p className="collaborator-reason">{person.reason}</p>}
+            </div>
+            {mayManage && (
+              <button
+                type="button"
+                className="ghost"
+                disabled={remove.isPending}
+                onClick={() => remove.mutate(person.user_id)}
+              >
+                {t("collaboratorRemove")}
+              </button>
+            )}
+          </li>
+        ))}
+      </ul>
+      {mayManage && (
+        <form
+          className="form-grid"
+          style={{ marginTop: "1rem" }}
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (userId) add.mutate();
+          }}
+        >
+          <label>
+            {t("collaboratorPerson")}
+            <AssigneeCombobox value={userId} onChange={setUserId} />
+          </label>
+          <label>
+            {/* Why someone was brought near a case is part of its record, so it
+                is asked for at the moment the reason is still known. */}
+            {t("collaboratorReason")}
+            <input maxLength={500} value={reason} onChange={(e) => setReason(e.target.value)} />
+          </label>
+          <button type="submit" disabled={add.isPending || !userId}>
+            {t("collaboratorAdd")}
+          </button>
+          {add.isError && (
+            <p className="form-error" role="alert">
+              {t("actionError")}
+            </p>
+          )}
+        </form>
+      )}
+    </section>
+  );
+}
 
 function TechnicalFile({
   incidentId,
@@ -4020,6 +4116,7 @@ function IncidentDetailPage() {
         <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
           {/* First, because it is the record of the case itself; the playbook
               decisions below are one kind of event within it. */}
+          <Collaborators incidentId={id} mayManage={permitted.has("update")} />
           <TechnicalFile
             incidentId={id}
             claims={claims.data ?? []}

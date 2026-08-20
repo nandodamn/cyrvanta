@@ -844,6 +844,40 @@ export async function linkIncidentAlerts(
     }),
   );
 }
+const collaboratorSchema = z.object({
+  user_id: z.string().uuid(),
+  email: z.string(),
+  display_name: z.string(),
+  reason: z.string().nullable(),
+  added_at: z.string(),
+});
+export type Collaborator = z.infer<typeof collaboratorSchema>;
+export async function getCollaborators(id: string): Promise<Collaborator[]> {
+  return z
+    .array(collaboratorSchema)
+    .parse(await authorized(`/api/v1/incidents/${id}/collaborators`));
+}
+export async function addCollaborator(
+  id: string,
+  userId: string,
+  reason: string | null,
+): Promise<Collaborator[]> {
+  return z.array(collaboratorSchema).parse(
+    await authorizedMutation(`/api/v1/incidents/${id}/collaborators`, "POST", {
+      user_id: userId,
+      reason,
+    }),
+  );
+}
+export async function removeCollaborator(id: string, userId: string): Promise<Collaborator[]> {
+  return z.array(collaboratorSchema).parse(
+    await checked(
+      await authenticatedFetch(`/api/v1/incidents/${id}/collaborators/${userId}`, {
+        method: "DELETE",
+      }),
+    ),
+  );
+}
 export async function getResolutionReadiness(id: string): Promise<string[]> {
   return z
     .array(z.string())

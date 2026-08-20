@@ -32,6 +32,13 @@ const resources = {
       rememberSession: "Recordar sesión en este equipo",
       securityOperations: "Operaciones de seguridad",
       noRoleAssigned: "Sin rol asignado",
+      collaborators: "Colaboradores",
+      collaboratorsIntro:
+        "Gente que trabaja en el caso sin quedar a cargo de el. Pueden aportar notas y evidencia; no pueden darlo por resuelto, cerrarlo ni reasignarlo, porque eso no es aportar al caso sino juzgarlo, y de eso responde el responsable.",
+      collaboratorAdd: "Sumar colaborador",
+      collaboratorRemove: "Quitar",
+      collaboratorPerson: "Persona",
+      collaboratorReason: "Motivo (opcional)",
       technicalFile: "Expediente tecnico",
       technicalFileIntro:
         "Lo minimo que este caso debe poder mostrar antes de darse por resuelto. Resolver es pedirle a otra persona que acepte tu trabajo; sin esto no tiene con que juzgarlo, y dentro de seis meses nadie puede reconstruir que se hizo ni por que.",
@@ -813,6 +820,13 @@ const resources = {
       rememberSession: "Remember session on this device",
       securityOperations: "Security operations",
       noRoleAssigned: "No role assigned",
+      collaborators: "Collaborators",
+      collaboratorsIntro:
+        "People working on the case without becoming accountable for it. They can add notes and evidence; they cannot resolve, close or reassign it, because those are judgements about the case rather than contributions to it, and the owner answers for those.",
+      collaboratorAdd: "Add collaborator",
+      collaboratorRemove: "Remove",
+      collaboratorPerson: "Person",
+      collaboratorReason: "Reason (optional)",
       technicalFile: "Technical file",
       technicalFileIntro:
         "The least this case must be able to show before it is called resolved. Resolving is asking someone else to accept your work; without this they have nothing to judge it by, and six months from now nobody can reconstruct what was done or why.",

@@ -825,6 +825,18 @@ export async function getIncident(id: string): Promise<Incident> {
 export async function getIncidentAlerts(id: string): Promise<Alert[]> {
   return z.array(alertSchema).parse(await authorized(`/api/v1/incidents/${id}/alerts`));
 }
+export async function linkIncidentAlerts(
+  id: string,
+  expectedVersion: number,
+  alertIds: string[],
+): Promise<Alert[]> {
+  return z.array(alertSchema).parse(
+    await authorizedMutation(`/api/v1/incidents/${id}/alerts`, "POST", {
+      expected_version: expectedVersion,
+      alert_ids: alertIds,
+    }),
+  );
+}
 export async function getTimeline(id: string): Promise<TimelineEntry[]> {
   return z.array(timelineSchema).parse(await authorized(`/api/v1/incidents/${id}/timeline`));
 }

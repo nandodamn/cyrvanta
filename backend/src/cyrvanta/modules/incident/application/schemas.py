@@ -68,6 +68,19 @@ class IncidentAssign(BaseModel):
     assignee_user_id: UUID | None
 
 
+class IncidentAlertsLink(BaseModel):
+    """Alerts an analyst is attaching as evidence for an incident.
+
+    `expected_version` is required for the same reason every other mutation
+    requires it: two analysts working the same incident must not overwrite each
+    other silently. Attaching evidence changes what the incident claims to be
+    based on, so it is a mutation like any other.
+    """
+
+    expected_version: int = Field(ge=1)
+    alert_ids: list[UUID] = Field(min_length=1, max_length=50)
+
+
 class TimelineCreate(BaseModel):
     expected_version: int = Field(ge=1)
     summary: str = Field(min_length=1, max_length=5000)

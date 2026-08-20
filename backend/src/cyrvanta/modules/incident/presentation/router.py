@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from cyrvanta.modules.incident.application.schemas import (
     AlertResponse,
     AlertTriageUpdate,
+    IncidentAlertsLink,
     IncidentAssign,
     IncidentCreate,
     IncidentResponse,
@@ -16,6 +17,7 @@ from cyrvanta.modules.incident.application.schemas import (
     TimelineResponse,
 )
 from cyrvanta.modules.incident.application.service import (
+    AlertNotFound,
     AlertSort,
     IncidentConflict,
     IncidentNotFound,
@@ -50,7 +52,9 @@ def correlation_id(request: Request) -> UUID:
 
 
 def translate_error(exc: Exception) -> HTTPException:
-    if isinstance(exc, IncidentNotFound):
+    if isinstance(exc, IncidentNotFound | AlertNotFound):
+        # An alert belonging to another tenant is reported as absent, not
+        # refused: whether it exists is not this tenant's business.
         return HTTPException(status.HTTP_404_NOT_FOUND, "Resource not found")
     if isinstance(exc, IncidentConflict):
         return HTTPException(status.HTTP_409_CONFLICT, "Incident version conflict")
@@ -217,6 +221,31 @@ async def assign_incident(
     except (IncidentNotFound, IncidentConflict) as exc:
         raise translate_error(exc) from exc
     return IncidentResponse.model_validate(incident)
+
+
+@router.post("/incidents/{incident_id}/alerts", response_model=list[AlertResponse])
+async def link_incident_alerts(
+    incident_id: UUID,
+    payload: IncidentAlertsLink,
+    request: Request,
+    context: IncidentUpdatePermission,
+    service: Service,
+) -> list[AlertResponse]:
+    """Attach alerts to an incident as evidence.
+
+    Guarded by incident.update rather than a permission of its own: changing
+    what an incident is based on is changing the incident.
+    """
+    try:
+        return await service.link_alerts(
+            context.tenant_id,
+            incident_id,
+            context.user_id,
+            payload,
+            correlation_id(request),
+        )
+    except (IncidentNotFound, IncidentConflict, AlertNotFound) as exc:
+        raise translate_error(exc) from exc
 
 
 @router.get("/incidents/{incident_id}/timeline", response_model=list[TimelineResponse])

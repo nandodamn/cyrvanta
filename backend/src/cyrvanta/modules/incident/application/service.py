@@ -4,12 +4,14 @@ from typing import Literal
 from uuid import UUID, uuid4
 
 from sqlalchemy import case, or_, select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from cyrvanta.modules.identity.infrastructure.models import AuditEventModel, UserModel
 from cyrvanta.modules.incident.application.schemas import (
     AlertResponse,
     AlertTriageUpdate,
+    IncidentAlertsLink,
     IncidentAssign,
     IncidentCreate,
     IncidentTransition,
@@ -28,6 +30,15 @@ from cyrvanta.shared.database import tenant_session
 
 class IncidentNotFound(Exception):
     pass
+
+
+class AlertNotFound(Exception):
+    """An alert was named that this tenant does not have, or that is simulated.
+
+    Raised for the whole request rather than skipping the unknown ids: an
+    analyst attaching five alerts and getting three attached, silently, would
+    believe the evidence is there when it is not.
+    """
 
 
 class IncidentConflict(Exception):
@@ -266,6 +277,82 @@ class IncidentService:
                 session, tenant_id, actor_id, "incident.created", incident.id, correlation_id
             )
             return incident
+
+    async def link_alerts(
+        self,
+        tenant_id: UUID,
+        incident_id: UUID,
+        actor_id: UUID,
+        payload: IncidentAlertsLink,
+        correlation_id: UUID,
+    ) -> list[AlertResponse]:
+        """Attach alerts to an incident as evidence.
+
+        Until this existed, only correlation and the entity-risk sweep could
+        link an alert to an incident, so an incident opened by an analyst --
+        the kind reported by a phone call, a CERT notice or an audit finding --
+        could never hold any evidence at all. It could carry notes and change
+        status, but nothing tying it to what was observed.
+
+        Attaching is additive and there is no detach. Evidence an analyst
+        connected to a case is part of that case's record; a mistake is
+        corrected by saying so in the timeline, not by making it disappear.
+        """
+        now = datetime.now(UTC)
+        async with tenant_session(tenant_id) as session:
+            incident = await self._get(session, incident_id)
+            self._expect_version(incident, payload.expected_version)
+
+            requested = list(dict.fromkeys(payload.alert_ids))
+            # Simulated alerts are excluded here as everywhere else: a demo
+            # record must never become the evidence behind a real incident.
+            found = list(
+                (
+                    await session.scalars(
+                        select(AlertReferenceModel.id).where(
+                            AlertReferenceModel.tenant_id == tenant_id,
+                            AlertReferenceModel.id.in_(requested),
+                            AlertReferenceModel.is_simulated.is_(False),
+                        )
+                    )
+                ).all()
+            )
+            if len(found) != len(requested):
+                raise AlertNotFound
+
+            for alert_id in found:
+                await session.execute(
+                    pg_insert(IncidentAlertModel)
+                    .values(tenant_id=tenant_id, incident_id=incident_id, alert_id=alert_id)
+                    .on_conflict_do_nothing(
+                        index_elements=(
+                            IncidentAlertModel.tenant_id,
+                            IncidentAlertModel.incident_id,
+                            IncidentAlertModel.alert_id,
+                        )
+                    )
+                )
+            incident.version += 1
+            incident.updated_at = now
+            self._timeline(
+                session,
+                incident,
+                actor_id,
+                "evidence_linked",
+                f"{len(found)} alert(s) attached as evidence",
+                now,
+            )
+            self._audit(
+                session,
+                tenant_id,
+                actor_id,
+                "incident.evidence.linked",
+                incident_id,
+                correlation_id,
+            )
+            await session.flush()
+
+        return await self.list_incident_alerts(tenant_id, incident_id)
 
     async def update_incident(
         self,

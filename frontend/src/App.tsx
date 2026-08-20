@@ -26,6 +26,7 @@ import {
   executeAuthorizedResponse,
   generateIncidentExplanation,
   getAlerts,
+  linkIncidentAlerts,
   AlertSeverity,
   AlertSort,
   getAuditEvents,
@@ -440,6 +441,18 @@ function Layout() {
       </section>
     </div>
   );
+}
+
+/** How an incident came to exist, read from its code prefix.
+ *
+ * The prefix already encoded this -- CORR- for correlation, RISK- for the
+ * entity-risk sweep, INC- for one an analyst logged -- but only to someone who
+ * knew the convention. An analyst reading the list should not have to.
+ */
+function incidentOriginKey(code: string): string {
+  if (code.startsWith("CORR-")) return "incidentOriginCorrelated";
+  if (code.startsWith("RISK-")) return "incidentOriginRisk";
+  return "incidentOriginManual";
 }
 
 function PageState({
@@ -1299,6 +1312,13 @@ function IncidentsPage() {
                     {incident.code} · {incident.title}
                   </strong>
                   <span
+                    className="preview-badge"
+                    title={t("incidentOrigin")}
+                    style={{ whiteSpace: "nowrap" }}
+                  >
+                    {t(incidentOriginKey(incident.code))}
+                  </span>
+                  <span
                     style={{
                       color: "var(--muted)",
                       fontSize: "0.85rem",
@@ -1343,6 +1363,105 @@ const INCIDENT_TRANSITIONS: Record<string, string[]> = {
   closed: ["reopened"],
   reopened: ["triaged", "investigating"],
 };
+
+/** Attach already-ingested alerts to an incident as evidence.
+ *
+ * Correlation and the entity-risk sweep attach their own evidence, so this is
+ * for the incidents nobody detected: the ones an analyst opens after a phone
+ * call, a CERT notice or an audit finding, where the evidence has to be
+ * assembled by hand. Before this they could never hold any.
+ *
+ * Attaching is additive by design and there is no detach: evidence connected
+ * to a case is part of its record, and a mistake is corrected by saying so in
+ * the timeline rather than by making it disappear.
+ */
+function EvidenceLinker({
+  incidentId,
+  incidentVersion,
+  linkedIds,
+}: {
+  incidentId: string;
+  incidentVersion: number | undefined;
+  linkedIds: Set<string>;
+}) {
+  const { t } = useTranslation();
+  const queryClient = useQueryClient();
+  const [selected, setSelected] = useState<string[]>([]);
+  const [failed, setFailed] = useState(false);
+
+  const candidates = useQuery({
+    queryKey: ["alerts", "linkable"],
+    queryFn: () => getAlerts({ pageSize: 100 }),
+  });
+
+  const available = (candidates.data ?? []).filter((alert) => !linkedIds.has(alert.id));
+
+  const attach = useMutation({
+    mutationFn: () => linkIncidentAlerts(incidentId, incidentVersion ?? 1, selected),
+    onSuccess: async () => {
+      setSelected([]);
+      setFailed(false);
+      await queryClient.invalidateQueries({ queryKey: ["incident-alerts", incidentId] });
+      await queryClient.invalidateQueries({ queryKey: ["incident", incidentId] });
+      await queryClient.invalidateQueries({ queryKey: ["timeline", incidentId] });
+    },
+    onError: () => setFailed(true),
+  });
+
+  return (
+    <details className="panel" style={{ marginBottom: "1.25rem" }}>
+      <summary>{t("linkEvidence")}</summary>
+      <p style={{ marginTop: "0.75rem" }}>{t("linkEvidenceHelp")}</p>
+      {failed && (
+        <p className="status-message status-error" role="alert">
+          {t("linkEvidenceError")}
+        </p>
+      )}
+      {available.length === 0 ? (
+        <p className="status-message">{t("linkEvidenceEmpty")}</p>
+      ) : (
+        <>
+          <div
+            className="data-list"
+            style={{ marginTop: "0.75rem", maxHeight: "320px", overflowY: "auto" }}
+          >
+            {available.map((alert) => (
+              <label
+                key={alert.id}
+                style={{ display: "flex", gap: "10px", alignItems: "baseline", maxWidth: "none" }}
+              >
+                <input
+                  type="checkbox"
+                  style={{ width: "auto" }}
+                  checked={selected.includes(alert.id)}
+                  onChange={(event) =>
+                    setSelected((current) =>
+                      event.target.checked
+                        ? [...current, alert.id]
+                        : current.filter((item) => item !== alert.id),
+                    )
+                  }
+                />
+                <span>
+                  <strong>{alert.title}</strong> · {alert.severity} ·{" "}
+                  {new Date(alert.observed_at).toLocaleString()}
+                </span>
+              </label>
+            ))}
+          </div>
+          <button
+            type="button"
+            style={{ marginTop: "0.75rem" }}
+            disabled={selected.length === 0 || attach.isPending || incidentVersion === undefined}
+            onClick={() => attach.mutate()}
+          >
+            {t("linkEvidenceAction")} ({selected.length})
+          </button>
+        </>
+      )}
+    </details>
+  );
+}
 
 function IncidentDetailPage() {
   const { id = "" } = useParams();
@@ -2564,6 +2683,11 @@ function IncidentDetailPage() {
 
       {activeTab === "alerts" && (
         <>
+          <EvidenceLinker
+            incidentId={id}
+            incidentVersion={incident.data?.version}
+            linkedIds={new Set((linkedAlerts.data ?? []).map((alert) => alert.id))}
+          />
           <section className="panel" style={{ marginBottom: "1.25rem" }}>
             <div>
               <p className="eyebrow">{t("traceability")}</p>

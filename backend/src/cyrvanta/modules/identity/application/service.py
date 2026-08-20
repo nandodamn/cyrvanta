@@ -7,11 +7,18 @@ from sqlalchemy import select, text
 
 from cyrvanta.modules.identity.application.schemas import (
     CurrentUserResponse,
+    CurrentUserRole,
     LoginRequest,
     TokenResponse,
 )
 from cyrvanta.modules.identity.application.tokens import TokenService
-from cyrvanta.modules.identity.infrastructure.models import AuditEventModel, TenantModel, UserModel
+from cyrvanta.modules.identity.infrastructure.models import (
+    AuditEventModel,
+    RoleModel,
+    TenantModel,
+    UserModel,
+    UserRoleModel,
+)
 from cyrvanta.shared.config import get_settings
 from cyrvanta.shared.database import SessionFactory, tenant_session
 
@@ -116,7 +123,19 @@ class AuthenticationService:
             )
             if user is None:
                 raise AuthenticationError
-            return CurrentUserResponse.model_validate(user)
+            roles = list(
+                (
+                    await session.scalars(
+                        select(RoleModel)
+                        .join(UserRoleModel, UserRoleModel.role_id == RoleModel.id)
+                        .where(UserRoleModel.user_id == user_id)
+                        .order_by(RoleModel.name)
+                    )
+                ).all()
+            )
+            return CurrentUserResponse.model_validate(user).model_copy(
+                update={"roles": [CurrentUserRole.model_validate(role) for role in roles]}
+            )
 
     async def issue_user(
         self,

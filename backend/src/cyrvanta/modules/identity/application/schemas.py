@@ -30,9 +30,21 @@ class AccessTokenResponse(BaseModel):
     token_type: str = "bearer"
 
 
+class CurrentUserRole(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    code: str
+    name: str
+
+
 class CurrentUserResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: UUID
     tenant_id: UUID
     email: EmailStr
     display_name: str
+    # What the signed-in person is allowed to be, in their own words. Without
+    # it the interface can offer an action and refuse it a moment later with no
+    # explanation the user could have anticipated -- and once authorization
+    # depends on which hat someone is wearing, they need to know which hat that
+    # is before they act.
+    roles: list[CurrentUserRole] = []

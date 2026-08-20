@@ -5,6 +5,9 @@ export const userSchema = z.object({
   tenant_id: z.string().uuid(),
   email: z.string().email(),
   display_name: z.string(),
+  // Optional because the administration endpoints return the same shape
+  // without them; only /me carries the signed-in person's roles.
+  roles: z.array(z.object({ code: z.string(), name: z.string() })).optional(),
 });
 export type CurrentUser = z.infer<typeof userSchema>;
 

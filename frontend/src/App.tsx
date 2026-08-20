@@ -418,6 +418,21 @@ function Layout() {
             <div>
               <p className="eyebrow">{t("securityOperations")}</p>
               <strong>{me.data?.display_name ?? t("loading")}</strong>
+              {/* Which hat the person is wearing. It was nowhere on screen,
+                  and once an action depends on the role it is not something
+                  someone should have to infer from which buttons work. All of
+                  them are listed, because holding two is allowed and is
+                  exactly the case worth seeing. */}
+              {me.data &&
+                (me.data.roles?.length ? (
+                  <p className="session-roles">
+                    {me.data.roles.map((role) => role.name).join(" · ")}
+                  </p>
+                ) : (
+                  // Not a cosmetic gap: a user with no role can sign in and do
+                  // nothing at all, which is how one went unnoticed here.
+                  <p className="session-roles is-empty">{t("noRoleAssigned")}</p>
+                ))}
             </div>
           </div>
           <div className="actions">

@@ -2684,3 +2684,21 @@ details > .admin-list {
     monospace;
   text-transform: uppercase;
 }
+
+/* The signed-in person's roles, under their name. Muted: it is context for
+   what the interface will let them do, not a heading. */
+.session-roles {
+  margin: 2px 0 0;
+  color: var(--accent);
+  font:
+    700 10px "Space Mono",
+    monospace;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* Someone with no role can sign in and do nothing, so this states it rather
+   than leaving an empty space that reads as "still loading". */
+.session-roles.is-empty {
+  color: var(--warning, #e0a458);
+}

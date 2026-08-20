@@ -1,6 +1,6 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { FormEvent, lazy, Suspense, useEffect, useMemo, useState } from "react";
+import { FormEvent, lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { useTranslation } from "react-i18next";
 import { NavLink, Navigate, Outlet, Route, Routes, useNavigate, useParams } from "react-router-dom";
@@ -48,6 +48,7 @@ import {
   getTenant,
   getTimeline,
   getUserRoles,
+  getUserById,
   getUsers,
   linkUserDirectoryIdentity,
   login,
@@ -453,6 +454,155 @@ function incidentOriginKey(code: string): string {
   if (code.startsWith("CORR-")) return "incidentOriginCorrelated";
   if (code.startsWith("RISK-")) return "incidentOriginRisk";
   return "incidentOriginManual";
+}
+
+/** Assignee picker that searches as you type.
+ *
+ * The plain select loaded the first 100 users and listed them all. With more
+ * than that, the hundred-and-first person simply could not be assigned and
+ * nothing said so; with dozens, finding anyone meant scrolling a flat list.
+ *
+ * Search runs on the server (`GET /users?q=`), so the list never has to be
+ * held in the browser and the cap stops mattering. The currently assigned
+ * user is resolved separately from the search results: an incident assigned
+ * to someone whose name you have not typed must still show who owns it.
+ */
+export function AssigneeCombobox({
+  value,
+  onChange,
+  disabled,
+}: {
+  value: string;
+  onChange: (userId: string) => void;
+  disabled?: boolean;
+}) {
+  const { t } = useTranslation();
+  const [draft, setDraft] = useState("");
+  const [query, setQuery] = useState("");
+  const [open, setOpen] = useState(false);
+  const [highlighted, setHighlighted] = useState(0);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // Typing must not fire a request per keystroke.
+  useEffect(() => {
+    const timer = setTimeout(() => setQuery(draft.trim()), 200);
+    return () => clearTimeout(timer);
+  }, [draft]);
+
+  const results = useQuery({
+    queryKey: ["users", "assignee-search", query],
+    queryFn: () => getUsers({ query, pageSize: 20 }),
+    enabled: open,
+    retry: false,
+  });
+
+  // Resolved by id, not by search: an incident already assigned to someone
+  // must name them on first render, and their name is not in a result set the
+  // analyst has not typed yet.
+  const assigned = useQuery({
+    queryKey: ["users", "by-id", value],
+    queryFn: () => getUserById(value),
+    enabled: value !== "",
+    retry: false,
+  });
+
+  const options = (results.data ?? []).filter((user) => user.is_active);
+  const selected = options.find((user) => user.id === value) ?? assigned.data;
+
+  useEffect(() => {
+    if (!open) return;
+    const onOutside = (event: MouseEvent) => {
+      if (!containerRef.current?.contains(event.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", onOutside);
+    return () => document.removeEventListener("mousedown", onOutside);
+  }, [open]);
+
+  const choose = (userId: string) => {
+    onChange(userId);
+    setOpen(false);
+    setDraft("");
+  };
+
+  const closedLabel = value
+    ? selected
+      ? `${selected.display_name} · ${selected.email}`
+      : value
+    : t("unassigned");
+
+  return (
+    <div ref={containerRef} className="combobox">
+      <input
+        type="text"
+        role="combobox"
+        aria-expanded={open}
+        aria-controls="assignee-listbox"
+        aria-autocomplete="list"
+        disabled={disabled}
+        placeholder={t("assigneeSearchPlaceholder")}
+        value={open ? draft : closedLabel}
+        onFocus={() => setOpen(true)}
+        onChange={(event) => {
+          setDraft(event.target.value);
+          setHighlighted(0);
+          setOpen(true);
+        }}
+        onKeyDown={(event) => {
+          if (event.key === "ArrowDown") {
+            event.preventDefault();
+            setOpen(true);
+            setHighlighted((current) => Math.min(current + 1, options.length));
+          } else if (event.key === "ArrowUp") {
+            event.preventDefault();
+            setHighlighted((current) => Math.max(current - 1, 0));
+          } else if (event.key === "Enter" && open) {
+            event.preventDefault();
+            if (highlighted === 0) choose("");
+            else if (options[highlighted - 1]) choose(options[highlighted - 1].id);
+          } else if (event.key === "Escape") {
+            setOpen(false);
+            setDraft("");
+          }
+        }}
+      />
+      {open && (
+        <ul className="combobox-list" id="assignee-listbox" role="listbox">
+          <li
+            role="option"
+            aria-selected={value === ""}
+            className={highlighted === 0 ? "is-highlighted" : undefined}
+            onMouseEnter={() => setHighlighted(0)}
+            onMouseDown={(event) => {
+              event.preventDefault();
+              choose("");
+            }}
+          >
+            {t("unassigned")}
+          </li>
+          {results.isLoading && <li className="combobox-status">{t("loading")}</li>}
+          {!results.isLoading && options.length === 0 && (
+            <li className="combobox-status">{t("assigneeNoMatches")}</li>
+          )}
+          {options.map((user, index) => (
+            <li
+              key={user.id}
+              role="option"
+              aria-selected={user.id === value}
+              className={highlighted === index + 1 ? "is-highlighted" : undefined}
+              onMouseEnter={() => setHighlighted(index + 1)}
+              onMouseDown={(event) => {
+                event.preventDefault();
+                choose(user.id);
+              }}
+            >
+              <strong>{user.display_name}</strong>
+              <span className="muted"> · {user.email}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
 }
 
 function PageState({
@@ -2179,20 +2329,7 @@ function IncidentDetailPage() {
             <div className="form-grid" style={{ marginTop: "1.25rem" }}>
               <label>
                 {t("assignee")}
-                <select
-                  value={assigneeUserId}
-                  disabled={tenantUsers.isLoading || tenantUsers.isError}
-                  onChange={(event) => setAssigneeUserId(event.target.value)}
-                >
-                  <option value="">{t("unassigned")}</option>
-                  {tenantUsers.data
-                    ?.filter((user) => user.is_active)
-                    .map((user) => (
-                      <option key={user.id} value={user.id}>
-                        {user.display_name} · {user.email}
-                      </option>
-                    ))}
-                </select>
+                <AssigneeCombobox value={assigneeUserId} onChange={setAssigneeUserId} />
               </label>
               <div style={{ alignSelf: "end" }}>
                 <button

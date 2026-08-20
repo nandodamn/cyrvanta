@@ -2579,3 +2579,43 @@ details > .admin-list {
   color: var(--text-soft);
   margin-top: 0.5rem;
 }
+
+/* Searchable assignee picker. The list floats over what follows it, so the
+   wrapper is the positioning context and the panel is lifted above siblings
+   that would otherwise paint on top of it. */
+.combobox {
+  position: relative;
+}
+
+.combobox-list {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 20;
+  margin: 0;
+  padding: 4px;
+  max-height: 260px;
+  overflow-y: auto;
+  list-style: none;
+  background: var(--panel-raised);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  box-shadow: 0 6px 18px rgb(0 0 0 / 28%);
+}
+
+.combobox-list li {
+  padding: 8px 10px;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.combobox-list li.is-highlighted {
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
+/* Not selectable: these say why the list is empty, they are not choices. */
+.combobox-list li.combobox-status {
+  color: var(--text-soft);
+  cursor: default;
+}

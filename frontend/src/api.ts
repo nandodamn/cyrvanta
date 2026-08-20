@@ -654,6 +654,10 @@ export async function getUsers(options?: ListQuery): Promise<AdminUser[]> {
   return z.array(adminUserSchema).parse(await authorized(listPath("/api/v1/users", options)));
 }
 
+export async function getUserById(userId: string): Promise<AdminUser> {
+  return adminUserSchema.parse(await authorized(`/api/v1/users/${userId}`));
+}
+
 export async function getRoles(): Promise<Role[]> {
   return z.array(roleSchema).parse(await authorized("/api/v1/roles"));
 }

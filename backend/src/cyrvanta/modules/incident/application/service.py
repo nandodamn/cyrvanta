@@ -7,10 +7,16 @@ from sqlalchemy import case, or_, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from cyrvanta.modules.identity.infrastructure.models import AuditEventModel, UserModel
+from cyrvanta.modules.identity.infrastructure.models import (
+    AuditEventModel,
+    RoleModel,
+    UserModel,
+    UserRoleModel,
+)
 from cyrvanta.modules.incident.application.schemas import (
     AlertResponse,
     AlertTriageUpdate,
+    HistoryEntry,
     IncidentAlertsLink,
     IncidentAssign,
     IncidentCreate,
@@ -395,6 +401,73 @@ class IncidentService:
         actor = Actor(user_id=actor_id, permissions=permissions)
         return [action.value for action in allowed_actions(actor, facts)]
 
+    async def history(self, tenant_id: UUID, incident_id: UUID) -> list[HistoryEntry]:
+        """The incident's record, in the order it happened.
+
+        Two sources, one story. Audit events carry the structured change --
+        what moved, from what, to what, and why -- while timeline entries carry
+        what a person wrote in their own words. Reading only one of them leaves
+        an auditor reconstructing the case from half of it.
+        """
+        async with tenant_session(tenant_id) as session:
+            await self._get(session, incident_id)
+
+            audits = (
+                await session.execute(
+                    select(AuditEventModel, UserModel.email, UserModel.display_name)
+                    .outerjoin(UserModel, UserModel.id == AuditEventModel.actor_user_id)
+                    .where(
+                        AuditEventModel.tenant_id == tenant_id,
+                        AuditEventModel.resource_id == incident_id,
+                    )
+                )
+            ).all()
+            entries = (
+                await session.execute(
+                    select(IncidentTimelineModel, UserModel.email, UserModel.display_name)
+                    .outerjoin(UserModel, UserModel.id == IncidentTimelineModel.actor_user_id)
+                    .where(IncidentTimelineModel.incident_id == incident_id)
+                )
+            ).all()
+
+        history: list[HistoryEntry] = []
+        for audit, email, name in audits:
+            details = audit.details or {}
+            history.append(
+                HistoryEntry(
+                    occurred_at=audit.occurred_at,
+                    actor_email=email,
+                    actor_name=name,
+                    actor_roles=[str(role) for role in details.get("actor_roles", []) or []],
+                    actor_relation=(
+                        str(details["actor_relation"]) if details.get("actor_relation") else None
+                    ),
+                    action=audit.action,
+                    before={k: str(v) for k, v in (details.get("before") or {}).items()},
+                    after={k: str(v) for k, v in (details.get("after") or {}).items()},
+                    reason=(str(details["reason"]) if details.get("reason") else None),
+                    source="audit",
+                )
+            )
+        for entry, email, name in entries:
+            history.append(
+                HistoryEntry(
+                    occurred_at=entry.effective_at,
+                    actor_email=email,
+                    actor_name=name,
+                    # An automatic entry has no actor: correlation and the risk
+                    # sweep write here too, and attributing them to a person
+                    # would be a lie in the one record meant to be trusted.
+                    action=entry.entry_type,
+                    reason=entry.summary,
+                    source="timeline",
+                )
+            )
+        # Newest first, and stable: two events in the same millisecond must not
+        # swap places between reads of the same record.
+        history.sort(key=lambda item: (item.occurred_at, item.source, item.action), reverse=True)
+        return history
+
     async def update_incident(
         self,
         tenant_id: UUID,
@@ -457,6 +530,7 @@ class IncidentService:
                 raise InvalidTransition
             if payload.target_status == "closed" and payload.close_reason is None:
                 raise InvalidTransition
+            actor_context = await self._actor_context(session, actor_id, incident)
             previous = incident.status
             incident.status = payload.target_status
             incident.version += 1
@@ -482,7 +556,19 @@ class IncidentService:
                 now,
             )
             self._audit(
-                session, tenant_id, actor_id, "incident.status.changed", incident.id, correlation_id
+                session,
+                tenant_id,
+                actor_id,
+                "incident.status.changed",
+                incident.id,
+                correlation_id,
+                {
+                    "before": {"status": previous},
+                    "after": {"status": payload.target_status},
+                    "reason": payload.reason,
+                    "close_reason": payload.close_reason,
+                    **actor_context,
+                },
             )
             await session.flush()
             return incident
@@ -502,6 +588,8 @@ class IncidentService:
                 assignee = await session.get(UserModel, payload.assignee_user_id)
                 if assignee is None or not assignee.is_active:
                     raise IncidentNotFound
+            previous_assignee = incident.assignee_user_id
+            actor_context = await self._actor_context(session, actor_id, incident)
             incident.assignee_user_id = payload.assignee_user_id
             incident.version += 1
             incident.updated_at = datetime.now(UTC)
@@ -514,7 +602,17 @@ class IncidentService:
                 incident.updated_at,
             )
             self._audit(
-                session, tenant_id, actor_id, "incident.assigned", incident.id, correlation_id
+                session,
+                tenant_id,
+                actor_id,
+                "incident.assigned",
+                incident.id,
+                correlation_id,
+                {
+                    "before": {"assignee_user_id": str(previous_assignee or "")},
+                    "after": {"assignee_user_id": str(payload.assignee_user_id or "")},
+                    **actor_context,
+                },
             )
             await session.flush()
             return incident
@@ -601,7 +699,16 @@ class IncidentService:
         action: str,
         resource_id: UUID,
         correlation_id: UUID,
+        details: dict[str, object] | None = None,
     ) -> None:
+        """Record what changed, not only that something did.
+
+        Every one of these wrote an empty `details`, so the trail could say a
+        status had been changed but not from what, to what, or why. Answering
+        "who did what, when, from which state, to which, and for what reason"
+        was impossible from the audit alone -- it had to be inferred from a
+        sentence in the timeline, which is prose and cannot be relied on.
+        """
         session.add(
             AuditEventModel(
                 tenant_id=tenant_id,
@@ -611,6 +718,27 @@ class IncidentService:
                 resource_id=resource_id,
                 outcome="success",
                 correlation_id=correlation_id,
-                details={},
+                details=details or {},
             )
         )
+
+    @staticmethod
+    async def _actor_context(
+        session: AsyncSession, actor_id: UUID, incident: IncidentModel
+    ) -> dict[str, object]:
+        """What this person was to this incident at this moment.
+
+        Stored rather than derived when the history is read. Roles change and
+        assignments move, so working it out later would answer with today's
+        arrangement and quietly rewrite what happened.
+        """
+        roles = await session.scalars(
+            select(RoleModel.code)
+            .join(UserRoleModel, UserRoleModel.role_id == RoleModel.id)
+            .where(UserRoleModel.user_id == actor_id)
+            .order_by(RoleModel.code)
+        )
+        return {
+            "actor_roles": list(roles.all()),
+            "actor_relation": ("owner" if incident.assignee_user_id == actor_id else "not_owner"),
+        }

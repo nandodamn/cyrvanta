@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from cyrvanta.modules.incident.application.schemas import (
     AlertResponse,
     AlertTriageUpdate,
+    HistoryEntry,
     IncidentAlertsLink,
     IncidentAssign,
     IncidentCreate,
@@ -279,6 +280,24 @@ async def link_incident_alerts(
             correlation_id(request),
         )
     except (IncidentNotFound, IncidentConflict, AlertNotFound) as exc:
+        raise translate_error(exc) from exc
+
+
+@router.get("/incidents/{incident_id}/history", response_model=list[HistoryEntry])
+async def incident_history(
+    incident_id: UUID,
+    context: IncidentRead,
+    service: Service,
+) -> list[HistoryEntry]:
+    """The incident's full record, audit and timeline merged chronologically.
+
+    Read-only by construction: nothing in this module writes to either source
+    except by recording a new event, so the record can be added to and never
+    edited.
+    """
+    try:
+        return await service.history(context.tenant_id, incident_id)
+    except IncidentNotFound as exc:
         raise translate_error(exc) from exc
 
 

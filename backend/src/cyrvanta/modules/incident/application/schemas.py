@@ -68,6 +68,28 @@ class IncidentAssign(BaseModel):
     assignee_user_id: UUID | None
 
 
+class HistoryEntry(BaseModel):
+    """One line of the incident's record.
+
+    Shaped for reading rather than for storage: an auditor asks who did what,
+    when, from which value, to which, and why -- so the row carries all of it,
+    including what the actor was to this incident at that moment.
+    """
+
+    occurred_at: datetime
+    actor_email: str | None
+    actor_name: str | None
+    # Held at the time, not looked up now. Roles change and assignments move,
+    # so resolving them at read time would answer with today's arrangement.
+    actor_roles: list[str] = Field(default_factory=list)
+    actor_relation: str | None = None
+    action: str
+    before: dict[str, str] = Field(default_factory=dict)
+    after: dict[str, str] = Field(default_factory=dict)
+    reason: str | None = None
+    source: str
+
+
 class IncidentAlertsLink(BaseModel):
     """Alerts an analyst is attaching as evidence for an incident.
 

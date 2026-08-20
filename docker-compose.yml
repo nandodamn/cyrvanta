@@ -69,12 +69,14 @@ services:
     profiles: [core]
     env_file: .env
     command: ["python", "-m", "cyrvanta.worker"]
-    # Without this the container reports Up while the process is crash-looping
-    # or running an image built before the last change -- both of which have
-    # happened, silently. Checks the process is alive rather than the module
-    # being importable, which would pass even for a dead loop.
+    # Reads /proc directly: the image ships no procps, so a pgrep-based check
+    # fails for want of the binary and reports a perfectly healthy worker as
+    # unhealthy. `grep -a` because a cmdline is NUL-separated. This confirms
+    # PID 1 is the expected module, which catches a container started on the
+    # wrong command or left on a stale image; it does not prove the loop is
+    # still making progress. That needs a heartbeat the process updates.
     healthcheck:
-      test: ["CMD-SHELL", "pgrep -f 'cyrvanta.worker' > /dev/null || exit 1"]
+      test: ["CMD-SHELL", "grep -qa cyrvanta.worker /proc/1/cmdline || exit 1"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -90,12 +92,14 @@ services:
     profiles: [core]
     env_file: .env
     command: ["python", "-m", "cyrvanta.scheduler"]
-    # Without this the container reports Up while the process is crash-looping
-    # or running an image built before the last change -- both of which have
-    # happened, silently. Checks the process is alive rather than the module
-    # being importable, which would pass even for a dead loop.
+    # Reads /proc directly: the image ships no procps, so a pgrep-based check
+    # fails for want of the binary and reports a perfectly healthy worker as
+    # unhealthy. `grep -a` because a cmdline is NUL-separated. This confirms
+    # PID 1 is the expected module, which catches a container started on the
+    # wrong command or left on a stale image; it does not prove the loop is
+    # still making progress. That needs a heartbeat the process updates.
     healthcheck:
-      test: ["CMD-SHELL", "pgrep -f 'cyrvanta.scheduler' > /dev/null || exit 1"]
+      test: ["CMD-SHELL", "grep -qa cyrvanta.scheduler /proc/1/cmdline || exit 1"]
       interval: 30s
       timeout: 5s
       retries: 3

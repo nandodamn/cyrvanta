@@ -40,6 +40,7 @@ import {
   getIncidents,
   getMe,
   getPermissions,
+  Permission,
   getPlaybookExecutions,
   getPlaybookDefinitions,
   getRolePermissions,
@@ -602,6 +603,107 @@ export function AssigneeCombobox({
         </ul>
       )}
     </div>
+  );
+}
+
+/** Verbs that grant authority or do something that cannot be taken back.
+ *
+ * Marked in the permission list so an administrator handing out a role can see
+ * at a glance which boxes change what someone may authorize or execute, rather
+ * than reading fifty-five dotted codes with equal weight.
+ */
+const HIGH_IMPACT_VERBS = new Set([
+  "approve",
+  "activate",
+  "cancel",
+  "close",
+  "disable",
+  "execute",
+  "manage",
+  "publish",
+  "retract",
+  "revoke",
+]);
+
+function isHighImpact(code: string): boolean {
+  return HIGH_IMPACT_VERBS.has(code.split(".").pop() ?? "");
+}
+
+/** Permission picker for a role.
+ *
+ * Every checkbox stays mounted even when filtered out of view. The form reads
+ * its values with FormData.getAll, which only sees inputs that are in the DOM,
+ * so rendering just the matches would silently strip every permission outside
+ * the filter the moment someone searched and saved.
+ */
+export function PermissionMatrix({
+  permissions,
+  granted,
+  readOnly,
+}: {
+  permissions: Permission[];
+  granted: Set<string>;
+  readOnly: boolean;
+}) {
+  const { t } = useTranslation();
+  const [filter, setFilter] = useState("");
+  const needle = filter.trim().toLowerCase();
+
+  const byDomain = new Map<string, Permission[]>();
+  for (const permission of permissions) {
+    const domain = permission.code.split(".")[0];
+    byDomain.set(domain, [...(byDomain.get(domain) ?? []), permission]);
+  }
+
+  return (
+    <>
+      <label>
+        <span className="muted">{t("permissionFilter")}</span>
+        <input
+          type="search"
+          value={filter}
+          placeholder={t("permissionFilterPlaceholder")}
+          onChange={(event) => setFilter(event.target.value)}
+        />
+      </label>
+      {[...byDomain.entries()]
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([domain, items]) => {
+          const visible = items.filter(
+            (permission) =>
+              !needle ||
+              permission.code.toLowerCase().includes(needle) ||
+              permission.description.toLowerCase().includes(needle),
+          );
+          return (
+            <div key={domain} hidden={visible.length === 0}>
+              <p className="permission-domain">{domain}</p>
+              {items.map((permission) => (
+                <label
+                  className="check-row permission-row"
+                  key={permission.id}
+                  hidden={!visible.includes(permission)}
+                >
+                  <input
+                    type="checkbox"
+                    name="permission_ids"
+                    value={permission.id}
+                    defaultChecked={granted.has(permission.id)}
+                    disabled={readOnly}
+                  />
+                  <span>
+                    <code>{permission.code}</code>
+                    {isHighImpact(permission.code) && (
+                      <span className="permission-impact">{t("permissionHighImpact")}</span>
+                    )}
+                    <span className="permission-description">{permission.description}</span>
+                  </span>
+                </label>
+              ))}
+            </div>
+          );
+        })}
+    </>
   );
 }
 
@@ -4005,6 +4107,9 @@ function Administration() {
     queryFn: () => getUserRoles(selectedUser),
     enabled: Boolean(selectedUser),
   });
+  const selectedRoleIsSystem = Boolean(
+    roles.data?.find((role) => role.id === selectedRole)?.is_system,
+  );
   const rolePermissions = useQuery({
     queryKey: ["role-permissions", selectedRole],
     queryFn: () => getRolePermissions(selectedRole),
@@ -4731,27 +4836,31 @@ function Administration() {
                   onChange={(event) => setSelectedRole(event.target.value)}
                 >
                   <option value="">{t("selectRole")}</option>
+                  {/* System roles are selectable so they can be read. They are
+                      immutable, not secret: someone handing out a role needs to
+                      see what it grants, and an auditor needs to check it. */}
                   {roles.data?.map((role) => (
-                    <option key={role.id} value={role.id} disabled={role.is_system}>
+                    <option key={role.id} value={role.id}>
                       {role.name}
+                      {role.is_system ? ` · ${t("systemRole")}` : ""}
                     </option>
                   ))}
                 </select>
-                {permissions.data?.map((permission) => (
-                  <label className="check-row" key={permission.id}>
-                    <input
-                      type="checkbox"
-                      name="permission_ids"
-                      value={permission.id}
-                      defaultChecked={rolePermissions.data?.includes(permission.id)}
-                      disabled={!selectedRole}
-                    />
-                    {permission.code}
-                  </label>
-                ))}
-                <button disabled={!selectedRole || rolePermissionsMutation.isPending}>
-                  {t("save")}
-                </button>
+                {selectedRoleIsSystem && (
+                  <p className="status-message">{t("systemRoleImmutable")}</p>
+                )}
+                {selectedRole && permissions.data && (
+                  <PermissionMatrix
+                    permissions={permissions.data}
+                    granted={new Set(rolePermissions.data ?? [])}
+                    readOnly={selectedRoleIsSystem}
+                  />
+                )}
+                {!selectedRoleIsSystem && (
+                  <button disabled={!selectedRole || rolePermissionsMutation.isPending}>
+                    {t("save")}
+                  </button>
+                )}
               </form>
             </section>
           )}

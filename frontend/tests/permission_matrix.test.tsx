@@ -33,15 +33,36 @@ describe("permission matrix", () => {
     expect(checked.map((input) => input.value).sort()).toEqual(["p1", "p3"]);
   });
 
-  it("shows the description that the catalogue already carries", () => {
+  it("says what a permission does in the reader's language", () => {
     renderMatrix();
-    // Fifty-five dotted codes with no explanation is what made the screen
-    // unreadable; the text was in the API all along.
-    expect(screen.getByText("Cerrar un incidente")).toBeVisible();
+    // Groups start collapsed when nothing in them is granted -- that is what
+    // turns fifty-six checkboxes into nineteen lines -- so the group is opened
+    // the way a person would open it.
+    fireEvent.click(screen.getByText("Incidentes"));
+    // The stored description is written for whoever built the feature and
+    // exists only in English. The catalogue entry says the same thing in
+    // operational terms, in both languages.
+    expect(screen.getByText("Cerrar o reabrir un incidente")).toBeVisible();
+  });
+
+  it("falls back to the stored description for a permission it does not know", () => {
+    // A permission added later must still show something rather than its
+    // bare code while its label is being written.
+    render(
+      <form>
+        <PermissionMatrix
+          permissions={[{ id: "px", code: "future.thing", description: "Stored text" }]}
+          granted={new Set()}
+          readOnly={false}
+        />
+      </form>,
+    );
+    fireEvent.click(screen.getByText("future"));
+    expect(screen.getByText("Stored text")).toBeVisible();
   });
 
   it("marks the permissions that grant authority or cannot be undone", () => {
-    renderMatrix();
+    renderMatrix(["p1", "p2", "p3"]);
     const badges = screen.getAllByText(/alto impacto|high impact/i);
     expect(badges).toHaveLength(2); // incident.close and response.approve
   });

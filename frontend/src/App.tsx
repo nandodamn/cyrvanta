@@ -647,6 +647,10 @@ export function PermissionMatrix({
 }) {
   const { t } = useTranslation();
   const [filter, setFilter] = useState("");
+  // Controlled so each domain can show how many of its permissions are picked
+  // and have that number move as boxes are ticked. The inputs keep their name
+  // attribute, so the form still collects them with FormData.getAll.
+  const [selected, setSelected] = useState<Set<string>>(granted);
   const needle = filter.trim().toLowerCase();
 
   const byDomain = new Map<string, Permission[]>();
@@ -654,6 +658,14 @@ export function PermissionMatrix({
     const domain = permission.code.split(".")[0];
     byDomain.set(domain, [...(byDomain.get(domain) ?? []), permission]);
   }
+
+  const label = (permission: Permission) =>
+    // The stored description is written for whoever built the feature ("Read
+    // epistemological claims"), and only in English. The catalogue entry says
+    // the same thing in the reader's language and in operational terms; the
+    // stored text remains the fallback so a new permission still shows
+    // something rather than its bare code.
+    t(`permissionCatalog.${permission.code}`, { defaultValue: permission.description });
 
   return (
     <>
@@ -673,11 +685,27 @@ export function PermissionMatrix({
             (permission) =>
               !needle ||
               permission.code.toLowerCase().includes(needle) ||
-              permission.description.toLowerCase().includes(needle),
+              label(permission).toLowerCase().includes(needle),
           );
+          const picked = items.filter((permission) => selected.has(permission.id)).length;
           return (
-            <div key={domain} hidden={visible.length === 0}>
-              <p className="permission-domain">{domain}</p>
+            // Collapsed by default: fifty-six checkboxes at once is what makes
+            // the screen unreadable. `details` keeps its children mounted while
+            // closed, so nothing is lost from the form.
+            <details
+              key={domain}
+              className="permission-group"
+              hidden={visible.length === 0}
+              open={Boolean(needle) || picked > 0}
+            >
+              <summary>
+                <span className="permission-domain">
+                  {t(`permissionDomain.${domain}`, { defaultValue: domain })}
+                </span>
+                <span className="permission-count">
+                  {picked}/{items.length}
+                </span>
+              </summary>
               {items.map((permission) => (
                 <label
                   className="check-row permission-row"
@@ -688,19 +716,27 @@ export function PermissionMatrix({
                     type="checkbox"
                     name="permission_ids"
                     value={permission.id}
-                    defaultChecked={granted.has(permission.id)}
+                    checked={selected.has(permission.id)}
                     disabled={readOnly}
+                    onChange={(event) =>
+                      setSelected((current) => {
+                        const next = new Set(current);
+                        if (event.target.checked) next.add(permission.id);
+                        else next.delete(permission.id);
+                        return next;
+                      })
+                    }
                   />
                   <span>
-                    <code>{permission.code}</code>
+                    <span className="permission-label">{label(permission)}</span>
                     {isHighImpact(permission.code) && (
                       <span className="permission-impact">{t("permissionHighImpact")}</span>
                     )}
-                    <span className="permission-description">{permission.description}</span>
+                    <code className="permission-code">{permission.code}</code>
                   </span>
                 </label>
               ))}
-            </div>
+            </details>
           );
         })}
     </>
@@ -4836,15 +4872,29 @@ function Administration() {
                   onChange={(event) => setSelectedRole(event.target.value)}
                 >
                   <option value="">{t("selectRole")}</option>
-                  {/* System roles are selectable so they can be read. They are
-                      immutable, not secret: someone handing out a role needs to
+                  {/* Grouped rather than suffixed: almost every role is a
+                      system role now, so repeating the word on each line said
+                      nothing. System roles stay selectable because they are
+                      immutable, not secret -- whoever hands out a role needs to
                       see what it grants, and an auditor needs to check it. */}
-                  {roles.data?.map((role) => (
-                    <option key={role.id} value={role.id}>
-                      {role.name}
-                      {role.is_system ? ` · ${t("systemRole")}` : ""}
-                    </option>
-                  ))}
+                  <optgroup label={t("systemRoles")}>
+                    {roles.data
+                      ?.filter((role) => role.is_system)
+                      .map((role) => (
+                        <option key={role.id} value={role.id}>
+                          {role.name}
+                        </option>
+                      ))}
+                  </optgroup>
+                  <optgroup label={t("customRoles")}>
+                    {roles.data
+                      ?.filter((role) => !role.is_system)
+                      .map((role) => (
+                        <option key={role.id} value={role.id}>
+                          {role.name}
+                        </option>
+                      ))}
+                  </optgroup>
                 </select>
                 {selectedRoleIsSystem && (
                   <p className="status-message">{t("systemRoleImmutable")}</p>

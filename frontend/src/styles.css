@@ -2624,8 +2624,40 @@ details > .admin-list {
    hidden rather than unmounted: the form reads its values with
    FormData.getAll, which only sees inputs that are in the DOM, so dropping
    them would strip every permission outside the filter on save. */
+.permission-group {
+  border-bottom: 1px solid var(--line);
+}
+
+.permission-group > summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 2px;
+  cursor: pointer;
+}
+
+.permission-count {
+  color: var(--text-soft);
+  font:
+    400 11px "Space Mono",
+    monospace;
+}
+
+.permission-row .permission-label {
+  display: block;
+}
+
+/* The code is the identifier, not the label: it stays available for anyone
+   matching it against a policy document, but it no longer leads. */
+.permission-row .permission-code {
+  display: block;
+  color: var(--text-soft);
+  font-size: 0.72rem;
+}
+
 .permission-domain {
-  margin: 14px 0 4px;
+  margin: 0;
   color: var(--accent);
   font:
     700 10px "Space Mono",
@@ -2636,12 +2668,6 @@ details > .admin-list {
 
 .permission-row code {
   font-size: 0.85rem;
-}
-
-.permission-row .permission-description {
-  display: block;
-  color: var(--text-soft);
-  font-size: 0.8rem;
 }
 
 .permission-impact {

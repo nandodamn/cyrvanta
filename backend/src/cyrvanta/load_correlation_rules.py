@@ -12,9 +12,8 @@ OpenSearch data on 2026-08-19. None of them is assumed. The verification that
 mattered is recorded next to each rule, because a correlation rule that selects
 an ID this Wazuh never emits is silently dead.
 
-Rules are global: `correlation_rule_versions` has no tenant_id, so activating
-one changes detection for every tenant. `--tenant-id` exists to attribute the
-audit record, not to scope the rule.
+`--tenant-id` selects whose detection changes. Rules are scoped per tenant
+(migration 0026), so activating one here affects that tenant and no other.
 
     python -m cyrvanta.load_correlation_rules --tenant-id <uuid> --list
     python -m cyrvanta.load_correlation_rules --tenant-id <uuid> --rule <code>
@@ -38,9 +37,8 @@ from cyrvanta.shared.database import tenant_session
 
 __all__ = ["RULES", "canonical"]
 
-# `window_minutes` is carried for shape consistency with the rules already
-# stored, but the engine windows on a fixed 10-minute UTC bucket
-# (BUCKET_MINUTES) and does not read this field today.
+# `window_minutes` is the real window length: the engine reads it per rule
+# since correlation moved to a sliding window.
 _COMMON: dict[str, Any] = {
     "threshold": 85,
     "window_minutes": 10,
@@ -185,6 +183,7 @@ async def load(tenant_id: UUID, code: str, *, apply: bool) -> None:
         active = (
             await session.scalars(
                 select(CorrelationRuleVersionModel).where(
+                    CorrelationRuleVersionModel.tenant_id == tenant_id,
                     CorrelationRuleVersionModel.rule_code == code,
                     CorrelationRuleVersionModel.status == "ACTIVE",
                 )

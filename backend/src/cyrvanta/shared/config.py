@@ -18,6 +18,13 @@ class Settings(BaseSettings):
     frontend_url: str = "http://localhost"
     cors_origins: str = "http://localhost,http://localhost:5173"
     database_url: str = "postgresql+asyncpg://cyrvanta:change-me@postgres:5432/cyrvanta"
+    # The application role deliberately does not own the schema, so it cannot
+    # run DDL: migrations connect as the owner instead. Without this the
+    # documented `make migrate` fails on any schema change with "must be owner
+    # of ...", which is a surprising way to discover it at deploy time.
+    # Falls back to database_url so a deployment that runs everything as one
+    # role keeps working.
+    database_admin_url: str | None = None
     redis_url: str = "redis://redis:6379/0"
     rabbitmq_url: str = "amqp://cyrvanta:change-me@rabbitmq:5672/"
     event_max_payload_bytes: int = Field(default=262_144, ge=1024, le=1_048_576)

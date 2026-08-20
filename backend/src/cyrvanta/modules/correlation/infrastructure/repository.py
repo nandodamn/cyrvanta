@@ -32,15 +32,23 @@ from cyrvanta.modules.integrations.infrastructure.models import FindingRevisionM
 
 
 class SqlCorrelationRepository:
-    def __init__(self, session: AsyncSession) -> None:
+    def __init__(self, session: AsyncSession, tenant_id: UUID | None = None) -> None:
         self._session = session
+        self._tenant_id = tenant_id
 
     async def active_rules(self) -> tuple[CorrelationRule, ...]:
+        # Row-level security already scopes this to the session's tenant. The
+        # explicit filter is not redundant: it states the intent at the call
+        # site, and it keeps the query correct if this ever runs on a session
+        # opened without a tenant context.
+        statement = select(CorrelationRuleVersionModel).where(
+            CorrelationRuleVersionModel.status == "ACTIVE"
+        )
+        if self._tenant_id is not None:
+            statement = statement.where(CorrelationRuleVersionModel.tenant_id == self._tenant_id)
         models = (
             await self._session.scalars(
-                select(CorrelationRuleVersionModel)
-                .where(CorrelationRuleVersionModel.status == "ACTIVE")
-                .order_by(
+                statement.order_by(
                     CorrelationRuleVersionModel.rule_code,
                     CorrelationRuleVersionModel.version,
                 )

@@ -175,7 +175,7 @@ async def run() -> None:
                 lambda event: handle_normalized_finding(
                     event,
                     CorrelationService(
-                        SqlCorrelationRepository(session),
+                        SqlCorrelationRepository(session, event.tenant_id),
                         IncidentCorrelationAdapter(session),
                         ClaimCorrelationAdapter(session),
                         store.recorder(session),

@@ -19,9 +19,17 @@ from cyrvanta.shared.database import Base
 
 class CorrelationRuleVersionModel(Base):
     __tablename__ = "correlation_rule_versions"
-    __table_args__ = (UniqueConstraint("rule_code", "version", name="uq_correlation_rule_version"),)
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "rule_code", "version", name="uq_correlation_rule_version"),
+    )
 
     id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
+    # A rule belongs to the tenant that detects with it. Without this a rule was
+    # global, which made publishing one from a tenant-scoped role impossible to
+    # do safely.
+    tenant_id: Mapped[UUID] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("tenants.id"), nullable=False
+    )
     rule_code: Mapped[str] = mapped_column(String(120), nullable=False)
     version: Mapped[str] = mapped_column(String(40), nullable=False)
     status: Mapped[str] = mapped_column(String(16), nullable=False)

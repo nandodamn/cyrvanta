@@ -15,7 +15,10 @@ from cyrvanta.shared.config import get_settings
 from cyrvanta.shared.database import Base
 
 config = context.config
-config.set_main_option("sqlalchemy.url", get_settings().database_url)
+_settings = get_settings()
+# Migrations run as the schema owner. The application role has DML rights only,
+# so DDL under it fails with "must be owner of ...".
+config.set_main_option("sqlalchemy.url", _settings.database_admin_url or _settings.database_url)
 if config.config_file_name:
     fileConfig(config.config_file_name)
 target_metadata = Base.metadata

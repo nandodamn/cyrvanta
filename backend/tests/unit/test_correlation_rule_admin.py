@@ -103,7 +103,7 @@ async def test_activating_a_version_retires_the_previous_one(scope) -> None:
         )
         await service.activate(tenant_id=tenant_id, actor_user_id=actor_id, version_id=second.id)
 
-        versions = {row.version: row.status for row in await service.list_versions(code)}
+        versions = {row.version: row.status for row in await service.list_versions(tenant_id, code)}
         assert versions == {"1": RETIRED, "2": ACTIVE}
 
 
@@ -124,7 +124,7 @@ async def test_only_one_version_of_a_rule_is_ever_active(scope) -> None:
                 definition=_definition(),
             )
             await service.activate(tenant_id=tenant_id, actor_user_id=actor_id, version_id=draft.id)
-        rows = await service.list_versions(code)
+        rows = await service.list_versions(tenant_id, code)
         assert [row.status for row in rows].count(ACTIVE) == 1
 
 
@@ -220,7 +220,7 @@ async def test_an_invalid_definition_never_reaches_the_database(scope) -> None:
                 version="1",
                 definition=_definition(grouping="asset_owner"),
             )
-        assert await service.list_versions(code) == []
+        assert await service.list_versions(tenant_id, code) == []
         assert (
             await session.scalar(
                 select(AuditEventModel.id)

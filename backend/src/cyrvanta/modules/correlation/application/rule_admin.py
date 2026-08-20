@@ -11,18 +11,12 @@ So validation here is deliberately double: the definition is checked field by
 field, and then parsed through the very same code the worker uses to load it
 (`SqlCorrelationRepository._rule`). If it validates, the engine can load it.
 
-Scope warning: `correlation_rule_versions` has no tenant_id. A rule is global,
-so publishing one changes detection for every tenant, while the only roles this
-system defines (`tenant-admin`, `viewer`) are tenant-scoped. `tenant_id` here
-attributes the audit record; it does not scope the change.
-
-That is why this service is reached from an operator script and not from an
-HTTP endpoint: exposing it under a permission granted to `tenant-admin` would
-let one tenant's administrator change detection for every other tenant, which
-multitenancy isolation forbids regardless of what any later spec asks for.
-Resolving it needs a decision recorded in
-`docs/specifications/PLAN_AUTOMATIC_INCIDENT_DETECTION.md` (Fase 4): either
-scope rules per tenant, or introduce a platform-operator role.
+Rules are scoped to a tenant (migration 0026). `tenant_id` both attributes the
+audit record and bounds the change, so publishing a rule affects only the
+tenant that publishes it. Before that a rule was global, which is why this
+service was reachable from an operator script alone: exposing it to a
+tenant-scoped role would have let one tenant change what every other tenant
+detects.
 """
 
 from __future__ import annotations
@@ -146,10 +140,13 @@ def validate_definition(definition: Any) -> None:
         raise RuleDefinitionInvalid(f"window_minutes must not exceed {MAX_WINDOW_MINUTES}")
 
 
-def _parses_in_the_engine(rule_code: str, version: str, definition: Mapping[str, Any]) -> None:
+def _parses_in_the_engine(
+    tenant_id: UUID, rule_code: str, version: str, definition: Mapping[str, Any]
+) -> None:
     _text, digest = canonical(definition)
     # Built but never added to a session: this is a parse check, not a write.
     probe = CorrelationRuleVersionModel(
+        tenant_id=tenant_id,
         rule_code=rule_code,
         version=version,
         definition=dict(definition),
@@ -162,15 +159,17 @@ def _parses_in_the_engine(rule_code: str, version: str, definition: Mapping[str,
 
 
 class CorrelationRuleAdminService:
-    """Operator-facing. Not reachable from a tenant HTTP request by design."""
+    """Every operation is bound to one tenant and cannot reach another's rules."""
 
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
 
     async def list_versions(
-        self, rule_code: str | None = None
+        self, tenant_id: UUID, rule_code: str | None = None
     ) -> list[CorrelationRuleVersionModel]:
-        statement = select(CorrelationRuleVersionModel)
+        statement = select(CorrelationRuleVersionModel).where(
+            CorrelationRuleVersionModel.tenant_id == tenant_id
+        )
         if rule_code is not None:
             statement = statement.where(CorrelationRuleVersionModel.rule_code == rule_code)
         rows = await self._session.scalars(
@@ -193,11 +192,12 @@ class CorrelationRuleAdminService:
         if not rule_code or not version:
             raise RuleDefinitionInvalid("rule_code and version are required")
         validate_definition(definition)
-        _parses_in_the_engine(rule_code, version, definition)
+        _parses_in_the_engine(tenant_id, rule_code, version, definition)
         _text, digest = canonical(definition)
 
         existing = await self._session.scalar(
             select(CorrelationRuleVersionModel).where(
+                CorrelationRuleVersionModel.tenant_id == tenant_id,
                 CorrelationRuleVersionModel.rule_code == rule_code,
                 CorrelationRuleVersionModel.version == version,
             )
@@ -206,6 +206,7 @@ class CorrelationRuleAdminService:
             raise RuleVersionConflict(f"{rule_code} version {version} already exists")
 
         model = CorrelationRuleVersionModel(
+            tenant_id=tenant_id,
             rule_code=rule_code,
             version=version,
             status=DRAFT,
@@ -227,7 +228,9 @@ class CorrelationRuleAdminService:
         self, *, tenant_id: UUID, actor_user_id: UUID, version_id: UUID
     ) -> CorrelationRuleVersionModel:
         model = await self._session.get(CorrelationRuleVersionModel, version_id)
-        if model is None:
+        # A version from another tenant is reported as absent rather than
+        # refused: whether it exists is not this tenant's business.
+        if model is None or model.tenant_id != tenant_id:
             raise RuleVersionNotFound(str(version_id))
         if model.status == ACTIVE:
             return model
@@ -243,6 +246,7 @@ class CorrelationRuleAdminService:
             (
                 await self._session.scalars(
                     select(CorrelationRuleVersionModel).where(
+                        CorrelationRuleVersionModel.tenant_id == tenant_id,
                         CorrelationRuleVersionModel.rule_code == model.rule_code,
                         CorrelationRuleVersionModel.status == ACTIVE,
                     )
@@ -252,6 +256,7 @@ class CorrelationRuleAdminService:
         await self._session.execute(
             update(CorrelationRuleVersionModel)
             .where(
+                CorrelationRuleVersionModel.tenant_id == tenant_id,
                 CorrelationRuleVersionModel.rule_code == model.rule_code,
                 CorrelationRuleVersionModel.status == ACTIVE,
             )
@@ -276,7 +281,7 @@ class CorrelationRuleAdminService:
         self, *, tenant_id: UUID, actor_user_id: UUID, version_id: UUID
     ) -> CorrelationRuleVersionModel:
         model = await self._session.get(CorrelationRuleVersionModel, version_id)
-        if model is None:
+        if model is None or model.tenant_id != tenant_id:
             raise RuleVersionNotFound(str(version_id))
         if model.status == RETIRED:
             return model

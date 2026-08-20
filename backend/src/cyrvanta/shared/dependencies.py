@@ -116,3 +116,42 @@ async def is_authorized(context: SecurityContext, permission_code: str) -> bool:
             .limit(1)
         )
     return granted is not None
+
+
+async def granted_permissions(context: SecurityContext) -> frozenset[str]:
+    """Every permission this user holds, in one query.
+
+    Contextual authorization has to weigh several permissions at once -- may
+    they resolve, may they close, do they own the case -- and asking the
+    database once per permission turns one decision into half a dozen round
+    trips.
+    """
+    async with tenant_session(context.tenant_id) as session:
+        codes = await session.scalars(
+            select(PermissionModel.code)
+            .join(
+                RolePermissionModel,
+                RolePermissionModel.permission_id == PermissionModel.id,
+            )
+            .join(
+                UserRoleModel,
+                and_(
+                    UserRoleModel.role_id == RolePermissionModel.role_id,
+                    UserRoleModel.tenant_id == RolePermissionModel.tenant_id,
+                ),
+            )
+            .join(
+                UserModel,
+                and_(
+                    UserModel.id == UserRoleModel.user_id,
+                    UserModel.tenant_id == UserRoleModel.tenant_id,
+                ),
+            )
+            .where(
+                UserRoleModel.tenant_id == context.tenant_id,
+                RolePermissionModel.tenant_id == context.tenant_id,
+                UserRoleModel.user_id == context.user_id,
+                UserModel.is_active.is_(True),
+            )
+        )
+        return frozenset(codes.all())

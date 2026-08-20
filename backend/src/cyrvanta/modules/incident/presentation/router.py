@@ -17,6 +17,7 @@ from cyrvanta.modules.incident.application.schemas import (
     TimelineResponse,
 )
 from cyrvanta.modules.incident.application.service import (
+    ActionNotAllowed,
     AlertNotFound,
     AlertSort,
     IncidentConflict,
@@ -28,6 +29,7 @@ from cyrvanta.shared.dependencies import (
     SecurityContext,
     authorize,
     get_security_context,
+    granted_permissions,
     require_permission,
 )
 
@@ -56,6 +58,10 @@ def translate_error(exc: Exception) -> HTTPException:
         # An alert belonging to another tenant is reported as absent, not
         # refused: whether it exists is not this tenant's business.
         return HTTPException(status.HTTP_404_NOT_FOUND, "Resource not found")
+    if isinstance(exc, ActionNotAllowed):
+        # 403 with the reason: refused because of who the caller is to this
+        # incident, not because the request was malformed.
+        return HTTPException(status.HTTP_403_FORBIDDEN, exc.reason.value)
     if isinstance(exc, IncidentConflict):
         return HTTPException(status.HTTP_409_CONFLICT, "Incident version conflict")
     return HTTPException(status.HTTP_409_CONFLICT, "Invalid incident transition")
@@ -201,10 +207,33 @@ async def transition_incident(
             incident_id,
             payload,
             correlation_id(request),
+            await granted_permissions(context),
         )
-    except (IncidentNotFound, IncidentConflict, InvalidTransition) as exc:
+    except (IncidentNotFound, IncidentConflict, InvalidTransition, ActionNotAllowed) as exc:
         raise translate_error(exc) from exc
     return IncidentResponse.model_validate(incident)
+
+
+@router.get("/incidents/{incident_id}/actions", response_model=list[str])
+async def list_incident_actions(
+    incident_id: UUID,
+    context: IncidentRead,
+    service: Service,
+) -> list[str]:
+    """Exactly what the caller may do to this incident, right now.
+
+    The interface builds its menu from this instead of deciding for itself,
+    which keeps one set of rules rather than two that drift apart.
+    """
+    try:
+        return await service.available_actions(
+            context.tenant_id,
+            incident_id,
+            context.user_id,
+            await granted_permissions(context),
+        )
+    except IncidentNotFound as exc:
+        raise translate_error(exc) from exc
 
 
 @router.post("/incidents/{incident_id}/assign", response_model=IncidentResponse)

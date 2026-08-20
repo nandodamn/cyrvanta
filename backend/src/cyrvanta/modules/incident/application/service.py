@@ -19,6 +19,14 @@ from cyrvanta.modules.incident.application.schemas import (
     Severity,
     TimelineCreate,
 )
+from cyrvanta.modules.incident.domain.authorization import (
+    Actor,
+    Denial,
+    IncidentAction,
+    IncidentFacts,
+    allowed_actions,
+    can,
+)
 from cyrvanta.modules.incident.infrastructure.models import (
     AlertReferenceModel,
     IncidentAlertModel,
@@ -30,6 +38,18 @@ from cyrvanta.shared.database import tenant_session
 
 class IncidentNotFound(Exception):
     pass
+
+
+class ActionNotAllowed(Exception):
+    """Refused by a contextual rule rather than by a missing permission.
+
+    Carries the reason so the caller can say which one it was: "you own this
+    case" and "you lack the permission" send someone to different places.
+    """
+
+    def __init__(self, reason: Denial) -> None:
+        super().__init__(reason.value)
+        self.reason = reason
 
 
 class AlertNotFound(Exception):
@@ -354,6 +374,27 @@ class IncidentService:
 
         return await self.list_incident_alerts(tenant_id, incident_id)
 
+    async def available_actions(
+        self,
+        tenant_id: UUID,
+        incident_id: UUID,
+        actor_id: UUID,
+        permissions: frozenset[str],
+    ) -> list[str]:
+        """What this person can do to this incident, decided server-side.
+
+        The interface asks rather than working it out, so there is one set of
+        rules instead of two that can drift apart -- and so an action is never
+        offered and then refused.
+        """
+        async with tenant_session(tenant_id) as session:
+            incident = await self._get(session, incident_id)
+            facts = IncidentFacts(
+                status=incident.status, assignee_user_id=incident.assignee_user_id
+            )
+        actor = Actor(user_id=actor_id, permissions=permissions)
+        return [action.value for action in allowed_actions(actor, facts)]
+
     async def update_incident(
         self,
         tenant_id: UUID,
@@ -392,11 +433,24 @@ class IncidentService:
         incident_id: UUID,
         payload: IncidentTransition,
         correlation_id: UUID,
+        permissions: frozenset[str] = frozenset(),
     ) -> IncidentModel:
         now = datetime.now(UTC)
         async with tenant_session(tenant_id) as session:
             incident = await self._get(session, incident_id)
             self._expect_version(incident, payload.expected_version)
+            # The permission was already checked by the router; this is the
+            # part configuration cannot loosen -- whether this person may make
+            # this move on this incident.
+            decision = can(
+                Actor(user_id=actor_id, permissions=permissions),
+                IncidentFacts(status=incident.status, assignee_user_id=incident.assignee_user_id),
+                IncidentAction(f"transition:{payload.target_status}"),
+            )
+            if not decision.allowed:
+                if decision.reason is Denial.INVALID_TRANSITION:
+                    raise InvalidTransition
+                raise ActionNotAllowed(decision.reason or Denial.MISSING_PERMISSION)
             if payload.target_status not in TRANSITIONS.get(incident.status, set()):
                 raise InvalidTransition
             if payload.target_status in {"closed", "reopened"} and not payload.reason:

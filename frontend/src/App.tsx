@@ -2250,7 +2250,19 @@ function IncidentDetailPage() {
                   ["AWAITING_APPROVAL", "AUTHORIZED"].includes(item.status),
                 );
                 return (
-                  <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+                  // alignItems matters here: the label stacks a caption above
+                  // its select, so it is two lines tall. Left to stretch, the
+                  // button grew to match that height and read as the biggest
+                  // control on the page -- which it is not, and which made a
+                  // proposal look like an execution.
+                  <div
+                    style={{
+                      display: "flex",
+                      gap: "10px",
+                      flexWrap: "wrap",
+                      alignItems: "flex-end",
+                    }}
+                  >
                     <label>
                       <span className="muted">{t("selectReadyPlaybook")}</span>
                       <select

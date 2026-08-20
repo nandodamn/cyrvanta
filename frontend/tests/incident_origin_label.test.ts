@@ -20,6 +20,18 @@ describe("incident provenance is legible", () => {
     }
   });
 
+  it("does not name a person or a role it cannot know", () => {
+    // The prefix records that a human opened the case, not which human or
+    // what they are. An incident a supervisor logged read "logged by an
+    // analyst", which is an attribution the value cannot support -- in the
+    // one product whose argument is that its record can be trusted.
+    // Authorship belongs to the history, which knows it properly.
+    for (const role of ["analista", "analyst", "supervisor", "auditor"]) {
+      expect(i18n).not.toContain(`incidentOriginManual: "Registrado por ${role}`);
+      expect(i18n.toLowerCase()).not.toContain(`incidentoriginmanual: "logged by an ${role}`);
+    }
+  });
+
   it("no longer offers to create a *real* incident", () => {
     // The wording only made sense against simulated incidents, which no longer
     // exist. To a client it advertised a demo mode and invited the question of

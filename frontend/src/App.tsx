@@ -473,6 +473,15 @@ function Layout() {
  * entity-risk sweep, INC- for one an analyst logged -- but only to someone who
  * knew the convention. An analyst reading the list should not have to.
  */
+/** Where an incident came from -- not who created it.
+ *
+ * The distinction matters: this is read off the code prefix, which records
+ * whether a person opened the case or a rule did, and nothing about which
+ * person or what role they hold. A label that named one would be an
+ * attribution the value cannot support, in the one product whose argument is
+ * that its record can be trusted. Authorship lives in the history, which
+ * knows it properly.
+ */
 function incidentOriginKey(code: string): string {
   if (code.startsWith("CORR-")) return "incidentOriginCorrelated";
   if (code.startsWith("RISK-")) return "incidentOriginRisk";

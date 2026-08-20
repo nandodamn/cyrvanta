@@ -4,6 +4,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
+from cyrvanta.modules.incident.domain.resolution import TechnicalSlot
+
 ClaimTypeInput = Literal["FACT", "DERIVED_FACT", "INFERENCE", "HYPOTHESIS", "RECOMMENDATION"]
 EvidenceTypeInput = Literal[
     "FINDING_REVISION",
@@ -38,6 +40,10 @@ class ClaimCreate(BaseModel):
     method_code: str | None = Field(default=None, max_length=120)
     method_version: str | None = Field(default=None, max_length=80)
     evidence: list[EvidenceInput] = Field(min_length=1, max_length=32)
+    # Which part of the incident's technical file this entry fills, if any. The
+    # entry is an ordinary claim -- it keeps its evidence, its assessments and
+    # its author -- and the slot is only what the case is answering with it.
+    technical_slot: TechnicalSlot | None = None
 
 
 class AssessmentCreate(BaseModel):

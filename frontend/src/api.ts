@@ -844,6 +844,11 @@ export async function linkIncidentAlerts(
     }),
   );
 }
+export async function getResolutionReadiness(id: string): Promise<string[]> {
+  return z
+    .array(z.string())
+    .parse(await authorized(`/api/v1/incidents/${id}/resolution-readiness`));
+}
 export async function getIncidentActions(id: string): Promise<string[]> {
   return z.array(z.string()).parse(await authorized(`/api/v1/incidents/${id}/actions`));
 }
@@ -923,6 +928,7 @@ export async function createHumanClaim(
     missing_evidence: string[];
     method_code: string | null;
     method_version: string | null;
+    technical_slot?: string | null;
     evidence: Array<{
       evidence_type: "ALERT_REFERENCE" | "INCIDENT" | "INCIDENT_TIMELINE_ENTRY" | "CLAIM";
       evidence_id: string;

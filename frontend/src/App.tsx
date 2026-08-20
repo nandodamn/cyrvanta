@@ -16,6 +16,7 @@ import {
   createRole,
   createIncident,
   createHumanClaim,
+  type Claim,
   createUser,
   proposePlaybookAction,
   decideResponse,
@@ -38,6 +39,7 @@ import {
   getIncidentActions,
   getIncidentAlerts,
   getIncidentHistory,
+  getResolutionReadiness,
   getIncidentEnrichment,
   getIncidents,
   getMe,
@@ -767,6 +769,173 @@ export function PermissionMatrix({
  * not as they are now -- someone who has since stopped owning the case must
  * still appear as its owner on the day they acted.
  */
+// Slots the resolution gate actually weighs, in the order the case is worked:
+// what happened, why, what was done. The technical file can hold more, but a
+// form long enough to be resented is one people learn to fill with nothing.
+const REQUIRED_SLOTS = [
+  { slot: "diagnosis", requirement: "diagnosis", claimType: "INFERENCE" as const },
+  { slot: "root_cause", requirement: "root_cause", claimType: "INFERENCE" as const },
+  {
+    slot: "root_cause_undetermined",
+    requirement: "root_cause",
+    claimType: "INFERENCE" as const,
+  },
+  { slot: "resolution", requirement: "resolution", claimType: "FACT" as const },
+];
+
+function TechnicalFile({
+  incidentId,
+  claims,
+  evidenceOptions,
+}: {
+  incidentId: string;
+  claims: Claim[];
+  evidenceOptions: Array<{
+    key: string;
+    type: "ALERT_REFERENCE" | "INCIDENT" | "INCIDENT_TIMELINE_ENTRY" | "CLAIM";
+    id: string;
+    label: string;
+  }>;
+}) {
+  const { t, i18n } = useTranslation();
+  const queryClient = useQueryClient();
+  const [slot, setSlot] = useState("diagnosis");
+  const [statement, setStatement] = useState("");
+  const [evidenceKey, setEvidenceKey] = useState("");
+
+  const readiness = useQuery({
+    queryKey: ["resolution-readiness", incidentId, claims.length],
+    queryFn: () => getResolutionReadiness(incidentId),
+  });
+
+  const filed = new Map(
+    claims
+      .filter((claim) => claim.origin_code?.startsWith("technical-file:"))
+      .map((claim) => [claim.origin_code!.slice("technical-file:".length), claim]),
+  );
+  const missing = new Set(readiness.data ?? []);
+  const evidence = evidenceOptions.find((option) => option.key === evidenceKey);
+
+  const file = useMutation({
+    mutationFn: () => {
+      if (!evidence) throw new Error("CLAIM_EVIDENCE_REQUIRED");
+      const chosen = REQUIRED_SLOTS.find((entry) => entry.slot === slot);
+      return createHumanClaim(incidentId, {
+        claim_type: chosen?.claimType ?? "INFERENCE",
+        statement: statement.trim(),
+        language_code: i18n.language.startsWith("es") ? "es" : "en",
+        // An inference states what the analyst concluded, not something read
+        // off a log, so it carries how sure they are of it.
+        confidence: chosen?.claimType === "INFERENCE" ? 0.7 : null,
+        explanation: chosen?.claimType === "INFERENCE" ? statement.trim() : null,
+        validation_criteria: null,
+        missing_evidence: [],
+        method_code: null,
+        method_version: null,
+        technical_slot: slot,
+        evidence: [
+          { evidence_type: evidence.type, evidence_id: evidence.id, relationship: "SUPPORTS" },
+        ],
+      });
+    },
+    onSuccess: async () => {
+      setStatement("");
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["claims", incidentId] }),
+        queryClient.invalidateQueries({ queryKey: ["resolution-readiness", incidentId] }),
+        queryClient.invalidateQueries({ queryKey: ["incident-actions", incidentId] }),
+      ]);
+    },
+  });
+
+  // Named requirements, not a free-text warning: the analyst is told what to go
+  // and do rather than pressing resolve and being refused.
+  const requirements = ["diagnosis", "root_cause", "resolution", "technical_note", "evidence"];
+
+  return (
+    <section className="panel">
+      <div>
+        <p className="eyebrow">{t("traceability")}</p>
+        <h2>{t("technicalFile")}</h2>
+        <p>{t("technicalFileIntro")}</p>
+      </div>
+      <ul className="readiness-list">
+        {requirements.map((requirement) => {
+          const done = !missing.has(requirement);
+          return (
+            <li key={requirement} className={done ? "is-done" : "is-pending"}>
+              <span aria-hidden="true">{done ? "✓" : "○"}</span>
+              <span>{t(`resolutionRequirement.${requirement}`)}</span>
+            </li>
+          );
+        })}
+      </ul>
+      {readiness.data?.length === 0 && <p className="readiness-ready">{t("resolutionReady")}</p>}
+      <details style={{ marginTop: "1rem" }}>
+        <summary>{t("technicalFileAdd")}</summary>
+        <form
+          className="form-grid"
+          style={{ marginTop: "1rem" }}
+          onSubmit={(event) => {
+            event.preventDefault();
+            file.mutate();
+          }}
+        >
+          <label>
+            {t("technicalFileSlot")}
+            <select value={slot} onChange={(event) => setSlot(event.target.value)}>
+              {REQUIRED_SLOTS.map((entry) => (
+                <option key={entry.slot} value={entry.slot}>
+                  {t(`technicalSlot.${entry.slot}`)}
+                  {filed.has(entry.slot) ? ` · ${t("technicalFileFiled")}` : ""}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            {t("claimEvidence")}
+            <select value={evidenceKey} onChange={(event) => setEvidenceKey(event.target.value)}>
+              <option value="">{t("selectOption")}</option>
+              {evidenceOptions.map((option) => (
+                <option key={option.key} value={option.key}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label style={{ gridColumn: "1 / -1" }}>
+            {t("technicalFileStatement")}
+            <textarea
+              required
+              minLength={1}
+              maxLength={2000}
+              rows={3}
+              value={statement}
+              onChange={(event) => setStatement(event.target.value)}
+            />
+          </label>
+          <button type="submit" disabled={file.isPending || !evidence}>
+            {t("technicalFileAdd")}
+          </button>
+          {file.isError && (
+            <p className="form-error" role="alert">
+              {t("actionError")}
+            </p>
+          )}
+        </form>
+      </details>
+      <ul className="technical-file-entries">
+        {[...filed.entries()].map(([entrySlot, claim]) => (
+          <li key={claim.id}>
+            <p className="eyebrow">{t(`technicalSlot.${entrySlot}`)}</p>
+            <p>{claim.statement}</p>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 function IncidentHistory({ incidentId }: { incidentId: string }) {
   const { t } = useTranslation();
   const history = useQuery({
@@ -3851,6 +4020,11 @@ function IncidentDetailPage() {
         <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
           {/* First, because it is the record of the case itself; the playbook
               decisions below are one kind of event within it. */}
+          <TechnicalFile
+            incidentId={id}
+            claims={claims.data ?? []}
+            evidenceOptions={claimEvidenceOptions}
+          />
           <IncidentHistory incidentId={id} />
           <section className="panel">
             <div>

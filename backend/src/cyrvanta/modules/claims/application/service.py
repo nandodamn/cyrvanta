@@ -140,6 +140,12 @@ class ClaimService:
                 not payload.method_code or not payload.method_version
             ):
                 raise ClaimConflict("Derived facts require method code and version")
+            # A claim records what produced it. A derived fact was produced by a
+            # named method; a technical-file entry was produced by a person
+            # answering one of the case's questions. One claim cannot be both,
+            # and quietly keeping one of the two would lose the other.
+            if payload.technical_slot and claim_type is ClaimType.DERIVED_FACT:
+                raise ClaimConflict("A technical file entry cannot be a derived fact")
             if claim_type is ClaimType.FACT and not any(
                 EvidenceType(item.evidence_type)
                 in {
@@ -161,7 +167,11 @@ class ClaimService:
                 confidence=payload.confidence,
                 origin_type=ClaimOriginType.HUMAN,
                 origin_actor_user_id=actor_user_id,
-                origin_code=payload.method_code,
+                origin_code=(
+                    payload.technical_slot.origin_code
+                    if payload.technical_slot
+                    else payload.method_code
+                ),
                 origin_version=payload.method_version,
                 provider=None,
                 model=None,

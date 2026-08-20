@@ -2759,3 +2759,60 @@ details > .admin-list {
   color: var(--text-soft);
   font-size: 0.85rem;
 }
+
+/* The checklist is read before acting, so what is done and what is missing
+   have to be distinguishable at a glance rather than after reading five
+   lines of similar text. */
+.readiness-list {
+  list-style: none;
+  margin: 1rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.readiness-list li {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  font-size: 0.92rem;
+}
+
+.readiness-list li span:first-child {
+  font-weight: 700;
+}
+
+.readiness-list .is-done {
+  color: var(--text-muted, #94a3b8);
+}
+
+.readiness-list .is-done span:first-child {
+  color: #22c55e;
+}
+
+.readiness-list .is-pending span:first-child {
+  color: #f59e0b;
+}
+
+.readiness-ready {
+  margin: 0.75rem 0 0;
+  color: #22c55e;
+  font-size: 0.9rem;
+}
+
+.technical-file-entries {
+  list-style: none;
+  margin: 1rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.technical-file-entries li {
+  border-left: 2px solid var(--border, #1f2937);
+  padding-left: 0.75rem;
+}
+
+.technical-file-entries p:last-child {
+  margin: 0.15rem 0 0;
+}

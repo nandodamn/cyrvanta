@@ -2685,24 +2685,6 @@ details > .admin-list {
   text-transform: uppercase;
 }
 
-/* The signed-in person's roles, under their name. Muted: it is context for
-   what the interface will let them do, not a heading. */
-.session-roles {
-  margin: 2px 0 0;
-  color: var(--accent);
-  font:
-    700 10px "Space Mono",
-    monospace;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-
-/* Someone with no role can sign in and do nothing, so this states it rather
-   than leaving an empty space that reads as "still loading". */
-.session-roles.is-empty {
-  color: var(--warning, #e0a458);
-}
-
 /* The incident's record. One line per event, newest first. */
 .history-list {
   list-style: none;
@@ -2868,4 +2850,124 @@ details > .admin-list {
 
 .review-guidance {
   color: var(--text-muted, #94a3b8);
+}
+
+/* The account button and its menu.
+   Identity used to sit in the page-title slot with a constant eyebrow above
+   and the roles in accent caps below -- three lines around the one that
+   mattered, in the place the eye reads as the name of the screen. */
+.account {
+  position: relative;
+}
+
+.account-button {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.3rem 0.65rem 0.3rem 0.3rem;
+  border: 1px solid var(--border, #1f2937);
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.account-button:hover,
+.account-button[aria-expanded="true"] {
+  border-color: var(--accent);
+}
+
+.account-initials {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #06121f;
+  font:
+    700 11px "Space Mono",
+    monospace;
+}
+
+.account-name {
+  font-size: 0.88rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* The name alone is enough on a narrow screen; the initials carry it. */
+@media (max-width: 640px) {
+  .account-name {
+    display: none;
+  }
+}
+
+.account-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 40;
+  min-width: 240px;
+  padding: 0.85rem;
+  border: 1px solid var(--border, #1f2937);
+  border-radius: 10px;
+  background: var(--surface, #0b1622);
+  box-shadow: 0 12px 32px rgb(0 0 0 / 35%);
+  display: grid;
+  gap: 0.75rem;
+}
+
+.account-identity strong {
+  display: block;
+}
+
+.account-identity span {
+  font-size: 0.82rem;
+  color: var(--muted);
+  word-break: break-all;
+}
+
+.account-label {
+  margin: 0 0 0.3rem;
+  font:
+    700 10px "Space Mono",
+    monospace;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.account-section select {
+  width: 100%;
+}
+
+/* One role per line, in its own case: holding two is allowed and is exactly
+   the case worth reading carefully. */
+.account-roles {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.15rem;
+  font-size: 0.88rem;
+}
+
+/* Someone with no role can sign in and do nothing, so this states it rather
+   than leaving an empty space that reads as "still loading". */
+.account-no-role {
+  margin: 0;
+  font-size: 0.88rem;
+  color: var(--warning, #e0a458);
+}
+
+.account-actions {
+  display: flex;
+  gap: 0.5rem;
+  border-top: 1px solid var(--border, #1f2937);
+  padding-top: 0.7rem;
+}
+
+.account-actions button {
+  flex: 1;
 }

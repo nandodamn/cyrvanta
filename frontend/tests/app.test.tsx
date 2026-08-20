@@ -78,6 +78,8 @@ describe("protected application", () => {
     expect(await screen.findByRole("link", { name: /incidentes|incidents/i })).toBeVisible();
     expect(screen.getByRole("link", { name: /playbooks/i })).toBeVisible();
     expect(screen.getByRole("link", { name: /auditoría|audit/i })).toBeVisible();
+    // The theme switch lives with the account controls now, one click deeper.
+    fireEvent.click(screen.getByRole("button", { expanded: false }));
     const themeButton = screen.getByRole("button", { name: /tema claro|light theme/i });
     fireEvent.click(themeButton);
     expect(document.documentElement).toHaveClass("light");

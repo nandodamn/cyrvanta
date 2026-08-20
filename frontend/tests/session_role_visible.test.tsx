@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -47,29 +47,56 @@ function signedInAs(roles: { code: string; name: string }[]) {
   );
 }
 
-describe("the signed-in person's role is visible", () => {
+describe("the signed-in person is identifiable", () => {
   beforeEach(() => sessionStorage.clear());
   afterEach(() => {
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
   });
 
+  const openAccount = async () => {
+    fireEvent.click(await screen.findByRole("button", { expanded: false }));
+  };
+
+  it("shows who is signed in without being asked", async () => {
+    // The name used to sit in the page-title slot, where it read as the name
+    // of the screen rather than of the person. It has to be legible at rest.
+    signedInAs([{ code: "soc-analyst", name: "Analista SOC" }]);
+
+    expect(await screen.findByText("Quien Sea")).toBeVisible();
+  });
+
   it("names every role the session holds", async () => {
     // Every one of them: holding two is allowed, and that is exactly the case
     // worth seeing, because it concentrates duties the product separates.
+    // One per line rather than run together, so both can be read.
     signedInAs([
       { code: "soc-analyst", name: "Analista SOC" },
       { code: "soc-supervisor", name: "Supervisor SOC" },
     ]);
+    await openAccount();
 
-    expect(await screen.findByText("Analista SOC · Supervisor SOC")).toBeVisible();
+    expect(await screen.findByText("Analista SOC")).toBeVisible();
+    expect(screen.getByText("Supervisor SOC")).toBeVisible();
   });
 
   it("says so when the session holds no role at all", async () => {
     // Not a cosmetic gap: such a user can sign in and do nothing, which is how
     // one of them went unnoticed in this very deployment.
     signedInAs([]);
+    await openAccount();
 
     expect(await screen.findByText(/sin rol asignado|no role assigned/i)).toBeVisible();
+  });
+
+  it("keeps signing out reachable, one click deeper", async () => {
+    // Moving the account controls behind a menu must not strand anyone in a
+    // session they cannot leave.
+    signedInAs([{ code: "soc-analyst", name: "Analista SOC" }]);
+    await openAccount();
+
+    expect(
+      screen.getByRole("button", { name: /cerrar sesion|cerrar sesión|sign out/i }),
+    ).toBeVisible();
   });
 });

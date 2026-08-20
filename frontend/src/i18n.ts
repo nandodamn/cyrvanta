@@ -31,6 +31,7 @@ const resources = {
       password: "Contraseña",
       rememberSession: "Recordar sesión en este equipo",
       securityOperations: "Operaciones de seguridad",
+      yourRoles: "Tus roles",
       noRoleAssigned: "Sin rol asignado",
       resolutionReview: "Revision de la resolucion",
       resolutionReviewBy:
@@ -828,6 +829,7 @@ const resources = {
       password: "Password",
       rememberSession: "Remember session on this device",
       securityOperations: "Security operations",
+      yourRoles: "Your roles",
       noRoleAssigned: "No role assigned",
       resolutionReview: "Resolution review",
       resolutionReviewBy:

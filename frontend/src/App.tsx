@@ -17,6 +17,7 @@ import {
   createIncident,
   createHumanClaim,
   type Claim,
+  type CurrentUser,
   createUser,
   proposePlaybookAction,
   decideResponse,
@@ -422,47 +423,148 @@ function Layout() {
               width="42"
               height="42"
             />
-            <div>
-              <p className="eyebrow">{t("securityOperations")}</p>
-              <strong>{me.data?.display_name ?? t("loading")}</strong>
-              {/* Which hat the person is wearing. It was nowhere on screen,
-                  and once an action depends on the role it is not something
-                  someone should have to infer from which buttons work. All of
-                  them are listed, because holding two is allowed and is
-                  exactly the case worth seeing. */}
-              {me.data &&
-                (me.data.roles?.length ? (
-                  <p className="session-roles">
-                    {me.data.roles.map((role) => role.name).join(" · ")}
-                  </p>
-                ) : (
-                  // Not a cosmetic gap: a user with no role can sign in and do
-                  // nothing at all, which is how one went unnoticed here.
-                  <p className="session-roles is-empty">{t("noRoleAssigned")}</p>
-                ))}
-            </div>
           </div>
           <div className="actions">
-            <select
-              aria-label={t("language")}
-              value={i18n.language.slice(0, 2)}
-              onChange={(e) => setLanguage(e.target.value)}
-            >
-              <option value="es">ES</option>
-              <option value="en">EN</option>
-            </select>
-            <button className="ghost" type="button" aria-pressed={lightTheme} onClick={toggleTheme}>
-              {lightTheme ? t("darkTheme") : t("lightTheme")}
-            </button>
-            <button className="ghost" type="button" onClick={() => void signOut()}>
-              {t("signOut")}
-            </button>
+            <AccountMenu
+              me={me.data}
+              language={i18n.language}
+              onLanguage={setLanguage}
+              lightTheme={lightTheme}
+              onToggleTheme={toggleTheme}
+              onSignOut={() => void signOut()}
+            />
           </div>
         </header>
         <main className="content">
           <Outlet />
         </main>
       </section>
+    </div>
+  );
+}
+
+/** Initials for the account button.
+ *
+ * Two letters from the name, or the first of the email when there is no name
+ * to take them from -- never an empty circle, which reads as a failed avatar.
+ */
+function initials(name: string, email: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length >= 2) return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return email.slice(0, 1).toUpperCase();
+}
+
+/** Who is signed in, and the settings that belong to them.
+ *
+ * This used to sit in the page-title slot on the left, with a constant eyebrow
+ * above it and the roles shouted in accent caps below. Three lines around the
+ * one thing that mattered, in the place the eye reads as "the name of this
+ * screen" -- so the person's own name did not register as their own.
+ *
+ * It belongs where every other tool puts it and where the account-level
+ * controls already were: top right, behind the person's initials.
+ */
+function AccountMenu({
+  me,
+  language,
+  onLanguage,
+  lightTheme,
+  onToggleTheme,
+  onSignOut,
+}: {
+  me: CurrentUser | undefined;
+  language: string;
+  onLanguage: (value: string) => void;
+  lightTheme: boolean;
+  onToggleTheme: () => void;
+  onSignOut: () => void;
+}) {
+  const { t } = useTranslation();
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onOutside = (event: MouseEvent) => {
+      if (!containerRef.current?.contains(event.target as Node)) setOpen(false);
+    };
+    const onEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("mousedown", onOutside);
+    document.addEventListener("keydown", onEscape);
+    return () => {
+      document.removeEventListener("mousedown", onOutside);
+      document.removeEventListener("keydown", onEscape);
+    };
+  }, [open]);
+
+  return (
+    <div className="account" ref={containerRef}>
+      <button
+        type="button"
+        className="account-button"
+        aria-expanded={open}
+        aria-haspopup="menu"
+        onClick={() => setOpen((current) => !current)}
+      >
+        <span className="account-initials" aria-hidden="true">
+          {me ? initials(me.display_name, me.email) : "·"}
+        </span>
+        <span className="account-name">{me?.display_name ?? t("loading")}</span>
+      </button>
+      {open && (
+        <div className="account-panel" role="menu">
+          <div className="account-identity">
+            <strong>{me?.display_name}</strong>
+            <span>{me?.email}</span>
+          </div>
+          <div className="account-section">
+            <p className="account-label">{t("yourRoles")}</p>
+            {me?.roles?.length ? (
+              // One per line, in their own case. Holding two roles is allowed
+              // and is exactly the case worth reading carefully, which a
+              // single uppercase run of names does not let you do.
+              <ul className="account-roles">
+                {me.roles.map((role) => (
+                  <li key={role.code}>{role.name}</li>
+                ))}
+              </ul>
+            ) : (
+              // Not a cosmetic gap: a user with no role can sign in and do
+              // nothing at all, which is how one went unnoticed here.
+              <p className="account-no-role">{t("noRoleAssigned")}</p>
+            )}
+          </div>
+          <div className="account-section">
+            <label className="account-label" htmlFor="account-language">
+              {t("language")}
+            </label>
+            <select
+              id="account-language"
+              value={language.slice(0, 2)}
+              onChange={(event) => onLanguage(event.target.value)}
+            >
+              <option value="es">Español</option>
+              <option value="en">English</option>
+            </select>
+          </div>
+          <div className="account-actions">
+            <button
+              type="button"
+              className="ghost"
+              aria-pressed={lightTheme}
+              onClick={onToggleTheme}
+            >
+              {lightTheme ? t("darkTheme") : t("lightTheme")}
+            </button>
+            <button type="button" className="ghost" onClick={onSignOut}>
+              {t("signOut")}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

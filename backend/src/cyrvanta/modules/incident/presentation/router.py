@@ -28,6 +28,7 @@ from cyrvanta.modules.incident.application.service import (
     IncidentNotFound,
     IncidentService,
     InvalidTransition,
+    ResolutionIncomplete,
 )
 from cyrvanta.shared.dependencies import (
     SecurityContext,
@@ -62,6 +63,13 @@ def translate_error(exc: Exception) -> HTTPException:
         # An alert belonging to another tenant is reported as absent, not
         # refused: whether it exists is not this tenant's business.
         return HTTPException(status.HTTP_404_NOT_FOUND, "Resource not found")
+    if isinstance(exc, ResolutionIncomplete):
+        # 409, not 403: the caller is allowed to do this, the case is not yet
+        # in a state where it means anything.
+        return HTTPException(
+            status.HTTP_409_CONFLICT,
+            "resolution_incomplete: " + ", ".join(item.value for item in exc.missing),
+        )
     if isinstance(exc, ActionNotAllowed):
         # 403 with the reason: refused because of who the caller is to this
         # incident, not because the request was malformed.
@@ -213,7 +221,13 @@ async def transition_incident(
             correlation_id(request),
             await granted_permissions(context),
         )
-    except (IncidentNotFound, IncidentConflict, InvalidTransition, ActionNotAllowed) as exc:
+    except (
+        IncidentNotFound,
+        IncidentConflict,
+        InvalidTransition,
+        ActionNotAllowed,
+        ResolutionIncomplete,
+    ) as exc:
         raise translate_error(exc) from exc
     return IncidentResponse.model_validate(incident)
 
@@ -334,6 +348,22 @@ async def remove_collaborator(
         )
     except IncidentNotFound as exc:
         raise translate_error(exc) from exc
+
+
+@router.get("/incidents/{incident_id}/resolution-readiness", response_model=list[str])
+async def resolution_readiness(
+    incident_id: UUID, context: IncidentRead, service: Service
+) -> list[str]:
+    """What is still missing before this case can be called resolved.
+
+    Returned so the analyst can see what to go and do, rather than pressing a
+    button and being told no.
+    """
+    try:
+        readiness = await service.resolution_readiness(context.tenant_id, incident_id)
+    except IncidentNotFound as exc:
+        raise translate_error(exc) from exc
+    return [item.value for item in readiness.missing]
 
 
 @router.get("/incidents/{incident_id}/history", response_model=list[HistoryEntry])

@@ -3,10 +3,11 @@ from datetime import UTC, datetime
 from typing import Literal
 from uuid import UUID, uuid4
 
-from sqlalchemy import case, delete, or_, select
+from sqlalchemy import case, delete, func, or_, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from cyrvanta.modules.claims.infrastructure.models import ClaimModel
 from cyrvanta.modules.identity.infrastructure.models import (
     AuditEventModel,
     RoleModel,
@@ -35,6 +36,13 @@ from cyrvanta.modules.incident.domain.authorization import (
     allowed_actions,
     can,
 )
+from cyrvanta.modules.incident.domain.resolution import (
+    SLOT_PREFIX,
+    MissingRequirement,
+    Readiness,
+    ResolutionEvidence,
+    assess,
+)
 from cyrvanta.modules.incident.infrastructure.models import (
     AlertReferenceModel,
     IncidentAlertModel,
@@ -59,6 +67,18 @@ class ActionNotAllowed(Exception):
     def __init__(self, reason: Denial) -> None:
         super().__init__(reason.value)
         self.reason = reason
+
+
+class ResolutionIncomplete(Exception):
+    """The case cannot be called resolved until it can be reviewed.
+
+    Carries what is missing rather than a sentence, so the interface can list
+    it in the reader's language and the analyst knows what to go and do.
+    """
+
+    def __init__(self, missing: tuple[MissingRequirement, ...]) -> None:
+        super().__init__(", ".join(item.value for item in missing))
+        self.missing = missing
 
 
 class CollaboratorNotFound(Exception):
@@ -628,6 +648,53 @@ class IncidentService:
             collaborator_ids=frozenset(collaborators.all()),
         )
 
+    async def resolution_readiness(self, tenant_id: UUID, incident_id: UUID) -> Readiness:
+        """What is still missing before this case can be called resolved."""
+        async with tenant_session(tenant_id) as session:
+            await self._get(session, incident_id)
+            return await self._readiness(session, incident_id)
+
+    @staticmethod
+    async def _readiness(session: AsyncSession, incident_id: UUID) -> Readiness:
+        """Read from what the incident actually holds -- filled slots of the
+        technical file, notes a person wrote, evidence attached -- rather than
+        from a flag someone can set. A checklist that can be ticked without
+        doing the work is decoration.
+
+        Takes the caller's session so the gate sees the same transaction as the
+        transition it is guarding.
+        """
+        slots = await session.scalars(
+            select(ClaimModel.origin_code).where(
+                ClaimModel.incident_id == incident_id,
+                ClaimModel.origin_code.like(f"{SLOT_PREFIX}%"),
+                ClaimModel.is_simulated.is_(False),
+            )
+        )
+        notes = await session.scalar(
+            select(func.count())
+            .select_from(IncidentTimelineModel)
+            .where(
+                IncidentTimelineModel.incident_id == incident_id,
+                IncidentTimelineModel.entry_type == "comment",
+                IncidentTimelineModel.actor_user_id.is_not(None),
+            )
+        )
+        alerts = await session.scalar(
+            select(func.count())
+            .select_from(IncidentAlertModel)
+            .where(IncidentAlertModel.incident_id == incident_id)
+        )
+        return assess(
+            ResolutionEvidence(
+                filled_slots=frozenset(
+                    code.removeprefix(SLOT_PREFIX) for code in slots.all() if code
+                ),
+                human_notes=int(notes or 0),
+                linked_alerts=int(alerts or 0),
+            )
+        )
+
     async def update_incident(
         self,
         tenant_id: UUID,
@@ -684,6 +751,13 @@ class IncidentService:
                 if decision.reason is Denial.INVALID_TRANSITION:
                     raise InvalidTransition
                 raise ActionNotAllowed(decision.reason or Denial.MISSING_PERMISSION)
+            if payload.target_status == "resolved":
+                # Checked here rather than in the interface: a resolution
+                # someone else has to accept cannot rest on the browser having
+                # asked nicely.
+                readiness = await self._readiness(session, incident_id)
+                if not readiness.ready:
+                    raise ResolutionIncomplete(readiness.missing)
             if payload.target_status not in TRANSITIONS.get(incident.status, set()):
                 raise InvalidTransition
             if payload.target_status in {"closed", "reopened"} and not payload.reason:

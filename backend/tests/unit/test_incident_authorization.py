@@ -157,3 +157,35 @@ def test_the_menu_is_what_this_person_can_do_to_this_incident() -> None:
 )
 def test_actions_that_are_not_transitions_need_only_their_permission(action) -> None:
     assert can(actor(SUPERVISOR), incident("new"), action).allowed
+
+
+def test_whoever_resolved_an_unassigned_case_cannot_then_close_it() -> None:
+    """Ownership is the usual way someone ends up judging their own work, not
+    the only one. An unassigned incident can be resolved by whoever picks it
+    up, and closing it afterwards is the same person saying the work is done
+    and accepting that it is.
+    """
+    decision = can(
+        actor(SUPERVISOR, user_id=SOMEONE_ELSE),
+        IncidentFacts(status="resolved", assignee_user_id=None, resolved_by_user_id=SOMEONE_ELSE),
+        IncidentAction.TRANSITION_CLOSED,
+    )
+    assert decision.allowed is False
+    assert decision.reason is Denial.RESOLVER_CANNOT_CLOSE
+
+
+def test_a_second_supervisor_closes_what_the_first_resolved() -> None:
+    assert can(
+        actor(SUPERVISOR, user_id=SOMEONE_ELSE),
+        IncidentFacts(status="resolved", assignee_user_id=None, resolved_by_user_id=OWNER),
+        IncidentAction.TRANSITION_CLOSED,
+    ).allowed
+
+
+def test_the_resolver_may_still_reopen_what_they_resolved() -> None:
+    """Withdrawing your own resolution is not approving it."""
+    assert can(
+        actor(SUPERVISOR, user_id=SOMEONE_ELSE),
+        IncidentFacts(status="resolved", assignee_user_id=None, resolved_by_user_id=SOMEONE_ELSE),
+        IncidentAction.TRANSITION_REOPENED,
+    ).allowed

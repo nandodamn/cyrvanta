@@ -68,6 +68,12 @@ class IncidentModel(Base):
     detected_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     acknowledged_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Who declared it technically resolved. A reviewer accepting a resolution
+    # needs to know whose work they are accepting, and it is what lets the
+    # system refuse someone accepting their own.
+    resolved_by_user_id: Mapped[UUID | None] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("users.id")
+    )
     closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     close_reason: Mapped[str | None] = mapped_column(String)
     close_comment: Mapped[str | None] = mapped_column(Text)

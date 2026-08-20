@@ -396,7 +396,9 @@ class IncidentService:
         async with tenant_session(tenant_id) as session:
             incident = await self._get(session, incident_id)
             facts = IncidentFacts(
-                status=incident.status, assignee_user_id=incident.assignee_user_id
+                status=incident.status,
+                assignee_user_id=incident.assignee_user_id,
+                resolved_by_user_id=incident.resolved_by_user_id,
             )
         actor = Actor(user_id=actor_id, permissions=permissions)
         return [action.value for action in allowed_actions(actor, facts)]
@@ -539,6 +541,9 @@ class IncidentService:
                 incident.acknowledged_at = now
             if payload.target_status == "resolved":
                 incident.resolved_at = now
+                # Whose work a reviewer is being asked to accept, and what
+                # stops that reviewer being the same person.
+                incident.resolved_by_user_id = actor_id
             if payload.target_status == "closed":
                 incident.closed_at = now
                 incident.close_reason = payload.close_reason
@@ -567,6 +572,13 @@ class IncidentService:
                     "after": {"status": payload.target_status},
                     "reason": payload.reason,
                     "close_reason": payload.close_reason,
+                    # Reopening a resolved incident is a supervisor refusing
+                    # the resolution, which is a different act from reopening
+                    # a closed case months later. The record distinguishes
+                    # them; the state machine cannot.
+                    "resolution_rejected": (
+                        previous == "resolved" and payload.target_status == "reopened"
+                    ),
                     **actor_context,
                 },
             )

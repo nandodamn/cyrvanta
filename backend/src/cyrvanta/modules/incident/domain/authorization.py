@@ -69,6 +69,7 @@ class Denial(StrEnum):
     MISSING_PERMISSION = "missing_permission"
     INVALID_TRANSITION = "invalid_transition"
     OWNER_CANNOT_CLOSE = "owner_cannot_close"
+    RESOLVER_CANNOT_CLOSE = "resolver_cannot_close"
     NOT_THE_OWNER = "not_the_owner"
 
 
@@ -82,9 +83,13 @@ class Actor:
 class IncidentFacts:
     status: str
     assignee_user_id: UUID | None
+    resolved_by_user_id: UUID | None = None
 
     def is_owner(self, actor: Actor) -> bool:
         return self.assignee_user_id is not None and self.assignee_user_id == actor.user_id
+
+    def resolved_it(self, actor: Actor) -> bool:
+        return self.resolved_by_user_id is not None and self.resolved_by_user_id == actor.user_id
 
 
 @dataclass(frozen=True, slots=True)
@@ -135,8 +140,15 @@ def can(actor: Actor, incident: IncidentFacts, action: IncidentAction) -> Decisi
             return _denied(Denial.MISSING_PERMISSION)
         # The invariant. Reopening is exempt: it is the opposite of approving
         # your own work -- it is admitting the case is not finished.
-        if target == "closed" and incident.is_owner(actor):
-            return _denied(Denial.OWNER_CANNOT_CLOSE)
+        if target == "closed":
+            if incident.is_owner(actor):
+                return _denied(Denial.OWNER_CANNOT_CLOSE)
+            # Ownership is the usual way someone ends up judging their own
+            # work, but not the only one: an unassigned incident can be
+            # resolved by whoever picks it up, and closing it afterwards is
+            # the same person saying the work is done and accepting that it is.
+            if incident.resolved_it(actor):
+                return _denied(Denial.RESOLVER_CANNOT_CLOSE)
         return ALLOWED
 
     if "incident.update" not in actor.permissions:

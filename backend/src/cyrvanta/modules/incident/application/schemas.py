@@ -68,6 +68,22 @@ class IncidentAssign(BaseModel):
     assignee_user_id: UUID | None
 
 
+class CollaboratorAdd(BaseModel):
+    """Bringing someone into a case without handing it over."""
+
+    user_id: UUID
+    reason: str | None = Field(default=None, max_length=500)
+
+
+class CollaboratorResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    user_id: UUID
+    email: str
+    display_name: str
+    reason: str | None = None
+    added_at: datetime
+
+
 class HistoryEntry(BaseModel):
     """One line of the incident's record.
 

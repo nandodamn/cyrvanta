@@ -6,6 +6,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from cyrvanta.modules.incident.application.schemas import (
     AlertResponse,
     AlertTriageUpdate,
+    CollaboratorAdd,
+    CollaboratorResponse,
     HistoryEntry,
     IncidentAlertsLink,
     IncidentAssign,
@@ -21,6 +23,7 @@ from cyrvanta.modules.incident.application.service import (
     ActionNotAllowed,
     AlertNotFound,
     AlertSort,
+    CollaboratorNotFound,
     IncidentConflict,
     IncidentNotFound,
     IncidentService,
@@ -55,7 +58,7 @@ def correlation_id(request: Request) -> UUID:
 
 
 def translate_error(exc: Exception) -> HTTPException:
-    if isinstance(exc, IncidentNotFound | AlertNotFound):
+    if isinstance(exc, IncidentNotFound | AlertNotFound | CollaboratorNotFound):
         # An alert belonging to another tenant is reported as absent, not
         # refused: whether it exists is not this tenant's business.
         return HTTPException(status.HTTP_404_NOT_FOUND, "Resource not found")
@@ -280,6 +283,56 @@ async def link_incident_alerts(
             correlation_id(request),
         )
     except (IncidentNotFound, IncidentConflict, AlertNotFound) as exc:
+        raise translate_error(exc) from exc
+
+
+@router.get("/incidents/{incident_id}/collaborators", response_model=list[CollaboratorResponse])
+async def list_collaborators(
+    incident_id: UUID, context: IncidentRead, service: Service
+) -> list[CollaboratorResponse]:
+    try:
+        return await service.list_collaborators(context.tenant_id, incident_id)
+    except IncidentNotFound as exc:
+        raise translate_error(exc) from exc
+
+
+@router.post("/incidents/{incident_id}/collaborators", response_model=list[CollaboratorResponse])
+async def add_collaborator(
+    incident_id: UUID,
+    payload: CollaboratorAdd,
+    request: Request,
+    context: IncidentUpdatePermission,
+    service: Service,
+) -> list[CollaboratorResponse]:
+    """Bring someone into the case without handing it over.
+
+    Guarded by incident.update: contributing to a case is working on it, and
+    the collaborator gains no authority to decide it is finished.
+    """
+    try:
+        return await service.add_collaborator(
+            context.tenant_id, incident_id, context.user_id, payload, correlation_id(request)
+        )
+    except (IncidentNotFound, CollaboratorNotFound) as exc:
+        raise translate_error(exc) from exc
+
+
+@router.delete(
+    "/incidents/{incident_id}/collaborators/{user_id}",
+    response_model=list[CollaboratorResponse],
+)
+async def remove_collaborator(
+    incident_id: UUID,
+    user_id: UUID,
+    request: Request,
+    context: IncidentUpdatePermission,
+    service: Service,
+) -> list[CollaboratorResponse]:
+    try:
+        return await service.remove_collaborator(
+            context.tenant_id, incident_id, context.user_id, user_id, correlation_id(request)
+        )
+    except IncidentNotFound as exc:
         raise translate_error(exc) from exc
 
 

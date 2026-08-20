@@ -189,3 +189,59 @@ def test_the_resolver_may_still_reopen_what_they_resolved() -> None:
         IncidentFacts(status="resolved", assignee_user_id=None, resolved_by_user_id=SOMEONE_ELSE),
         IncidentAction.TRANSITION_REOPENED,
     ).allowed
+
+
+HELPER = uuid4()
+
+
+def test_a_collaborator_contributes_but_does_not_decide_the_case_is_finished() -> None:
+    """Helping with a case and judging it complete are different things. The
+    owner asked for help, not for someone else to declare the work over.
+    """
+    decision = can(
+        actor(ANALYST, user_id=HELPER),
+        IncidentFacts(
+            status="investigating",
+            assignee_user_id=OWNER,
+            collaborator_ids=frozenset({HELPER}),
+        ),
+        IncidentAction.TRANSITION_RESOLVED,
+    )
+    assert decision.allowed is False
+    assert decision.reason is Denial.COLLABORATOR_CANNOT_JUDGE
+
+
+def test_a_collaborator_can_still_work_the_case() -> None:
+    helper = actor(ANALYST, user_id=HELPER)
+    facts = IncidentFacts(
+        status="investigating", assignee_user_id=OWNER, collaborator_ids=frozenset({HELPER})
+    )
+    assert can(helper, facts, IncidentAction.UPDATE).allowed
+    assert can(helper, facts, IncidentAction.LINK_EVIDENCE).allowed
+
+
+def test_being_listed_as_a_collaborator_does_not_demote_the_owner() -> None:
+    """Someone can be both. Ownership is what decides, so the owner keeps the
+    call on their own case even if their name also appears on the list.
+    """
+    assert can(
+        actor(ANALYST, user_id=OWNER),
+        IncidentFacts(
+            status="investigating",
+            assignee_user_id=OWNER,
+            collaborator_ids=frozenset({OWNER}),
+        ),
+        IncidentAction.TRANSITION_RESOLVED,
+    ).allowed
+
+
+def test_a_supervisor_helping_out_still_holds_their_own_authority() -> None:
+    assert can(
+        actor(SUPERVISOR, user_id=HELPER),
+        IncidentFacts(
+            status="investigating",
+            assignee_user_id=OWNER,
+            collaborator_ids=frozenset({HELPER}),
+        ),
+        IncidentAction.TRANSITION_RESOLVED,
+    ).allowed

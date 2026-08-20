@@ -3,7 +3,7 @@ from datetime import UTC, datetime
 from typing import Literal
 from uuid import UUID, uuid4
 
-from sqlalchemy import case, or_, select
+from sqlalchemy import case, delete, or_, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -16,6 +16,8 @@ from cyrvanta.modules.identity.infrastructure.models import (
 from cyrvanta.modules.incident.application.schemas import (
     AlertResponse,
     AlertTriageUpdate,
+    CollaboratorAdd,
+    CollaboratorResponse,
     HistoryEntry,
     IncidentAlertsLink,
     IncidentAssign,
@@ -36,6 +38,7 @@ from cyrvanta.modules.incident.domain.authorization import (
 from cyrvanta.modules.incident.infrastructure.models import (
     AlertReferenceModel,
     IncidentAlertModel,
+    IncidentCollaboratorModel,
     IncidentModel,
     IncidentTimelineModel,
 )
@@ -56,6 +59,10 @@ class ActionNotAllowed(Exception):
     def __init__(self, reason: Denial) -> None:
         super().__init__(reason.value)
         self.reason = reason
+
+
+class CollaboratorNotFound(Exception):
+    """Named someone this tenant does not have, or an inactive account."""
 
 
 class AlertNotFound(Exception):
@@ -395,11 +402,7 @@ class IncidentService:
         """
         async with tenant_session(tenant_id) as session:
             incident = await self._get(session, incident_id)
-            facts = IncidentFacts(
-                status=incident.status,
-                assignee_user_id=incident.assignee_user_id,
-                resolved_by_user_id=incident.resolved_by_user_id,
-            )
+            facts = await self._facts(session, incident)
         actor = Actor(user_id=actor_id, permissions=permissions)
         return [action.value for action in allowed_actions(actor, facts)]
 
@@ -469,6 +472,161 @@ class IncidentService:
         # swap places between reads of the same record.
         history.sort(key=lambda item: (item.occurred_at, item.source, item.action), reverse=True)
         return history
+
+    async def list_collaborators(
+        self, tenant_id: UUID, incident_id: UUID
+    ) -> list[CollaboratorResponse]:
+        async with tenant_session(tenant_id) as session:
+            await self._get(session, incident_id)
+            rows = (
+                await session.execute(
+                    select(IncidentCollaboratorModel, UserModel.email, UserModel.display_name)
+                    .join(UserModel, UserModel.id == IncidentCollaboratorModel.user_id)
+                    .where(IncidentCollaboratorModel.incident_id == incident_id)
+                    .order_by(UserModel.display_name)
+                )
+            ).all()
+        return [
+            CollaboratorResponse(
+                user_id=row.user_id,
+                email=email,
+                display_name=name,
+                reason=row.reason,
+                added_at=row.created_at,
+            )
+            for row, email, name in rows
+        ]
+
+    async def add_collaborator(
+        self,
+        tenant_id: UUID,
+        incident_id: UUID,
+        actor_id: UUID,
+        payload: CollaboratorAdd,
+        correlation_id: UUID,
+    ) -> list[CollaboratorResponse]:
+        """Bring someone in to help, without moving accountability.
+
+        The owner stays the owner. A collaborator can contribute to the case --
+        notes, evidence, work -- but not decide it is finished, which is why
+        adding one is a change to the record rather than a private arrangement.
+        """
+        async with tenant_session(tenant_id) as session:
+            incident = await self._get(session, incident_id)
+            invitee = await session.scalar(
+                select(UserModel).where(
+                    UserModel.tenant_id == tenant_id,
+                    UserModel.id == payload.user_id,
+                    UserModel.is_active.is_(True),
+                )
+            )
+            if invitee is None:
+                raise CollaboratorNotFound
+            actor_context = await self._actor_context(session, actor_id, incident)
+            await session.execute(
+                pg_insert(IncidentCollaboratorModel)
+                .values(
+                    tenant_id=tenant_id,
+                    incident_id=incident_id,
+                    user_id=payload.user_id,
+                    added_by_user_id=actor_id,
+                    reason=payload.reason,
+                )
+                .on_conflict_do_nothing(
+                    index_elements=(
+                        IncidentCollaboratorModel.tenant_id,
+                        IncidentCollaboratorModel.incident_id,
+                        IncidentCollaboratorModel.user_id,
+                    )
+                )
+            )
+            self._timeline(
+                session,
+                incident,
+                actor_id,
+                "collaborator_added",
+                f"{invitee.display_name} joined as a collaborator",
+                datetime.now(UTC),
+            )
+            self._audit(
+                session,
+                tenant_id,
+                actor_id,
+                "incident.collaborator.added",
+                incident_id,
+                correlation_id,
+                {
+                    "after": {"collaborator": invitee.email},
+                    "reason": payload.reason,
+                    **actor_context,
+                },
+            )
+            await session.flush()
+        return await self.list_collaborators(tenant_id, incident_id)
+
+    async def remove_collaborator(
+        self,
+        tenant_id: UUID,
+        incident_id: UUID,
+        actor_id: UUID,
+        user_id: UUID,
+        correlation_id: UUID,
+    ) -> list[CollaboratorResponse]:
+        """Removing someone is audited as deliberately as adding them: who was
+        allowed near a case, and until when, is part of its record.
+        """
+        async with tenant_session(tenant_id) as session:
+            incident = await self._get(session, incident_id)
+            removed = await session.scalar(select(UserModel).where(UserModel.id == user_id))
+            actor_context = await self._actor_context(session, actor_id, incident)
+            await session.execute(
+                delete(IncidentCollaboratorModel).where(
+                    IncidentCollaboratorModel.incident_id == incident_id,
+                    IncidentCollaboratorModel.user_id == user_id,
+                )
+            )
+            self._timeline(
+                session,
+                incident,
+                actor_id,
+                "collaborator_removed",
+                f"{removed.display_name if removed else user_id} left the case",
+                datetime.now(UTC),
+            )
+            self._audit(
+                session,
+                tenant_id,
+                actor_id,
+                "incident.collaborator.removed",
+                incident_id,
+                correlation_id,
+                {
+                    "before": {"collaborator": removed.email if removed else str(user_id)},
+                    **actor_context,
+                },
+            )
+            await session.flush()
+        return await self.list_collaborators(tenant_id, incident_id)
+
+    @staticmethod
+    async def _facts(session: AsyncSession, incident: IncidentModel) -> IncidentFacts:
+        """Everything the rules weigh, gathered once.
+
+        The collaborator set is part of it: helping with a case and deciding it
+        is finished are different things, and the rules cannot tell them apart
+        without knowing who is helping.
+        """
+        collaborators = await session.scalars(
+            select(IncidentCollaboratorModel.user_id).where(
+                IncidentCollaboratorModel.incident_id == incident.id
+            )
+        )
+        return IncidentFacts(
+            status=incident.status,
+            assignee_user_id=incident.assignee_user_id,
+            resolved_by_user_id=incident.resolved_by_user_id,
+            collaborator_ids=frozenset(collaborators.all()),
+        )
 
     async def update_incident(
         self,

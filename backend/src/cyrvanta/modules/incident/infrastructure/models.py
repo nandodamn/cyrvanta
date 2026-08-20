@@ -48,6 +48,23 @@ class AlertReferenceModel(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
+class IncidentCollaboratorModel(Base):
+    """Someone brought into a case without becoming accountable for it."""
+
+    __tablename__ = "incident_collaborators"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "incident_id", "user_id", name="uq_incident_collaborator"),
+    )
+
+    id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
+    tenant_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), ForeignKey("tenants.id"))
+    incident_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), ForeignKey("incidents.id"))
+    user_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), ForeignKey("users.id"))
+    added_by_user_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), ForeignKey("users.id"))
+    reason: Mapped[str | None] = mapped_column(String(500))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
 class IncidentModel(Base):
     __tablename__ = "incidents"
     __table_args__ = (UniqueConstraint("id", "tenant_id", name="uq_incidents_id_tenant"),)

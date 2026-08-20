@@ -71,6 +71,7 @@ class Denial(StrEnum):
     OWNER_CANNOT_CLOSE = "owner_cannot_close"
     RESOLVER_CANNOT_CLOSE = "resolver_cannot_close"
     NOT_THE_OWNER = "not_the_owner"
+    COLLABORATOR_CANNOT_JUDGE = "collaborator_cannot_judge"
 
 
 @dataclass(frozen=True, slots=True)
@@ -84,12 +85,21 @@ class IncidentFacts:
     status: str
     assignee_user_id: UUID | None
     resolved_by_user_id: UUID | None = None
+    collaborator_ids: frozenset[UUID] = frozenset()
 
     def is_owner(self, actor: Actor) -> bool:
         return self.assignee_user_id is not None and self.assignee_user_id == actor.user_id
 
     def resolved_it(self, actor: Actor) -> bool:
         return self.resolved_by_user_id is not None and self.resolved_by_user_id == actor.user_id
+
+    def is_collaborator(self, actor: Actor) -> bool:
+        """Brought in to help, without becoming accountable for the case.
+
+        Someone can be both: an owner is not made a collaborator by being
+        listed, so ownership is checked first everywhere it matters.
+        """
+        return actor.user_id in self.collaborator_ids and not self.is_owner(actor)
 
 
 @dataclass(frozen=True, slots=True)
@@ -124,6 +134,10 @@ def can(actor: Actor, incident: IncidentFacts, action: IncidentAction) -> Decisi
     if target == "resolved":
         if "incident.resolve" not in actor.permissions:
             return _denied(Denial.MISSING_PERMISSION)
+        # Helping with a case is not the same as deciding it is finished. That
+        # remains the owner's call, or a supervisor's.
+        if incident.is_collaborator(actor) and "incident.close" not in actor.permissions:
+            return _denied(Denial.COLLABORATOR_CANNOT_JUDGE)
         # An incident with an owner is theirs to declare resolved. A supervisor
         # may still do it -- they hold incident.close -- but a second analyst
         # cannot finish someone else's case from the side.

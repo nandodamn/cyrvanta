@@ -183,11 +183,16 @@ async def transition_incident(
     context: Authenticated,
     service: Service,
 ) -> IncidentResponse:
-    permission = (
-        "incident.close"
-        if payload.target_status in {"resolved", "closed", "reopened"}
-        else "incident.update"
-    )
+    # Resolving and closing are deliberately different authorities. Declaring
+    # an incident technically resolved is the work of whoever handled it;
+    # accepting that resolution and closing the case is someone else's
+    # judgement. Both used to require incident.close, which collapsed the two.
+    if payload.target_status == "resolved":
+        permission = "incident.resolve"
+    elif payload.target_status in {"closed", "reopened"}:
+        permission = "incident.close"
+    else:
+        permission = "incident.update"
     await authorize(context, permission)
     try:
         incident = await service.transition(

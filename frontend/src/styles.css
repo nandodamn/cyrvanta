@@ -2702,3 +2702,60 @@ details > .admin-list {
 .session-roles.is-empty {
   color: var(--warning, #e0a458);
 }
+
+/* The incident's record. One line per event, newest first. */
+.history-list {
+  list-style: none;
+  margin: 1rem 0 0;
+  padding: 0;
+}
+
+.history-list li {
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.history-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 10px;
+  color: var(--text-soft);
+  font:
+    400 11px "Space Mono",
+    monospace;
+}
+
+.history-actor {
+  color: var(--text);
+  font-weight: 700;
+}
+
+/* What the actor was to this case when they acted, not what they are now. */
+.history-relation {
+  padding: 1px 7px;
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--line));
+  border-radius: 999px;
+  color: var(--accent);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.history-action {
+  margin: 4px 0 0;
+}
+
+.history-change {
+  margin-left: 8px;
+  color: var(--text-soft);
+  font:
+    400 12px "Space Mono",
+    monospace;
+}
+
+.history-reason {
+  margin: 2px 0 0;
+  color: var(--text-soft);
+  font-size: 0.85rem;
+}

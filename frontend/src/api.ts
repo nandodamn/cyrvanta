@@ -847,6 +847,22 @@ export async function linkIncidentAlerts(
 export async function getIncidentActions(id: string): Promise<string[]> {
   return z.array(z.string()).parse(await authorized(`/api/v1/incidents/${id}/actions`));
 }
+const historyEntrySchema = z.object({
+  occurred_at: z.string(),
+  actor_email: z.string().nullable(),
+  actor_name: z.string().nullable(),
+  actor_roles: z.array(z.string()),
+  actor_relation: z.string().nullable(),
+  action: z.string(),
+  before: z.record(z.string()),
+  after: z.record(z.string()),
+  reason: z.string().nullable(),
+  source: z.string(),
+});
+export type HistoryEntry = z.infer<typeof historyEntrySchema>;
+export async function getIncidentHistory(id: string): Promise<HistoryEntry[]> {
+  return z.array(historyEntrySchema).parse(await authorized(`/api/v1/incidents/${id}/history`));
+}
 export async function getTimeline(id: string): Promise<TimelineEntry[]> {
   return z.array(timelineSchema).parse(await authorized(`/api/v1/incidents/${id}/timeline`));
 }

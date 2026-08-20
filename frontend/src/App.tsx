@@ -37,6 +37,7 @@ import {
   getIncident,
   getIncidentActions,
   getIncidentAlerts,
+  getIncidentHistory,
   getIncidentEnrichment,
   getIncidents,
   getMe,
@@ -756,6 +757,72 @@ export function PermissionMatrix({
           );
         })}
     </>
+  );
+}
+
+/** The incident's record, as an auditor reads it.
+ *
+ * One line per event: when, who, what they were to this case at that moment,
+ * what changed, and why. The relation and roles are shown as they were stored,
+ * not as they are now -- someone who has since stopped owning the case must
+ * still appear as its owner on the day they acted.
+ */
+function IncidentHistory({ incidentId }: { incidentId: string }) {
+  const { t } = useTranslation();
+  const history = useQuery({
+    queryKey: ["incident-history", incidentId],
+    queryFn: () => getIncidentHistory(incidentId),
+  });
+
+  const values = (pairs: Record<string, string>) =>
+    Object.entries(pairs)
+      .map(([, value]) => value || t("unassigned"))
+      .join(", ");
+
+  return (
+    <section className="panel">
+      <div>
+        <p className="eyebrow">{t("traceability")}</p>
+        <h2>{t("incidentHistory")}</h2>
+        <p>{t("incidentHistoryIntro")}</p>
+      </div>
+      <PageState
+        loading={history.isLoading}
+        error={history.isError}
+        empty={!history.isLoading && !history.isError && history.data?.length === 0}
+      />
+      <ol className="history-list">
+        {history.data?.map((entry, index) => (
+          <li key={`${entry.occurred_at}-${entry.action}-${index}`}>
+            <div className="history-head">
+              <time>{new Date(entry.occurred_at).toLocaleString()}</time>
+              <span className="history-actor">
+                {/* Correlation and the risk sweep write here too; attributing
+                    them to a person would be a lie in the one record meant to
+                    be trusted. */}
+                {entry.actor_name ?? t("automaticActor")}
+              </span>
+              {entry.actor_relation && (
+                <span className="history-relation">
+                  {t(`incidentRelation.${entry.actor_relation}`, {
+                    defaultValue: entry.actor_relation,
+                  })}
+                </span>
+              )}
+            </div>
+            <p className="history-action">
+              {t(`auditAction.${entry.action}`, { defaultValue: entry.action })}
+              {Object.keys(entry.after).length > 0 && (
+                <span className="history-change">
+                  {values(entry.before) || "—"} → {values(entry.after)}
+                </span>
+              )}
+            </p>
+            {entry.reason && <p className="history-reason">{entry.reason}</p>}
+          </li>
+        ))}
+      </ol>
+    </section>
   );
 }
 
@@ -3782,6 +3849,9 @@ function IncidentDetailPage() {
 
       {activeTab === "audit" && (
         <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+          {/* First, because it is the record of the case itself; the playbook
+              decisions below are one kind of event within it. */}
+          <IncidentHistory incidentId={id} />
           <section className="panel">
             <div>
               <p className="eyebrow">{t("traceability")}</p>

@@ -17,3 +17,7 @@ frontend/coverage/
 .idea/
 .vscode/
 *.key
+
+# Local credential handoffs for demo accounts. Never committed: these are
+# real passwords for a running environment, even if that environment is a lab.
+*.local.txt

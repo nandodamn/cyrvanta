@@ -105,7 +105,7 @@ class IntegrationConnectionService:
         self.settings = settings or get_settings()
         self.cipher = SecretCipher(self.settings.integration_encryption_key)
 
-    async def list(self, tenant_id: UUID) -> list[IntegrationConnectionResponse]:
+    async def list_connections(self, tenant_id: UUID) -> list[IntegrationConnectionResponse]:
         async with tenant_session(tenant_id) as session:
             rows = list(
                 (
@@ -127,7 +127,7 @@ class IntegrationConnectionService:
         payload: IntegrationConfigurationWrite,
         correlation_id: UUID,
     ) -> IntegrationConnectionResponse:
-        values = dict(payload.configuration)
+        values: dict[str, object] = dict(payload.configuration)
         async with tenant_session(tenant_id) as session:
             row = None
             if connection_id != "new":
@@ -144,7 +144,10 @@ class IntegrationConnectionService:
                 if row is None:
                     raise IntegrationConfigurationError("INTEGRATION_NOT_FOUND")
             preserve_secret = row is not None and not values
-            if preserve_secret:
+            # `row is not None` is repeated rather than relying on the flag:
+            # the flag already implies it, but only the explicit check narrows
+            # the type for the attribute access below.
+            if row is not None and preserve_secret:
                 if row.connector_type != payload.connector_type:
                     raise IntegrationConfigurationError("INTEGRATION_CONFIGURATION_INVALID")
                 encrypted = row.configuration_encrypted.decode()
@@ -223,6 +226,8 @@ class IntegrationConnectionService:
                 raise IntegrationConfigurationError("INTEGRATION_DISABLED")
             values = self._decrypt(row)
             started = perf_counter()
+            healthy: bool
+            error_code: str | None
             try:
                 self._validate(row.connector_type, values)
             except IntegrationConfigurationError as exc:
@@ -485,7 +490,7 @@ class IntegrationConnectionService:
 
     @staticmethod
     def _probe_smtp(values: dict[str, object]) -> None:
-        host, port = str(values["host"]), int(values["port"])
+        host, port = str(values["host"]), as_int(values["port"], 25)
         timeout = min(30, max(1, as_int(values.get("timeout_seconds"), 10)))
         with smtplib.SMTP(host, port, timeout=timeout) as client:
             client.ehlo()

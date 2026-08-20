@@ -82,7 +82,7 @@ async def resolve_connection(
 
 @router.get("/integrations/connections", response_model=list[IntegrationConnectionResponse])
 async def list_connections(context: IntegrationReader) -> list[IntegrationConnectionResponse]:
-    return await IntegrationConnectionService().list(context.tenant_id)
+    return await IntegrationConnectionService().list_connections(context.tenant_id)
 
 
 @router.post(

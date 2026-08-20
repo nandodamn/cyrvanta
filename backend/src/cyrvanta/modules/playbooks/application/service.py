@@ -371,6 +371,8 @@ class PlaybookExecutionService:
         }
         try:
             impact = ActionImpact(version_impact)
+            if definition_approval_mode is None:
+                raise KeyError("approval_mode")
             response_mode = response_modes[definition_approval_mode]
         except (KeyError, ValueError) as exc:
             raise PlaybookConflict("Released playbook governance is invalid") from exc

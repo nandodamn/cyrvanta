@@ -880,7 +880,7 @@ class RealActionConnector:
     def _smtp_send(credential: dict[str, object], message: EmailMessage) -> None:
         timeout = min(30, max(1, as_int(credential.get("timeout_seconds"), 10)))
         with smtplib.SMTP(
-            str(credential["host"]), int(credential["port"]), timeout=timeout
+            str(credential["host"]), as_int(credential["port"], 25), timeout=timeout
         ) as client:
             client.ehlo()
             if bool(credential.get("use_starttls", True)):

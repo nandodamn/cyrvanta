@@ -323,7 +323,7 @@ RETIRED_PLAYBOOK_CODES: frozenset[str] = frozenset(
 )
 
 PLAYBOOK_MITRE_COVERAGE: dict[str, list[str]] = {
-    pb["code"]: list(pb.get("mitre_codes", []))  # type: ignore[arg-type]
+    cast(str, pb["code"]): [str(item) for item in cast(list[object], pb.get("mitre_codes", []))]
     for pb in ESSENTIAL_NATIVE_PLAYBOOKS
 }
 
@@ -554,6 +554,9 @@ class PlaybookAdministrationService:
                 )
             ).all()
         )
+        # Declared once: the same name is later rebound from a scalar() that
+        # can return None, and without this mypy pins it to the loop's type.
+        definition: PlaybookDefinitionModel | None
         for definition in retired:
             # Every version, including those already RETIRED: status alone does
             # not stop a dispatch, and an earlier retirement left the binding
@@ -658,7 +661,7 @@ class PlaybookAdministrationService:
                     return False
                 if version.result_schema != current_result_schema:
                     return False
-                steps = (version.portable_artifact or {}).get("steps") or []
+                steps = cast(list[object], (version.portable_artifact or {}).get("steps") or [])
                 actions = tuple(
                     step.get("action")
                     for step in steps
@@ -1087,7 +1090,7 @@ class PlaybookAdministrationService:
                     )
                     credential_id: UUID | None = None
                     credential_ready = descriptor.egress == "NONE"
-                    if binding_ready and descriptor.egress != "NONE":
+                    if binding is not None and binding_ready and descriptor.egress != "NONE":
                         try:
                             credential_id = UUID(binding.credential_key_id or "")
                         except ValueError:
@@ -2089,7 +2092,8 @@ class PlaybookAdministrationService:
                 value,
             )
             if match is not None:
-                parsed.append(tuple(int(part) for part in match.groups()))
+                major, minor, patch = match.groups()
+                parsed.append((int(major), int(minor), int(patch)))
         if not parsed:
             return "1.0.0"
         major, minor, patch = max(parsed)

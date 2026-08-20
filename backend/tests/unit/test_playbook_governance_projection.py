@@ -62,12 +62,19 @@ def test_definition_projection_has_no_fabricated_readiness_defaults() -> None:
     assert '"rollback_action_code": PLAYBOOK_ROLLBACK_ACTIONS.get(item.code)' in projection
     assert 'f"rollback-{item.code}"' not in projection
 
-    # Both lookup tables must be sourced from the reviewed catalog, not fabricated.
-    assert (
-        "PLAYBOOK_MITRE_COVERAGE: dict[str, list[str]] = {\n"
-        '    pb["code"]: list(pb.get("mitre_codes", []))'
-    ) in source
-    assert "for pb in ESSENTIAL_NATIVE_PLAYBOOKS" in source
+    # Both lookup tables must be sourced from the reviewed catalog, not
+    # fabricated. Asserted over the table's own body with whitespace collapsed,
+    # so the guard survives reformatting and type narrowing while still
+    # refusing a coverage map built from anything but the catalog entries.
+    coverage = source.split("PLAYBOOK_MITRE_COVERAGE: dict[str, list[str]] = {", maxsplit=1)[
+        1
+    ].split("\n}", maxsplit=1)[0]
+    collapsed = " ".join(coverage.split())
+    assert 'pb["code"]' in collapsed
+    assert 'pb.get("mitre_codes", [])' in collapsed
+    assert "for pb in ESSENTIAL_NATIVE_PLAYBOOKS" in collapsed
+    # No technique may be conjured out of the playbook code itself.
+    assert 'f"' not in collapsed
     rollback_actions = source.split("PLAYBOOK_ROLLBACK_ACTIONS: dict[str, str] = {", maxsplit=1)[
         1
     ].split("}", maxsplit=1)[0]

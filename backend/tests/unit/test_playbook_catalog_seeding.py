@@ -246,12 +246,16 @@ async def test_retired_playbooks_are_neither_listed_nor_left_approved() -> None:
 
     assert RETIRED_PLAYBOOK_CODES.isdisjoint({item.code for item in result.items})
     async with tenant_session(tenant_id) as session:
-        retired_versions = select(PlaybookVersionModel.id).join(
-            PlaybookDefinitionModel,
-            PlaybookDefinitionModel.id == PlaybookVersionModel.definition_id,
-        ).where(
-            PlaybookVersionModel.tenant_id == tenant_id,
-            PlaybookDefinitionModel.code.in_(RETIRED_PLAYBOOK_CODES),
+        retired_versions = (
+            select(PlaybookVersionModel.id)
+            .join(
+                PlaybookDefinitionModel,
+                PlaybookDefinitionModel.id == PlaybookVersionModel.definition_id,
+            )
+            .where(
+                PlaybookVersionModel.tenant_id == tenant_id,
+                PlaybookDefinitionModel.code.in_(RETIRED_PLAYBOOK_CODES),
+            )
         )
         live = await session.scalars(
             select(PlaybookVersionModel.status)

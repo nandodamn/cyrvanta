@@ -16,9 +16,7 @@ class OllamaAIProvider:
     ) -> None:
         self._settings = settings
         self._base_url = (base_url or settings.ollama_base_url).rstrip("/")
-        self._headers = (
-            {"Authorization": f"Bearer {bearer_token}"} if bearer_token else {}
-        )
+        self._headers = {"Authorization": f"Bearer {bearer_token}"} if bearer_token else {}
 
     async def redact_explanation(
         self, deterministic_es: str, deterministic_en: str

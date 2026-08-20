@@ -21,21 +21,11 @@ def test_execution_service_queries_include_explicit_tenant_filters() -> None:
         "ActionProposalModel": "ActionProposalModel.tenant_id == tenant_id",
         "PlaybookDefinitionModel": "PlaybookDefinitionModel.tenant_id == tenant_id",
         "PlaybookVersionModel": "PlaybookVersionModel.tenant_id == tenant_id",
-        "AutomationEngineBindingModel": (
-            "AutomationEngineBindingModel.tenant_id == tenant_id"
-        ),
-        "PlaybookStepExecutionModel": (
-            "PlaybookStepExecutionModel.tenant_id == tenant_id"
-        ),
-        "PlaybookExecutionAttemptModel": (
-            "PlaybookExecutionAttemptModel.tenant_id == tenant_id"
-        ),
-        "PlaybookExecutionUpdateModel": (
-            "PlaybookExecutionUpdateModel.tenant_id == tenant_id"
-        ),
-        "AutomationReplayNonceModel": (
-            "AutomationReplayNonceModel.tenant_id == tenant_id"
-        ),
+        "AutomationEngineBindingModel": ("AutomationEngineBindingModel.tenant_id == tenant_id"),
+        "PlaybookStepExecutionModel": ("PlaybookStepExecutionModel.tenant_id == tenant_id"),
+        "PlaybookExecutionAttemptModel": ("PlaybookExecutionAttemptModel.tenant_id == tenant_id"),
+        "PlaybookExecutionUpdateModel": ("PlaybookExecutionUpdateModel.tenant_id == tenant_id"),
+        "AutomationReplayNonceModel": ("AutomationReplayNonceModel.tenant_id == tenant_id"),
     }
 
     for model, tenant_filter in required_filters.items():

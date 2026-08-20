@@ -3,9 +3,6 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 
-from cyrvanta.modules.integrations.infrastructure.composition import (
-    configured_wazuh_connector,
-)
 from cyrvanta.modules.integrations.application.connection_service import (
     IntegrationConfigurationError,
     IntegrationConfigurationWrite,
@@ -13,10 +10,14 @@ from cyrvanta.modules.integrations.application.connection_service import (
     IntegrationConnectionService,
     IntegrationProbeResponse,
 )
+from cyrvanta.modules.integrations.infrastructure.composition import (
+    configured_wazuh_connector,
+)
 from cyrvanta.modules.operations.application.activity import (
     OperationalActivity24h,
     OperationalActivityService,
 )
+from cyrvanta.modules.operations.application.reporting import IncidentReportService
 from cyrvanta.modules.operations.application.schemas import (
     AnalysisResponse,
     IntegrationHealth,
@@ -25,7 +26,6 @@ from cyrvanta.modules.operations.application.schemas import (
     PlaybookManagementResponse,
     Technique,
 )
-from cyrvanta.modules.operations.application.reporting import IncidentReportService
 from cyrvanta.modules.operations.application.service import OperationsService
 from cyrvanta.modules.operations.application.topology_service import NetworkTopologyService
 from cyrvanta.modules.operations.infrastructure.n8n_catalog import N8nWorkflowCatalog
@@ -85,7 +85,9 @@ async def list_connections(context: IntegrationReader) -> list[IntegrationConnec
     return await IntegrationConnectionService().list(context.tenant_id)
 
 
-@router.post("/integrations/connections/{connection_id}/test", response_model=IntegrationProbeResponse)
+@router.post(
+    "/integrations/connections/{connection_id}/test", response_model=IntegrationProbeResponse
+)
 async def test_connection(
     connection_id: UUID,
     context: IntegrationManager,
@@ -101,12 +103,17 @@ async def test_connection(
     except IntegrationConfigurationError as exc:
         code = str(exc)
         raise HTTPException(
-            status.HTTP_404_NOT_FOUND if code == "INTEGRATION_NOT_FOUND" else status.HTTP_409_CONFLICT,
+            status.HTTP_404_NOT_FOUND
+            if code == "INTEGRATION_NOT_FOUND"
+            else status.HTTP_409_CONFLICT,
             code,
         ) from exc
 
 
-@router.post("/integrations/connections/{connection_id}/configure", response_model=IntegrationConnectionResponse)
+@router.post(
+    "/integrations/connections/{connection_id}/configure",
+    response_model=IntegrationConnectionResponse,
+)
 async def configure_connection(
     connection_id: str,
     payload: IntegrationConfigurationWrite,
@@ -124,9 +131,12 @@ async def configure_connection(
     except IntegrationConfigurationError as exc:
         code = str(exc)
         raise HTTPException(
-            status.HTTP_404_NOT_FOUND if code == "INTEGRATION_NOT_FOUND" else status.HTTP_409_CONFLICT,
+            status.HTTP_404_NOT_FOUND
+            if code == "INTEGRATION_NOT_FOUND"
+            else status.HTTP_409_CONFLICT,
             code,
         ) from exc
+
 
 @router.get("/operations/activity-24h", response_model=OperationalActivity24h)
 async def operational_activity_24h(context: IncidentReader) -> OperationalActivity24h:

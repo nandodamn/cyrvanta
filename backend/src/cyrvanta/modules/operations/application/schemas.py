@@ -32,7 +32,6 @@ class AnalysisResponse(BaseModel):
     grounded: bool
 
 
-
 class PlaybookConnector(BaseModel):
     node_type: str
     name: str
@@ -85,7 +84,9 @@ class TopologyNodeService(BaseModel):
 class TopologyNode(BaseModel):
     id: str
     name: str
-    type: Literal["FIREWALL", "SERVER", "DATABASE", "SIEM", "GATEWAY", "ENDPOINT", "EDR", "WORKSTATION"]
+    type: Literal[
+        "FIREWALL", "SERVER", "DATABASE", "SIEM", "GATEWAY", "ENDPOINT", "EDR", "WORKSTATION"
+    ]
     category: Literal["CYRVANTA_CORE", "SECURITY_FEED", "MONITORED_ASSET"] = "CYRVANTA_CORE"
     ip_address: str
     ip_addresses: list[str] = []
@@ -117,4 +118,3 @@ class NetworkTopologyResponse(BaseModel):
     nodes: list[TopologyNode]
     edges: list[TopologyEdge]
     updated_at: str
-

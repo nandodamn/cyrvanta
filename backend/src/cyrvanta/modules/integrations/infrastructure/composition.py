@@ -67,9 +67,7 @@ async def configured_wazuh_connection(
             str(indexer.values["password"]) if indexer.values.get("password") else None
         ),
         indexer_bearer_token=(
-            str(indexer.values["bearer_token"])
-            if indexer.values.get("bearer_token")
-            else None
+            str(indexer.values["bearer_token"]) if indexer.values.get("bearer_token") else None
         ),
     )
     return integration_id, connector

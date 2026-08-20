@@ -64,7 +64,7 @@ def test_definition_projection_has_no_fabricated_readiness_defaults() -> None:
 
     # Both lookup tables must be sourced from the reviewed catalog, not fabricated.
     assert (
-        'PLAYBOOK_MITRE_COVERAGE: dict[str, list[str]] = {\n'
+        "PLAYBOOK_MITRE_COVERAGE: dict[str, list[str]] = {\n"
         '    pb["code"]: list(pb.get("mitre_codes", []))'
     ) in source
     assert "for pb in ESSENTIAL_NATIVE_PLAYBOOKS" in source
@@ -73,8 +73,13 @@ def test_definition_projection_has_no_fabricated_readiness_defaults() -> None:
     ].split("}", maxsplit=1)[0]
     # Every rollback target must be a registered reverse ACTION, never another
     # catalog playbook -- reverting is an operation on an execution.
-    for code in ("compromised-account", "compromised-endpoint", "lateral-movement",
-                 "privilege-escalation", "ransomware-destructive"):
+    for code in (
+        "compromised-account",
+        "compromised-endpoint",
+        "lateral-movement",
+        "privilege-escalation",
+        "ransomware-destructive",
+    ):
         assert f'"{code}"' in rollback_actions
         assert f'"{code}-rollback"' not in rollback_actions
     for reverse_action in ("account.enable", "host.restore"):

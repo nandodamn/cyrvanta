@@ -28,9 +28,7 @@ class WazuhIndexerClient:
     ) -> None:
         self.configuration = configuration
         self.auth = httpx.BasicAuth(username, password or "") if username else None
-        self.headers = (
-            {"Authorization": f"Bearer {bearer_token}"} if bearer_token else {}
-        )
+        self.headers = {"Authorization": f"Bearer {bearer_token}"} if bearer_token else {}
 
     async def search_alerts(
         self,
@@ -89,9 +87,7 @@ class WazuhIndexerClient:
                 verify=self.configuration.verify_tls,
                 follow_redirects=False,
             ) as client:
-                response = await client.post(
-                    url, json=body, auth=self.auth, headers=self.headers
-                )
+                response = await client.post(url, json=body, auth=self.auth, headers=self.headers)
             if len(response.content) > self.configuration.max_response_bytes:
                 raise ConnectorError(
                     ConnectorErrorCode.SOURCE_SCHEMA_CHANGED,

@@ -496,9 +496,9 @@ class PlaybookExecutionService:
         credential = None
         if connector.describe().egress != "NONE":
             try:
-                credential = await IntegrationConnectionService(
-                    get_settings()
-                ).resolve_credential(tenant_id, credential_reference)
+                credential = await IntegrationConnectionService(get_settings()).resolve_credential(
+                    tenant_id, credential_reference
+                )
             except IntegrationConfigurationError as exc:
                 raise PlaybookConflict("Rollback credential is unavailable") from exc
 

@@ -400,7 +400,9 @@ class ClaimService:
     ) -> tuple[UUID, ...]:
         created: list[UUID] = []
         async with tenant_session(tenant_id) as session:
-            incident = await self._incident(session, incident_id)
+            # Guards that the incident exists and belongs to the tenant; it
+            # raises when it does not, so nothing here needs the value.
+            await self._incident(session, incident_id)
             for item in claims:
                 origin_type = ClaimOriginType.AI if provider == "ollama" else ClaimOriginType.RULE
                 origin_code = (
@@ -606,13 +608,13 @@ class ClaimService:
         # so requiring a manual "add presentation" per claim per locale would
         # leave every correlation claim in English until someone did that by
         # hand -- on a platform where bilingual is a first-class requirement.
-        for locale, text in (("es", statement_es), ("en", statement_en)):
+        for locale, rendered in (("es", statement_es), ("en", statement_en)):
             session.add(
                 ClaimPresentationModel(
                     tenant_id=tenant_id,
                     claim_id=model.id,
                     locale=locale,
-                    text=text,
+                    text=rendered,
                     version=1,
                     origin_type=ClaimOriginType.RULE.value,
                     origin_actor_user_id=None,
@@ -670,8 +672,7 @@ class ClaimService:
         attribution_es = f"La fuente {source} " if source else "La fuente configurada "
         measured_es = f" con score {score}" if score is not None else ""
         statement_es = (
-            f"{attribution_es}devolvio el veredicto de reputacion "
-            f"{verdict_es}{measured_es}."
+            f"{attribution_es}devolvio el veredicto de reputacion {verdict_es}{measured_es}."
         )
         claim = Claim(
             claim_id=uuid4(),
@@ -723,13 +724,13 @@ class ClaimService:
         # claim_presentations only accepts HUMAN/RULE/AI (not SYSTEM, which the
         # claim itself uses), so this is filed as RULE: it is a deterministic
         # rendering, not a person's account.
-        for locale, text in (("es", statement_es), ("en", statement_en)):
+        for locale, rendered in (("es", statement_es), ("en", statement_en)):
             session.add(
                 ClaimPresentationModel(
                     tenant_id=tenant_id,
                     claim_id=model.id,
                     locale=locale,
-                    text=text,
+                    text=rendered,
                     version=1,
                     origin_type=ClaimOriginType.RULE.value,
                     origin_actor_user_id=None,

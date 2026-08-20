@@ -92,18 +92,14 @@ async def _probe_tcp(host: str, port: int) -> _Probe:
             asyncio.open_connection(host, port), timeout=_PROBE_TIMEOUT_SECONDS
         )
     except (TimeoutError, OSError):
-        return _Probe(
-            reachable=False, latency_ms=None, address=address, detail="unreachable"
-        )
+        return _Probe(reachable=False, latency_ms=None, address=address, detail="unreachable")
     latency_ms = max(1, round((time.perf_counter() - started) * 1000))
     writer.close()
     try:
         await writer.wait_closed()
     except OSError:
         pass
-    return _Probe(
-        reachable=True, latency_ms=latency_ms, address=address, detail=f"tcp/{port}"
-    )
+    return _Probe(reachable=True, latency_ms=latency_ms, address=address, detail=f"tcp/{port}")
 
 
 async def _probe_http(url: str) -> _Probe:
@@ -116,9 +112,7 @@ async def _probe_http(url: str) -> _Probe:
         async with httpx.AsyncClient(timeout=_PROBE_TIMEOUT_SECONDS, verify=True) as client:
             response = await client.get(url)
     except httpx.HTTPError:
-        return _Probe(
-            reachable=False, latency_ms=None, address=address, detail="unreachable"
-        )
+        return _Probe(reachable=False, latency_ms=None, address=address, detail="unreachable")
     latency_ms = max(1, round((time.perf_counter() - started) * 1000))
     return _Probe(
         reachable=response.is_success,
@@ -140,13 +134,9 @@ async def _probe_database() -> _Probe:
                 session.execute(text("SELECT 1")), timeout=_PROBE_TIMEOUT_SECONDS
             )
     except (TimeoutError, SQLAlchemyError, OSError):
-        return _Probe(
-            reachable=False, latency_ms=None, address=address, detail="query failed"
-        )
+        return _Probe(reachable=False, latency_ms=None, address=address, detail="query failed")
     latency_ms = max(1, round((time.perf_counter() - started) * 1000))
-    return _Probe(
-        reachable=True, latency_ms=latency_ms, address=address, detail="SELECT 1"
-    )
+    return _Probe(reachable=True, latency_ms=latency_ms, address=address, detail="SELECT 1")
 
 
 def _resolve_wazuh_timeout(configured: object) -> int:
@@ -448,23 +438,22 @@ class NetworkTopologyService:
                 role_description_en=(
                     f"Configured detection source ({connector})"
                     if verified
-                    else f"Configured but unverified ({connector}): a successful health check is missing"
+                    else f"Configured but unverified ({connector}): "
+                    "a successful health check is missing"
                 ),
             )
         return nodes, wazuh_configured
 
     # ── Assets Cyrvanta can actually see ───────────────────────────────────────
 
-    async def _monitored_assets(
-        self, tenant_id: UUID, now_iso: str
-    ) -> dict[str, TopologyNode]:
+    async def _monitored_assets(self, tenant_id: UUID, now_iso: str) -> dict[str, TopologyNode]:
         """The agents the Wazuh manager really reports -- never a synthesised host."""
         if self.settings.wazuh_mode != "live":
             return {}
         try:
-            credential = await IntegrationConnectionService(
-                self.settings
-            ).resolve_single_connector(tenant_id, "WAZUH")
+            credential = await IntegrationConnectionService(self.settings).resolve_single_connector(
+                tenant_id, "WAZUH"
+            )
         except IntegrationConfigurationError as error:
             # An unusable connector means the map genuinely cannot see any asset,
             # but staying silent made an empty map indistinguishable from a
@@ -479,9 +468,7 @@ class NetworkTopologyService:
         values = credential.values
         base_url = str(values.get("base_url", "")).rstrip("/")
         if not base_url:
-            logger.warning(
-                "topology: Wazuh connector for tenant %s has no base_url", tenant_id
-            )
+            logger.warning("topology: Wazuh connector for tenant %s has no base_url", tenant_id)
             return {}
         timeout_seconds = _resolve_wazuh_timeout(values.get("timeout_seconds"))
         try:
@@ -500,8 +487,7 @@ class NetworkTopologyService:
                 payload = agents_response.json()
         except (httpx.HTTPError, ValueError, KeyError) as error:
             logger.warning(
-                "topology: could not read Wazuh agents for tenant %s from %s "
-                "(timeout %ss): %s: %s",
+                "topology: could not read Wazuh agents for tenant %s from %s (timeout %ss): %s: %s",
                 tenant_id,
                 base_url,
                 timeout_seconds,
@@ -521,14 +507,17 @@ class NetworkTopologyService:
                 continue
             address = str(agent.get("ip") or "").strip()
             operating_system = agent.get("os") or {}
-            os_info = " ".join(
-                part
-                for part in (
-                    str(operating_system.get("name") or "").strip(),
-                    str(operating_system.get("version") or "").strip(),
+            os_info = (
+                " ".join(
+                    part
+                    for part in (
+                        str(operating_system.get("name") or "").strip(),
+                        str(operating_system.get("version") or "").strip(),
+                    )
+                    if part
                 )
-                if part
-            ) or None
+                or None
+            )
             reported = str(agent.get("status", "")).strip().lower()
             status = "ONLINE" if reported == "active" else "OFFLINE"
             last_keep_alive = str(agent.get("lastKeepAlive") or "").strip()

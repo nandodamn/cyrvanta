@@ -60,12 +60,12 @@ def test_operations_use_explicit_permissions() -> None:
     migration = (
         Path(__file__).parents[2] / "alembic" / "versions" / "0005_operations_permissions.py"
     ).read_text(encoding="utf-8")
-    operations_router = (
-        modules / "operations" / "presentation" / "router.py"
-    ).read_text(encoding="utf-8")
-    playbooks_router = (
-        modules / "playbooks" / "presentation" / "router.py"
-    ).read_text(encoding="utf-8")
+    operations_router = (modules / "operations" / "presentation" / "router.py").read_text(
+        encoding="utf-8"
+    )
+    playbooks_router = (modules / "playbooks" / "presentation" / "router.py").read_text(
+        encoding="utf-8"
+    )
     assert "analysis.request" in migration
     assert "response.execute" in migration
     assert 'require_permission("analysis.request")' in operations_router

@@ -4,14 +4,14 @@ from uuid import UUID, uuid4
 from sqlalchemy import select
 
 from cyrvanta.modules.identity.infrastructure.models import TenantModel
+from cyrvanta.modules.integrations.application.connection_service import (
+    IntegrationConfigurationError,
+)
 from cyrvanta.modules.integrations.application.finding_ingestion import (
     FindingIngestionService,
 )
 from cyrvanta.modules.integrations.application.services.synchronization import (
     FindingSynchronizationService,
-)
-from cyrvanta.modules.integrations.application.connection_service import (
-    IntegrationConfigurationError,
 )
 from cyrvanta.modules.integrations.domain.errors import UnsupportedCapabilityError
 from cyrvanta.modules.integrations.domain.findings import CanonicalFinding
@@ -62,7 +62,9 @@ class AutomaticWazuhIngestionService:
             except (IntegrationConfigurationError, UnsupportedCapabilityError):
                 continue
             except Exception:
-                logger.exception("wazuh_ingestion_tenant_failed", extra={"tenant_id": str(tenant_id)})
+                logger.exception(
+                    "wazuh_ingestion_tenant_failed", extra={"tenant_id": str(tenant_id)}
+                )
                 continue
             if created:
                 synced_tenants += 1

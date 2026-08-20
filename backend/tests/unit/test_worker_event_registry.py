@@ -4,7 +4,6 @@ from pathlib import Path
 
 from cyrvanta import worker
 
-
 EVENT_NAME = re.compile(r"^(?:security|knowledge|platform)\.[a-z0-9_.]+$")
 
 

@@ -167,10 +167,7 @@ class N8nPlaybookDispatcher:
             )
             if execution is None or execution.status != ExecutionStatus.QUEUED.value:
                 return None
-            if (
-                execution.execution_mode != "LIVE"
-                or not self.settings.playbook_live_enabled
-            ):
+            if execution.execution_mode != "LIVE" or not self.settings.playbook_live_enabled:
                 return None
             binding = await session.scalar(
                 select(AutomationEngineBindingModel).where(
@@ -200,7 +197,7 @@ class N8nPlaybookDispatcher:
                     await session.scalar(
                         select(func.count(PlaybookExecutionAttemptModel.id)).where(
                             PlaybookExecutionAttemptModel.tenant_id == tenant_id,
-                            PlaybookExecutionAttemptModel.execution_id == execution.id
+                            PlaybookExecutionAttemptModel.execution_id == execution.id,
                         )
                     )
                     or 0
@@ -267,9 +264,7 @@ class N8nPlaybookDispatcher:
                         "scheme": "CYRVANTA_HMAC_SHA256",
                         "key_id": str(snapshot["key_id"]),
                         "secret_source": "N8N_CALLBACK_KEY",
-                        "canonical_material": (
-                            "method,path,timestamp,nonce,body_sha256,tenant_id"
-                        ),
+                        "canonical_material": ("method,path,timestamp,nonce,body_sha256,tenant_id"),
                         "required_headers": [
                             "X-Cyrvanta-Key-Id",
                             "X-Cyrvanta-Timestamp",
@@ -327,7 +322,7 @@ class N8nPlaybookDispatcher:
             attempt = await session.scalar(
                 select(PlaybookExecutionAttemptModel).where(
                     PlaybookExecutionAttemptModel.tenant_id == tenant_id,
-                    PlaybookExecutionAttemptModel.dispatch_id == dispatch_id
+                    PlaybookExecutionAttemptModel.dispatch_id == dispatch_id,
                 )
             )
             if execution is None or attempt is None:
@@ -386,7 +381,7 @@ class N8nPlaybookDispatcher:
             attempt = await session.scalar(
                 select(PlaybookExecutionAttemptModel).where(
                     PlaybookExecutionAttemptModel.tenant_id == tenant_id,
-                    PlaybookExecutionAttemptModel.dispatch_id == dispatch_id
+                    PlaybookExecutionAttemptModel.dispatch_id == dispatch_id,
                 )
             )
             if execution is None or attempt is None:

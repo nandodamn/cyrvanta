@@ -47,7 +47,6 @@ from cyrvanta.shared.infrastructure.rabbitmq import (
 )
 from cyrvanta.shared.logging import configure_logging
 
-
 OBSERVED_EVENT_NAMES = frozenset(
     {
         "security.action_proposal.created",

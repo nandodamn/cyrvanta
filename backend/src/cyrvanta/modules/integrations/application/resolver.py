@@ -7,7 +7,6 @@ from sqlalchemy import select
 from cyrvanta.modules.integrations.application.connection_service import (
     CURRENT_CONFIGURATION_SCHEMA_VERSION,
 )
-
 from cyrvanta.modules.integrations.infrastructure.models import IntegrationModel
 from cyrvanta.shared.database import tenant_session
 

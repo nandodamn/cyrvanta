@@ -189,9 +189,7 @@ class DirectoryAdministrationService:
                     DirectoryIdentityModel.provider_type == configuration.provider_type,
                 )
             )
-            if (
-                existing is not None and existing.user_id != user_id
-            ) or (
+            if (existing is not None and existing.user_id != user_id) or (
                 user_identity is not None
                 and user_identity.external_subject != payload.external_subject
             ):

@@ -77,15 +77,12 @@ class HybridPlaybookDispatcher:
                             )
                             .where(
                                 PlaybookExecutionModel.tenant_id == tenant_id,
-                                PlaybookExecutionModel.status
-                                == ExecutionStatus.QUEUED.value,
+                                PlaybookExecutionModel.status == ExecutionStatus.QUEUED.value,
                                 PlaybookExecutionModel.execution_mode == "LIVE",
                                 AutomationEngineBindingModel.tenant_id == tenant_id,
                                 AutomationEngineBindingModel.active.is_(True),
                                 AutomationEngineBindingModel.sync_status == "SYNCHRONIZED",
-                                AutomationEngineBindingModel.engine_type.in_(
-                                    enabled_engines
-                                ),
+                                AutomationEngineBindingModel.engine_type.in_(enabled_engines),
                             )
                             .order_by(PlaybookExecutionModel.created_at)
                             .limit(limit)
@@ -96,9 +93,7 @@ class HybridPlaybookDispatcher:
                 pending_batches.append((tenant_id, execution_ids))
 
         dispatched = 0
-        for attempted, (tenant_id, execution_id) in enumerate(
-            self._round_robin(pending_batches)
-        ):
+        for attempted, (tenant_id, execution_id) in enumerate(self._round_robin(pending_batches)):
             if attempted >= limit:
                 break
             outcome = await self.dispatch(tenant_id, execution_id, uuid4())
@@ -158,13 +153,8 @@ class HybridPlaybookDispatcher:
                 select(AutomationEngineBindingModel.engine_type)
                 .join(
                     PlaybookExecutionModel,
-                    (
-                        PlaybookExecutionModel.binding_id == AutomationEngineBindingModel.id
-                    )
-                    & (
-                        PlaybookExecutionModel.tenant_id
-                        == AutomationEngineBindingModel.tenant_id
-                    ),
+                    (PlaybookExecutionModel.binding_id == AutomationEngineBindingModel.id)
+                    & (PlaybookExecutionModel.tenant_id == AutomationEngineBindingModel.tenant_id),
                 )
                 .join(
                     TenantModel,

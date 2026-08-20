@@ -12,7 +12,6 @@ from cyrvanta.modules.incident.application.schemas import (
     AlertTriageUpdate,
     IncidentAssign,
     IncidentCreate,
-    IncidentResponse,
     IncidentTransition,
     IncidentUpdate,
     Severity,
@@ -78,12 +77,14 @@ class IncidentService:
         severity: Sequence[Severity] | None = None,
     ) -> list[AlertResponse]:
         async with tenant_session(tenant_id) as session:
-            statement = select(
-                AlertReferenceModel, UserModel.email, UserModel.display_name
-            ).outerjoin(
-                UserModel,
-                AlertReferenceModel.reviewed_by_user_id == UserModel.id,
-            ).where(AlertReferenceModel.is_simulated.is_(False))
+            statement = (
+                select(AlertReferenceModel, UserModel.email, UserModel.display_name)
+                .outerjoin(
+                    UserModel,
+                    AlertReferenceModel.reviewed_by_user_id == UserModel.id,
+                )
+                .where(AlertReferenceModel.is_simulated.is_(False))
+            )
             if pattern := self._search_pattern(search):
                 statement = statement.where(
                     or_(

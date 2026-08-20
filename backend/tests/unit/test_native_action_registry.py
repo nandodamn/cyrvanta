@@ -24,9 +24,7 @@ def test_registry_exposes_only_real_actions() -> None:
 
     assert tuple(item.code for item in descriptors) == tuple(sorted(REAL_ACTIONS))
     assert all(item.modes == ("LIVE",) for item in descriptors)
-    assert all(
-        item.retry_safe == (item.code in _RETRY_SAFE_ACTIONS) for item in descriptors
-    )
+    assert all(item.retry_safe == (item.code in _RETRY_SAFE_ACTIONS) for item in descriptors)
 
 
 def test_registry_fails_closed_for_unknown_action_or_version() -> None:

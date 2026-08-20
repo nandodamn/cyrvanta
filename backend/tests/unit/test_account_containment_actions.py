@@ -25,7 +25,9 @@ async def _target_user(tenant_id: UUID):
             id=uuid4(),
             tenant_id=tenant_id,
             email=f"containment-{uuid4().hex[:8]}@example.test",
-            password_hash="x",
+            # Not a credential: this user never authenticates, the column is
+            # NOT NULL, and the value is never verified against anything.
+            password_hash="x",  # noqa: S106
             display_name="Containment Test User",
             is_active=True,
         )

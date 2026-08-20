@@ -27,8 +27,6 @@ from cyrvanta.modules.incident.application.service import (
 )
 from cyrvanta.modules.incident.infrastructure.models import IncidentModel
 from cyrvanta.modules.integrations.application.connection_service import (
-    IntegrationConfigurationError,
-    IntegrationConnectionService,
     StoredIntegrationCredential,
 )
 from cyrvanta.modules.operations.application.reporting import (
@@ -69,12 +67,14 @@ REAL_ACTIONS = (
 )
 
 # Internal actions (no egress, retry-safe): no external credential required.
-_INTERNAL_ACTIONS = frozenset({
-    "incident.status.transition",
-    "endpoint.isolate",
-    "account.disable",
-    "account.enable",
-})
+_INTERNAL_ACTIONS = frozenset(
+    {
+        "incident.status.transition",
+        "endpoint.isolate",
+        "account.disable",
+        "account.enable",
+    }
+)
 
 # Actions that call Wazuh Active Response (require WAZUH credential).
 _WAZUH_ACTIONS = frozenset({"host.isolate", "host.restore"})
@@ -91,15 +91,17 @@ _SMTP_ACTIONS = frozenset({"notification.send", "incident.report.generate"})
 # block, an EDR reactivation and an evidence seal through a single configured
 # URL. Cyrvanta does not purge mailboxes or write firewall rules itself -- it
 # invokes the system the tenant configured for that purpose.
-_HTTP_ACTIONS = frozenset({
-    "edr.invoke_allowlisted",
-    "evidence_vault.invoke_allowlisted",
-    "firewall.invoke_allowlisted",
-    "mail_security.invoke_allowlisted",
-    "threat_intel.lookup",
-    "ticket.create",
-    "webhook.invoke_allowlisted",
-})
+_HTTP_ACTIONS = frozenset(
+    {
+        "edr.invoke_allowlisted",
+        "evidence_vault.invoke_allowlisted",
+        "firewall.invoke_allowlisted",
+        "mail_security.invoke_allowlisted",
+        "threat_intel.lookup",
+        "ticket.create",
+        "webhook.invoke_allowlisted",
+    }
+)
 
 # Reputation verdicts a threat intelligence source may return. The response is
 # untrusted input, so anything outside this set is rejected rather than stored.
@@ -121,11 +123,16 @@ class RealActionConnector:
         is_internal = self._code in _INTERNAL_ACTIONS
         is_wazuh = self._code in _WAZUH_ACTIONS
         is_high_impact = self._code in {
-            "account.disable", "account.enable", "host.isolate", "host.restore"
+            "account.disable",
+            "account.enable",
+            "host.isolate",
+            "host.restore",
         }
         retry_safe = self._code in {
-            "incident.status.transition", "endpoint.isolate",
-            "account.disable", "account.enable",
+            "incident.status.transition",
+            "endpoint.isolate",
+            "account.disable",
+            "account.enable",
         }
         if is_internal:
             egress = "NONE"
@@ -375,8 +382,12 @@ class RealActionConnector:
                 ).hexdigest()[:24]
                 return ActionResult(
                     True,
-                    {"effect": "idempotent", "action_code": self._code,
-                     "target_user_id": str(target_user_id), "receipt": receipt},
+                    {
+                        "effect": "idempotent",
+                        "action_code": self._code,
+                        "target_user_id": str(target_user_id),
+                        "receipt": receipt,
+                    },
                     safe_detail="Account already disabled (idempotent)",
                 )
             user = await session.scalar(
@@ -429,7 +440,10 @@ class RealActionConnector:
         action_input: dict[str, object],
         idempotency_key: str,
     ) -> ActionResult:
-        """Re-enable a Cyrvanta user (rollback of account.disable). Requires original_execution_id."""
+        """Re-enable a Cyrvanta user (rollback of account.disable).
+
+        Requires original_execution_id.
+        """
         inputs = action_input.get("inputs")
         if not isinstance(inputs, dict):
             return ActionResult(False, {}, "PLAYBOOK_ACTION_CONFIG_INVALID")
@@ -450,8 +464,10 @@ class RealActionConnector:
             )
             if original_event is None:
                 return ActionResult(
-                    False, {}, "PLAYBOOK_STATE_CONFLICT",
-                    "No prior account.disable audit event found for this user"
+                    False,
+                    {},
+                    "PLAYBOOK_STATE_CONFLICT",
+                    "No prior account.disable audit event found for this user",
                 )
             # Idempotency: check prior enable for this correlation
             prior = await session.scalar(
@@ -468,8 +484,12 @@ class RealActionConnector:
                 ).hexdigest()[:24]
                 return ActionResult(
                     True,
-                    {"effect": "idempotent", "action_code": self._code,
-                     "target_user_id": str(target_user_id), "receipt": receipt},
+                    {
+                        "effect": "idempotent",
+                        "action_code": self._code,
+                        "target_user_id": str(target_user_id),
+                        "receipt": receipt,
+                    },
                     safe_detail="Account already re-enabled (idempotent)",
                 )
             user = await session.scalar(
@@ -522,8 +542,9 @@ class RealActionConnector:
         base_url = str(credential["base_url"]).rstrip("/")
         timeout = min(30, max(1, int(credential.get("timeout_seconds", 10))))
         auth = (str(credential["username"]), str(credential["password"]))
-        async with httpx.AsyncClient(timeout=timeout, follow_redirects=False,
-                                     verify=True) as client:
+        async with httpx.AsyncClient(
+            timeout=timeout, follow_redirects=False, verify=True
+        ) as client:
             resp = await client.get(
                 f"{base_url}/security/user/authenticate?raw=true",
                 auth=auth,
@@ -554,7 +575,11 @@ class RealActionConnector:
         except (KeyError, ValueError):
             return ActionResult(False, {}, "PLAYBOOK_ACTION_CONFIG_INVALID")
         # Validate agent_id format: 3-digit Wazuh ID or full UUID
-        if not target_agent_id or len(target_agent_id) > 64 or contains_control_characters(target_agent_id):
+        if (
+            not target_agent_id
+            or len(target_agent_id) > 64
+            or contains_control_characters(target_agent_id)
+        ):
             return ActionResult(False, {}, "PLAYBOOK_ACTION_CONFIG_INVALID")
         credential = credential_handle.values
         base_url = str(credential["base_url"]).rstrip("/")
@@ -574,8 +599,12 @@ class RealActionConnector:
                 ).hexdigest()[:24]
                 return ActionResult(
                     True,
-                    {"effect": "idempotent", "action_code": self._code,
-                     "target_agent_id": target_agent_id, "receipt": receipt},
+                    {
+                        "effect": "idempotent",
+                        "action_code": self._code,
+                        "target_agent_id": target_agent_id,
+                        "receipt": receipt,
+                    },
                     safe_detail="Host already isolated (idempotent)",
                 )
         try:
@@ -589,8 +618,9 @@ class RealActionConnector:
                 "Content-Type": "application/json",
                 "X-Cyrvanta-Correlation": str(context.correlation_id),
             }
-            async with httpx.AsyncClient(timeout=timeout, follow_redirects=False,
-                                         verify=True) as client:
+            async with httpx.AsyncClient(
+                timeout=timeout, follow_redirects=False, verify=True
+            ) as client:
                 resp = await client.put(
                     f"{base_url}/active-response",
                     params={"agents_list": target_agent_id},
@@ -600,12 +630,20 @@ class RealActionConnector:
                 resp.raise_for_status()
                 body = resp.json()
             if body.get("error") or body["data"]["total_failed_items"] > 0:
-                return ActionResult(False, {}, "PLAYBOOK_ACTION_FAILED",
-                                    "Wazuh rejected the active-response command")
+                return ActionResult(
+                    False,
+                    {},
+                    "PLAYBOOK_ACTION_FAILED",
+                    "Wazuh rejected the active-response command",
+                )
             wazuh_task_id = resp.headers.get("X-Request-Id", "")
         except httpx.HTTPError:
-            return ActionResult(False, {}, "PLAYBOOK_ACTION_OUTCOME_UNKNOWN",
-                                "Wazuh AR isolation command outcome unknown")
+            return ActionResult(
+                False,
+                {},
+                "PLAYBOOK_ACTION_OUTCOME_UNKNOWN",
+                "Wazuh AR isolation command outcome unknown",
+            )
         except (ValueError, KeyError):
             return ActionResult(False, {}, "PLAYBOOK_ACTION_FAILED")
         # Write audit event
@@ -651,7 +689,10 @@ class RealActionConnector:
         idempotency_key: str,
         credential_handle: CredentialHandle | None,
     ) -> ActionResult:
-        """Send a Wazuh Active Response command to restore host network (rollback of host.isolate)."""
+        """Send a Wazuh Active Response command to restore host network.
+
+        Rollback of host.isolate.
+        """
         if not isinstance(credential_handle, StoredIntegrationCredential):
             return ActionResult(False, {}, "PLAYBOOK_CREDENTIAL_UNAVAILABLE")
         inputs = action_input.get("inputs")
@@ -663,7 +704,11 @@ class RealActionConnector:
             original_execution_id = str(inputs["original_execution_id"])
         except (KeyError, ValueError):
             return ActionResult(False, {}, "PLAYBOOK_ACTION_CONFIG_INVALID")
-        if not target_agent_id or len(target_agent_id) > 64 or contains_control_characters(target_agent_id):
+        if (
+            not target_agent_id
+            or len(target_agent_id) > 64
+            or contains_control_characters(target_agent_id)
+        ):
             return ActionResult(False, {}, "PLAYBOOK_ACTION_CONFIG_INVALID")
         async with tenant_session(context.tenant_id) as session:
             # Verify prior isolation event exists (rollback traceability)
@@ -676,8 +721,10 @@ class RealActionConnector:
             )
             if original_event is None:
                 return ActionResult(
-                    False, {}, "PLAYBOOK_STATE_CONFLICT",
-                    "No prior host.isolate audit event found for this agent"
+                    False,
+                    {},
+                    "PLAYBOOK_STATE_CONFLICT",
+                    "No prior host.isolate audit event found for this agent",
                 )
             # Idempotency
             prior = await session.scalar(
@@ -693,8 +740,12 @@ class RealActionConnector:
                 ).hexdigest()[:24]
                 return ActionResult(
                     True,
-                    {"effect": "idempotent", "action_code": self._code,
-                     "target_agent_id": target_agent_id, "receipt": receipt},
+                    {
+                        "effect": "idempotent",
+                        "action_code": self._code,
+                        "target_agent_id": target_agent_id,
+                        "receipt": receipt,
+                    },
                     safe_detail="Host already restored (idempotent)",
                 )
         credential = credential_handle.values
@@ -711,8 +762,9 @@ class RealActionConnector:
                 "Content-Type": "application/json",
                 "X-Cyrvanta-Correlation": str(context.correlation_id),
             }
-            async with httpx.AsyncClient(timeout=timeout, follow_redirects=False,
-                                         verify=True) as client:
+            async with httpx.AsyncClient(
+                timeout=timeout, follow_redirects=False, verify=True
+            ) as client:
                 resp = await client.put(
                     f"{base_url}/active-response",
                     params={"agents_list": target_agent_id},
@@ -722,12 +774,20 @@ class RealActionConnector:
                 resp.raise_for_status()
                 body = resp.json()
             if body.get("error") or body["data"]["total_failed_items"] > 0:
-                return ActionResult(False, {}, "PLAYBOOK_ACTION_FAILED",
-                                    "Wazuh rejected the active-response command")
+                return ActionResult(
+                    False,
+                    {},
+                    "PLAYBOOK_ACTION_FAILED",
+                    "Wazuh rejected the active-response command",
+                )
             wazuh_task_id = resp.headers.get("X-Request-Id", "")
         except httpx.HTTPError:
-            return ActionResult(False, {}, "PLAYBOOK_ACTION_OUTCOME_UNKNOWN",
-                                "Wazuh AR restore command outcome unknown")
+            return ActionResult(
+                False,
+                {},
+                "PLAYBOOK_ACTION_OUTCOME_UNKNOWN",
+                "Wazuh AR restore command outcome unknown",
+            )
         except (ValueError, KeyError):
             return ActionResult(False, {}, "PLAYBOOK_ACTION_FAILED")
         # Write audit event
@@ -867,7 +927,9 @@ class RealActionConnector:
             )
         verdict = verdict.lower()
         raw_score = body.get("score")
-        score = raw_score if isinstance(raw_score, int) and not isinstance(raw_score, bool) else None
+        score = (
+            raw_score if isinstance(raw_score, int) and not isinstance(raw_score, bool) else None
+        )
         if score is not None and not 0 <= score <= 100:
             return ActionResult(
                 False, {}, "PLAYBOOK_ACTION_FAILED", "Threat intelligence response was not usable"
@@ -897,7 +959,9 @@ class RealActionConnector:
                     causation_id=context.causation_id,
                 )
         except (ValueError, ClaimConflict, ClaimNotFound):
-            return ActionResult(False, {}, "PLAYBOOK_ACTION_FAILED", "Enrichment could not be filed")
+            return ActionResult(
+                False, {}, "PLAYBOOK_ACTION_FAILED", "Enrichment could not be filed"
+            )
         return ActionResult(
             True,
             {

@@ -344,7 +344,9 @@ class NativePlaybookDispatcher:
             raise NativeEngineRejected("PLAYBOOK_ENGINE_DISABLED")
         if not getattr(self.settings, "playbook_dispatch_enabled", True):
             raise NativeEngineRejected("PLAYBOOK_ENGINE_DISABLED")
-        if execution.execution_mode == "LIVE" and not getattr(self.settings, "playbook_live_enabled", False):
+        if execution.execution_mode == "LIVE" and not getattr(
+            self.settings, "playbook_live_enabled", False
+        ):
             raise NativeEngineRejected("PLAYBOOK_LIVE_DISABLED")
         if datetime.now(UTC) >= execution.deadline_at:
             raise NativeEngineRejected("PLAYBOOK_DEADLINE_EXCEEDED")

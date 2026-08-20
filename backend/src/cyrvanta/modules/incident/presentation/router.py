@@ -69,9 +69,7 @@ async def list_alerts(
 ) -> list[AlertResponse]:
     return [
         AlertResponse.model_validate(item)
-        for item in await service.list_alerts(
-            context.tenant_id, limit, offset, q, sort, severity
-        )
+        for item in await service.list_alerts(context.tenant_id, limit, offset, q, sort, severity)
     ]
 
 

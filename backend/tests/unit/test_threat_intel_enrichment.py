@@ -166,12 +166,18 @@ async def test_lookup_is_idempotent_for_the_same_response(monkeypatch) -> None:
     async with _incident(tenant_id) as incident_id:
         key = f"ti-repeat-{incident_id}"
         first = await connector.execute(
-            _context(tenant_id), _action_input(incident_id), {"path": "/api/reputation"},
-            key, _credential(),
+            _context(tenant_id),
+            _action_input(incident_id),
+            {"path": "/api/reputation"},
+            key,
+            _credential(),
         )
         second = await connector.execute(
-            _context(tenant_id), _action_input(incident_id), {"path": "/api/reputation"},
-            key, _credential(),
+            _context(tenant_id),
+            _action_input(incident_id),
+            {"path": "/api/reputation"},
+            key,
+            _credential(),
         )
 
         assert first.succeeded and second.succeeded

@@ -150,9 +150,7 @@ class GovernedMemoryService:
         offset: int,
     ) -> FeedbackList:
         async with tenant_session(tenant_id) as session:
-            query = select(FeedbackEntryModel).where(
-                FeedbackEntryModel.is_synthetic.is_(False)
-            )
+            query = select(FeedbackEntryModel).where(FeedbackEntryModel.is_synthetic.is_(False))
             count = select(func.count(FeedbackEntryModel.id)).where(
                 FeedbackEntryModel.is_synthetic.is_(False)
             )

@@ -63,9 +63,15 @@ def test_native_dispatcher_queries_are_explicitly_tenant_scoped() -> None:
 
 
 def test_hybrid_join_uses_tenant_as_part_of_its_identity() -> None:
-    source = (INFRASTRUCTURE / "hybrid_dispatcher.py").read_text(encoding="utf-8")
+    """A binding is joined on tenant as well as id, so one tenant's execution
+    can never be matched against another tenant's engine binding.
 
-    assert (
-        "PlaybookExecutionModel.tenant_id\n"
-        "                        == AutomationEngineBindingModel.tenant_id"
-    ) in source
+    Whitespace is collapsed before matching. Pinned to exact indentation, this
+    broke the moment the formatter reflowed the expression, while the join it
+    guards had not changed at all -- and a guard that fails for the wrong
+    reason teaches people to edit the guard.
+    """
+    source = (INFRASTRUCTURE / "hybrid_dispatcher.py").read_text(encoding="utf-8")
+    collapsed = " ".join(source.split())
+
+    assert "PlaybookExecutionModel.tenant_id == AutomationEngineBindingModel.tenant_id" in collapsed

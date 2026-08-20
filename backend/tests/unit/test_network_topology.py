@@ -2,6 +2,7 @@ import re
 from uuid import UUID
 
 import pytest
+from sqlalchemy import text
 
 from cyrvanta.modules.operations.application.topology_service import (
     _CORE_REPRESENTED_CONNECTORS,
@@ -11,7 +12,6 @@ from cyrvanta.modules.operations.application.topology_service import (
     _subnet_of,
 )
 from cyrvanta.shared.database import SessionFactory
-from sqlalchemy import text
 
 
 async def _existing_tenant_id() -> UUID:

@@ -8,7 +8,7 @@ from uuid import UUID, uuid4
 from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from cyrvanta.modules.identity.infrastructure.models import AuditEventModel, UserModel
+from cyrvanta.modules.identity.infrastructure.models import AuditEventModel
 from cyrvanta.modules.integrations.application.connection_service import (
     CURRENT_CONFIGURATION_SCHEMA_VERSION,
 )
@@ -109,8 +109,9 @@ ESSENTIAL_NATIVE_PLAYBOOKS: list[dict[str, object]] = [
         "title_es": "Contención crítica y respuesta ante ransomware",
         "title_en": "Critical Ransomware Containment & Crisis Response",
         "description_es": (
-            "Procedimiento crítico de contención masiva: aislamiento de red de segmentos afectados, "
-            "bloqueo preventivo de repositorios de backups y activación del protocolo de crisis."
+            "Procedimiento crítico de contención masiva: aislamiento de red de "
+            "segmentos afectados, bloqueo preventivo de repositorios de backups "
+            "y activación del protocolo de crisis."
         ),
         "description_en": (
             "Critical mass containment: network isolation of affected segments, "
@@ -246,8 +247,8 @@ ESSENTIAL_NATIVE_PLAYBOOKS: list[dict[str, object]] = [
         "title_es": "Notificación urgente a guardia SOC y CISO",
         "title_en": "Urgent SOC Guard & CISO Notification",
         "description_es": (
-            "Notificación crítica: envía alertas inmediatas de alta prioridad al equipo de respuesta "
-            "y a la dirección de seguridad."
+            "Notificación crítica: envía alertas inmediatas de alta prioridad "
+            "al equipo de respuesta y a la dirección de seguridad."
         ),
         "description_en": (
             "Critical notification: sends immediate high-priority alerts to the incident "
@@ -330,30 +331,30 @@ ESSENTIAL_NATIVE_ACTIONS: dict[str, str] = {
     # ── Transición de estado del incidente (acciones existentes) ────────────────
     "contain-and-document-incident": "host.isolate",
     # ── Enriquecimiento por Threat Intel externo ────────────────────────────────
-    "automated-enrichment":          "threat_intel.lookup",
+    "automated-enrichment": "threat_intel.lookup",
     # ── Notificaciones SMTP (acción existente, mapeo corregido) ─────────────────
-    "notify-critical-incident":      "notification.send",
-    "escalation-notification":       "notification.send",
+    "notify-critical-incident": "notification.send",
+    "escalation-notification": "notification.send",
     # ── Reporte completo por SMTP (acción existente, mapeo corregido) ───────────
-    "incident-report-email":         "incident.report.generate",
+    "incident-report-email": "incident.report.generate",
     # ── Ticket en ITSM (acción existente, mapeo corregido) ──────────────────────
-    "create-security-ticket":        "ticket.create",
+    "create-security-ticket": "ticket.create",
     # ── Sistemas externos allowlisted, uno por destino ──────────────────────────
     # Un binding es único por (tenant, action_code): compartir un único
     # webhook.invoke_allowlisted obligaba a que la purga de correo, el bloqueo
     # perimetral, la reactivación del EDR y el sellado de evidencia salieran
     # todos por la misma URL configurada.
-    "security-control-disabled":     "edr.invoke_allowlisted",
-    "malicious-indicator":           "firewall.invoke_allowlisted",
-    "phishing-malicious-email":      "mail_security.invoke_allowlisted",
-    "evidence-preservation":         "evidence_vault.invoke_allowlisted",
+    "security-control-disabled": "edr.invoke_allowlisted",
+    "malicious-indicator": "firewall.invoke_allowlisted",
+    "phishing-malicious-email": "mail_security.invoke_allowlisted",
+    "evidence-preservation": "evidence_vault.invoke_allowlisted",
     # ── Contención real de cuentas (nuevas acciones) ─────────────────────────────
-    "compromised-account":           "account.disable",
-    "privilege-escalation":          "account.disable",
+    "compromised-account": "account.disable",
+    "privilege-escalation": "account.disable",
     # ── Aislamiento de host via Wazuh AR (nuevas acciones) ───────────────────────
-    "compromised-endpoint":          "host.isolate",
-    "lateral-movement":              "host.isolate",
-    "ransomware-destructive":        "host.isolate",
+    "compromised-endpoint": "host.isolate",
+    "lateral-movement": "host.isolate",
+    "ransomware-destructive": "host.isolate",
 }
 
 # Playbooks that run several registered actions in order. Steps are chained on
@@ -629,7 +630,17 @@ class PlaybookAdministrationService:
             current_result_schema = resolve_schema("security/incident-notification-result-v1")
             expected_actions = catalog_step_actions(code)
 
-            def matches_current_catalog(version: PlaybookVersionModel) -> bool:
+            # The loop variables are bound as defaults rather than captured. The
+            # closure is consumed inside this same iteration so late binding
+            # cannot bite today, but nothing in the code says so -- if it ever
+            # outlives the iteration it would silently compare against the last
+            # playbook in the catalog instead of this one.
+            def matches_current_catalog(
+                version: PlaybookVersionModel,
+                current_input_schema: dict[str, object] = current_input_schema,
+                current_result_schema: dict[str, object] = current_result_schema,
+                expected_actions: tuple[str | None, ...] = expected_actions,
+            ) -> bool:
                 """A seeded version is current only if it still runs the catalog's actions.
 
                 Schema equality alone is not enough: when a playbook is remapped to
@@ -763,11 +774,7 @@ class PlaybookAdministrationService:
             await self._retire_superseded_versions(
                 session,
                 tenant_id,
-                [
-                    version
-                    for version in existing_versions
-                    if not matches_current_catalog(version)
-                ],
+                [version for version in existing_versions if not matches_current_catalog(version)],
                 code,
             )
 
@@ -797,9 +804,7 @@ class PlaybookAdministrationService:
                         webhook_path=None,
                         key_id=None,
                         desired_digest=latest_version.artifact_sha256,
-                        observed_digest=(
-                            latest_version.artifact_sha256 if actions_ready else None
-                        ),
+                        observed_digest=(latest_version.artifact_sha256 if actions_ready else None),
                         sync_status="SYNCHRONIZED" if actions_ready else "PENDING",
                         active=actions_ready,
                         last_verified_at=datetime.now(UTC) if actions_ready else None,
@@ -809,16 +814,12 @@ class PlaybookAdministrationService:
                     # Readiness must degrade as well as improve: a connector that
                     # stops being usable disarms the playbook that depends on it.
                     engine_binding.active = actions_ready
-                    engine_binding.sync_status = (
-                        "SYNCHRONIZED" if actions_ready else "PENDING"
-                    )
+                    engine_binding.sync_status = "SYNCHRONIZED" if actions_ready else "PENDING"
                     engine_binding.desired_digest = latest_version.artifact_sha256
                     engine_binding.observed_digest = (
                         latest_version.artifact_sha256 if actions_ready else None
                     )
-                    engine_binding.last_verified_at = (
-                        datetime.now(UTC) if actions_ready else None
-                    )
+                    engine_binding.last_verified_at = datetime.now(UTC) if actions_ready else None
 
         await session.flush()
 
@@ -1657,9 +1658,7 @@ class PlaybookAdministrationService:
                 blockers.append(f"ACTION_CREDENTIAL_MISSING:{step.action}")
             elif credential.status != "active":
                 blockers.append(f"ACTION_CREDENTIAL_DISABLED:{step.action}")
-            elif credential.configuration_schema_version != (
-                CURRENT_CONFIGURATION_SCHEMA_VERSION
-            ):
+            elif credential.configuration_schema_version != (CURRENT_CONFIGURATION_SCHEMA_VERSION):
                 blockers.append(f"ACTION_CREDENTIAL_OUTDATED:{step.action}")
             elif credential.last_error_code is not None:
                 blockers.append(f"ACTION_CREDENTIAL_FAILING:{step.action}")

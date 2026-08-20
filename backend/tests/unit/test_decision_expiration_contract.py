@@ -24,9 +24,9 @@ def test_scheduler_materializes_decision_expirations() -> None:
 
 
 def test_expiration_discovery_is_restricted_and_bounded() -> None:
-    migration = (
-        BACKEND_ROOT / "alembic/versions/0022_decision_expiration_scheduler.py"
-    ).read_text(encoding="utf-8")
+    migration = (BACKEND_ROOT / "alembic/versions/0022_decision_expiration_scheduler.py").read_text(
+        encoding="utf-8"
+    )
     assert migration.count("SECURITY DEFINER") == 2
     assert "REVOKE ALL ON FUNCTION" in migration
     assert "p_limit < 1 OR p_limit > 500" in migration

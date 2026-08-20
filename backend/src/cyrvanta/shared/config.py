@@ -14,7 +14,6 @@ class Settings(BaseSettings):
     environment: str = "development"
     app_version: str = "0.1.0"
     log_level: str = "INFO"
-    default_locale: str = "es-UY"
     frontend_url: str = "http://localhost"
     cors_origins: str = "http://localhost,http://localhost:5173"
     database_url: str = "postgresql+asyncpg://cyrvanta:change-me@postgres:5432/cyrvanta"
@@ -62,8 +61,6 @@ class Settings(BaseSettings):
     opensearch_url: str = "http://opensearch:9200"
     opensearch_index_pattern: str = "wazuh-alerts-*"
     wazuh_mode: Literal["disabled", "live"] = "disabled"
-    wazuh_manager_host: str = "wazuh-manager"
-    wazuh_manager_port: int = 1514
     ollama_mode: Literal["disabled", "live"] = "disabled"
     ollama_base_url: str = "http://host.docker.internal:11434"
     ollama_model: str = "gemma4:e4b"
@@ -103,8 +100,6 @@ class Settings(BaseSettings):
     memory_influence_enabled: bool = False
     memory_max_validity_days: int = Field(default=90, ge=1, le=365)
     memory_minimum_sample_size: int = Field(default=20, ge=1, le=10_000)
-    memory_max_reason_length: int = Field(default=1000, ge=64, le=4000)
-    memory_max_explanation_length: int = Field(default=2000, ge=128, le=8000)
     internal_api_url: str = "http://backend:8000"
     automation_kill_switch: bool = False
 

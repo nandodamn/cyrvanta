@@ -1,6 +1,8 @@
 # Plan: ampliar la deteccion automatica de incidentes
 
-Estado: EN IMPLEMENTACION — aprobado 2026-08-18. Fase 1 completa.
+Estado: COMPLETO — las cuatro fases implementadas. Ampliado despues con
+ventana deslizante, puntaje de riesgo por entidad con linea base, selectores
+por severidad y reglas por tenant (2026-08-20).
 
 ## Contexto
 
@@ -249,32 +251,22 @@ worker (`SqlCorrelationRepository._rule`), de modo que si valida, el motor la
 puede cargar. Auditoria por operacion (`drafted` / `activated` / `retired`).
 `load_correlation_rules.py` ya no escribe SQL: delega en el servicio.
 
-### Contradiccion de multitenencia — requiere decision
+### Multitenencia — RESUELTA (migracion 0026, 2026-08-20)
 
-Los endpoints **no se expusieron**, y no por falta de tiempo:
+Las reglas eran globales y los unicos roles son por tenant, asi que exponer la
+administracion por API habria dejado que un tenant cambiara la deteccion de
+todos. Se resolvio moviendo las reglas bajo el tenant, que era la salida
+correcta a largo plazo de las dos planteadas.
 
-- `correlation_rule_versions` **no tiene `tenant_id`**. Una regla es global:
-  publicarla cambia la deteccion de todos los tenants.
-- Los unicos roles que existen son `tenant-admin` y `viewer`, ambos por tenant.
-  No hay rol de plataforma (verificado: la tabla `roles` solo tiene esos dos).
+`correlation_rule_versions` tiene `tenant_id NOT NULL`, RLS con aislamiento por
+tenant, y los indices unicos pasaron a `(tenant_id, rule_code, version)` y
+`(tenant_id, rule_code) WHERE status='ACTIVE'`. Las reglas existentes se
+**copiaron a cada tenant**, no se asignaron a uno: son lo que cada tenant
+detecta hoy y quedarse con un solo dueno habria apagado la deteccion en el
+resto sin avisar.
 
-Exponer escritura bajo un permiso `correlation.manage` otorgado a
-`tenant-admin` dejaria que el administrador de un tenant cambie la deteccion de
-los demas. Segun la precedencia de `CLAUDE.md`, aislamiento multitenant gana
-sobre cualquier spec posterior, incluida esta, asi que se detuvo y se registra
-en vez de implementarse.
-
-**Las dos salidas posibles** (decision pendiente del usuario):
-
-1. **Reglas por tenant.** Agregar `tenant_id` a `correlation_rule_versions`,
-   al indice unico parcial y al repositorio. Es lo correcto a largo plazo y lo
-   mas invasivo: toca el motor y exige migrar las reglas existentes.
-2. **Rol de operador de plataforma.** Crear un rol fuera del alcance de tenant
-   y otorgarle `correlation.manage`. Mas barato, pero introduce un concepto de
-   autorizacion que el sistema hoy no tiene.
-
-Mientras tanto la operacion se hace con el script, que es auditado y
-reproducible.
+Con esto los endpoints ya no estan bloqueados por aislamiento. Exponerlos es
+ahora una decision de producto, no de seguridad.
 
 **Objetivo:** dejar de insertar reglas con SQL.
 

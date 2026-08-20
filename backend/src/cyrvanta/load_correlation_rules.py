@@ -58,6 +58,30 @@ def _selector(code: str, value: str) -> dict[str, str]:
 
 
 RULES: dict[str, dict[str, Any]] = {
+    # The scenario the platform was first demonstrated with, minus four dead
+    # selectors. Versions 2 and 3 still carried selectors for source_system
+    # "cyrvanta-demo-v2" -- a synthetic feed with zero findings in this
+    # deployment, inherited from the seed migration and never removed. They
+    # could not match anything, and reading the rule suggested the demo feed
+    # was still part of detection.
+    #
+    # 5760 (sshd authentication failed) and 5715 (sshd authentication success)
+    # are the two that do the work, grouped by source IP: the same address
+    # failing and then succeeding.
+    "credential-attack": {
+        "version": "4",
+        "why": "failed logins then a success from one source address",
+        "verified": "5760 and 5715 both emitted by lab-server-01; the removed "
+        "cyrvanta-demo-v2 selectors match 0 of 18084 findings",
+        "definition": {
+            **_COMMON,
+            "grouping": "source_ip",
+            "selectors": [
+                _selector("auth_failure", "5760"),
+                _selector("auth_success", "5715"),
+            ],
+        },
+    },
     # Two different kinds of file-integrity change on the same host inside one
     # window. Grouping by asset is what makes this possible at all: syscheck
     # findings carry no source IP, so before asset grouping existed no rule

@@ -42,11 +42,3 @@ class CorrelationResponse(BaseModel):
     created_at: datetime
     members: list[CorrelationMemberResponse] = Field(default_factory=list)
     factors: list[CorrelationFactorResponse] = Field(default_factory=list)
-
-
-class CanonicalDemoResponse(BaseModel):
-    scenario: str
-    findings_created: int
-    duplicates: int
-    correlation_queued: bool
-    correlation_id: UUID

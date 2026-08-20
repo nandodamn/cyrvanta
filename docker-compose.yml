@@ -69,6 +69,16 @@ services:
     profiles: [core]
     env_file: .env
     command: ["python", "-m", "cyrvanta.worker"]
+    # Without this the container reports Up while the process is crash-looping
+    # or running an image built before the last change -- both of which have
+    # happened, silently. Checks the process is alive rather than the module
+    # being importable, which would pass even for a dead loop.
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f 'cyrvanta.worker' > /dev/null || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
     depends_on:
       backend: { condition: service_healthy }
     networks: [internal]
@@ -80,6 +90,16 @@ services:
     profiles: [core]
     env_file: .env
     command: ["python", "-m", "cyrvanta.scheduler"]
+    # Without this the container reports Up while the process is crash-looping
+    # or running an image built before the last change -- both of which have
+    # happened, silently. Checks the process is alive rather than the module
+    # being importable, which would pass even for a dead loop.
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f 'cyrvanta.scheduler' > /dev/null || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
     depends_on:
       backend: { condition: service_healthy }
     networks: [internal]

@@ -844,6 +844,9 @@ export async function linkIncidentAlerts(
     }),
   );
 }
+export async function getIncidentActions(id: string): Promise<string[]> {
+  return z.array(z.string()).parse(await authorized(`/api/v1/incidents/${id}/actions`));
+}
 export async function getTimeline(id: string): Promise<TimelineEntry[]> {
   return z.array(timelineSchema).parse(await authorized(`/api/v1/incidents/${id}/timeline`));
 }

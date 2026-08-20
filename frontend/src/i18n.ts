@@ -32,6 +32,8 @@ const resources = {
       rememberSession: "Recordar sesión en este equipo",
       securityOperations: "Operaciones de seguridad",
       noRoleAssigned: "Sin rol asignado",
+      noTransitionsAvailable:
+        "No hay cambios de estado disponibles para vos en este incidente. Si sos el responsable, el cierre lo hace un supervisor.",
       signOut: "Cerrar sesión",
       openIncidents: "Incidentes abiertos",
       listedOpenIncidents: "Incidentes abiertos (hasta 100 recientes)",
@@ -766,6 +768,8 @@ const resources = {
       rememberSession: "Remember session on this device",
       securityOperations: "Security operations",
       noRoleAssigned: "No role assigned",
+      noTransitionsAvailable:
+        "No status changes are available to you on this incident. If you own it, closing is a supervisor's call.",
       signOut: "Sign out",
       openIncidents: "Open incidents",
       listedOpenIncidents: "Open incidents (up to 100 recent)",

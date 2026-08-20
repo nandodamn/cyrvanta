@@ -35,6 +35,7 @@ import {
   getDirectoryConfiguration,
   getDirectoryGroupMappings,
   getIncident,
+  getIncidentActions,
   getIncidentAlerts,
   getIncidentEnrichment,
   getIncidents,
@@ -1844,6 +1845,10 @@ function IncidentDetailPage() {
     queryKey: ["incident-alerts", id],
     queryFn: () => getIncidentAlerts(id),
   });
+  const incidentActions = useQuery({
+    queryKey: ["incident-actions", id, incident.data?.version],
+    queryFn: () => getIncidentActions(id),
+  });
   const enrichment = useQuery({
     queryKey: ["enrichment", id],
     queryFn: () => getIncidentEnrichment(id),
@@ -2117,7 +2122,15 @@ function IncidentDetailPage() {
     },
   });
 
-  const transitionTargets = incident.data ? (INCIDENT_TRANSITIONS[incident.data.status] ?? []) : [];
+  // Asked, not worked out. The state machine says which moves exist; only the
+  // server knows whether this person may make them on this incident -- an
+  // owner cannot close their own case however their role is configured. The
+  // list is intersected so a stale answer can never widen what is offered.
+  const permitted = new Set(incidentActions.data ?? []);
+  const transitionTargets = (
+    incident.data ? (INCIDENT_TRANSITIONS[incident.data.status] ?? []) : []
+  ).filter((target) => permitted.has(`transition:${target}`));
+  const mayAssign = permitted.has("assign");
 
   if (incident.isLoading) return <PageState loading error={false} empty={false} />;
   if (incident.isError || !incident.data) {
@@ -2479,7 +2492,7 @@ function IncidentDetailPage() {
               </button>
             </form>
 
-            <div className="form-grid" style={{ marginTop: "1.25rem" }}>
+            <div className="form-grid" style={{ marginTop: "1.25rem" }} hidden={!mayAssign}>
               <label>
                 {t("assignee")}
                 <AssigneeCombobox value={assigneeUserId} onChange={setAssigneeUserId} />
@@ -2894,7 +2907,17 @@ function IncidentDetailPage() {
                 </p>
               </div>
 
-              <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+              {transitionTargets.length === 0 && (
+                // An empty picker reads as a bug. This says the move is not
+                // available to this person on this incident, which is a fact
+                // about them and the case, not about the software.
+                <p className="status-message">{t("noTransitionsAvailable")}</p>
+              )}
+
+              <div
+                style={{ display: "flex", flexDirection: "column", gap: "10px" }}
+                hidden={transitionTargets.length === 0}
+              >
                 <label style={{ maxWidth: "320px" }}>
                   {t("targetStatus")}
                   <select

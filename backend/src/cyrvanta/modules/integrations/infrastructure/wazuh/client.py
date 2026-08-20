@@ -87,7 +87,9 @@ class WazuhIndexerClient:
                 verify=self.configuration.verify_tls,
                 follow_redirects=False,
             ) as client:
-                response = await client.post(url, json=body, auth=self.auth, headers=self.headers)
+                response = await client.post(
+                    url, json=body, auth=self.auth or httpx.USE_CLIENT_DEFAULT, headers=self.headers
+                )
             if len(response.content) > self.configuration.max_response_bytes:
                 raise ConnectorError(
                     ConnectorErrorCode.SOURCE_SCHEMA_CHANGED,

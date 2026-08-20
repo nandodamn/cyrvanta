@@ -5,7 +5,7 @@ import json
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime, timedelta
-from typing import Any
+from typing import Any, cast
 from uuid import UUID, uuid4
 
 from sqlalchemy import select, text
@@ -505,6 +505,11 @@ class NativePlaybookDispatcher:
 
         credential = None
         if connector.describe().egress != "NONE":
+            # Same guard as the rollback path: UUID(None) raises TypeError,
+            # which resolve_credential does not catch, so a binding with egress
+            # and no credential escaped as an unhandled error.
+            if credential_reference is None:
+                raise NativeEngineRejected("PLAYBOOK_CREDENTIAL_UNAVAILABLE")
             try:
                 credential = await IntegrationConnectionService(self.settings).resolve_credential(
                     context.tenant_id, credential_reference
@@ -889,7 +894,7 @@ class NativePlaybookDispatcher:
             raise NativeEngineRejected("PLAYBOOK_NOT_FOUND")
         if not allow_terminal and execution.status != ExecutionStatus.RUNNING.value:
             raise NativeEngineRejected("PLAYBOOK_STATE_CONFLICT")
-        return execution
+        return cast(PlaybookExecutionModel, execution)
 
     @staticmethod
     async def _locked_step(session: Any, tenant_id: UUID, execution_id: UUID, step_id: str) -> Any:

@@ -495,6 +495,13 @@ class PlaybookExecutionService:
 
         credential = None
         if connector.describe().egress != "NONE":
+            # A binding that reaches outside must name a credential. Without
+            # this guard the reference went into UUID(None), which raises
+            # TypeError -- not the ValueError resolve_credential catches -- so
+            # a misconfigured binding surfaced as a 500 instead of saying what
+            # was wrong.
+            if credential_reference is None:
+                raise PlaybookConflict("Rollback credential is unavailable")
             try:
                 credential = await IntegrationConnectionService(get_settings()).resolve_credential(
                     tenant_id, credential_reference

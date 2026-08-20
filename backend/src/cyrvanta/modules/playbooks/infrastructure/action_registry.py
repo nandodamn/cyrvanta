@@ -42,6 +42,7 @@ from cyrvanta.modules.playbooks.application.engine_ports import (
     ProbeResult,
     ValidationResult,
 )
+from cyrvanta.shared.coercion import as_int
 from cyrvanta.shared.database import tenant_session
 from cyrvanta.shared.target_validation import (
     contains_control_characters,
@@ -540,7 +541,7 @@ class RealActionConnector:
     async def _wazuh_authenticate(self, credential: dict[str, object]) -> str:
         """Obtain a short-lived Wazuh bearer token via basic authentication."""
         base_url = str(credential["base_url"]).rstrip("/")
-        timeout = min(30, max(1, int(credential.get("timeout_seconds", 10))))
+        timeout = min(30, max(1, as_int(credential.get("timeout_seconds"), 10)))
         auth = (str(credential["username"]), str(credential["password"]))
         async with httpx.AsyncClient(
             timeout=timeout, follow_redirects=False, verify=True
@@ -583,7 +584,7 @@ class RealActionConnector:
             return ActionResult(False, {}, "PLAYBOOK_ACTION_CONFIG_INVALID")
         credential = credential_handle.values
         base_url = str(credential["base_url"]).rstrip("/")
-        timeout = min(30, max(1, int(credential.get("timeout_seconds", 10))))
+        timeout = min(30, max(1, as_int(credential.get("timeout_seconds"), 10)))
         async with tenant_session(context.tenant_id) as session:
             # Idempotency: check prior audit event
             prior = await session.scalar(
@@ -750,7 +751,7 @@ class RealActionConnector:
                 )
         credential = credential_handle.values
         base_url = str(credential["base_url"]).rstrip("/")
-        timeout = min(30, max(1, int(credential.get("timeout_seconds", 10))))
+        timeout = min(30, max(1, as_int(credential.get("timeout_seconds"), 10)))
         try:
             token = await self._wazuh_authenticate(credential)
             ar_payload = {
@@ -877,7 +878,7 @@ class RealActionConnector:
 
     @staticmethod
     def _smtp_send(credential: dict[str, object], message: EmailMessage) -> None:
-        timeout = min(30, max(1, int(credential.get("timeout_seconds", 10))))
+        timeout = min(30, max(1, as_int(credential.get("timeout_seconds"), 10)))
         with smtplib.SMTP(
             str(credential["host"]), int(credential["port"]), timeout=timeout
         ) as client:
@@ -1030,7 +1031,7 @@ class RealActionConnector:
         token = credential.get("api_key") or credential.get("bearer_token")
         if token:
             headers["Authorization"] = f"Bearer {token}"
-        timeout = min(30, max(1, int(credential.get("timeout_seconds", 10))))
+        timeout = min(30, max(1, as_int(credential.get("timeout_seconds"), 10)))
         async with httpx.AsyncClient(timeout=timeout, follow_redirects=False) as client:
             response = await client.post(target, headers=headers, json=action_input)
             response.raise_for_status()

@@ -25,6 +25,7 @@ from cyrvanta.modules.operations.application.schemas import (
     TopologyNodeAlert,
     TopologyNodeService,
 )
+from cyrvanta.shared.coercion import as_int
 from cyrvanta.shared.config import Settings, get_settings
 from cyrvanta.shared.database import SessionFactory, tenant_session
 
@@ -80,7 +81,7 @@ async def _resolve(host: str) -> str | None:
         )
     except (socket.gaierror, OSError):
         return None
-    return infos[0][4][0] if infos else None
+    return str(infos[0][4][0]) if infos else None
 
 
 async def _probe_tcp(host: str, port: int) -> _Probe:
@@ -141,11 +142,13 @@ async def _probe_database() -> _Probe:
 
 def _resolve_wazuh_timeout(configured: object) -> int:
     """Clamp the connector's configured timeout the same way integrations do."""
-    try:
-        timeout = int(configured)  # type: ignore[call-overload]
-    except (TypeError, ValueError):
-        return _DEFAULT_WAZUH_TIMEOUT_SECONDS
+    # Checked before converting: int(True) is 1, so testing afterwards only
+    # worked because the converted value was discarded anyway.
     if isinstance(configured, bool):
+        return _DEFAULT_WAZUH_TIMEOUT_SECONDS
+    try:
+        timeout = as_int(configured, _DEFAULT_WAZUH_TIMEOUT_SECONDS)
+    except (TypeError, ValueError):
         return _DEFAULT_WAZUH_TIMEOUT_SECONDS
     return min(_MAX_WAZUH_TIMEOUT_SECONDS, max(_MIN_WAZUH_TIMEOUT_SECONDS, timeout))
 
@@ -350,8 +353,8 @@ class NetworkTopologyService:
         return TopologyNode(
             id=node_id,
             name=name,
-            type=node_type,  # type: ignore[arg-type]
-            category=category,  # type: ignore[arg-type]
+            type=node_type,
+            category=category,
             ip_address=address,
             ip_addresses=[address],
             services=services,
@@ -408,7 +411,7 @@ class NetworkTopologyService:
             nodes[node_id] = TopologyNode(
                 id=node_id,
                 name=integration.name,
-                type=node_type,  # type: ignore[arg-type]
+                type=node_type,
                 category="SECURITY_FEED",
                 ip_address=connector.lower(),
                 ip_addresses=[],
@@ -530,7 +533,7 @@ class NetworkTopologyService:
                 ip_addresses=[address] if address else [],
                 services=[],
                 subnet=_subnet_of(address or None),
-                status=status,  # type: ignore[arg-type]
+                status=status,
                 latency_ms=None,
                 last_ping=last_keep_alive or now_iso,
                 active_alerts_count=0,
@@ -588,17 +591,17 @@ class NetworkTopologyService:
             if not raw:
                 continue
             candidate = raw.split()[0].rstrip(",:;").split(":")[0]
-            node = by_identity.get(candidate) or by_identity.get(candidate.casefold())
-            if node is None:
+            matched = by_identity.get(candidate) or by_identity.get(candidate.casefold())
+            if matched is None:
                 continue
             severity = (alert.severity or "").lower()
             if severity not in _VALID_SEVERITIES:
                 severity = "medium"
-            node.active_alerts_count += 1
-            if severity in ("critical", "high") and node.status == "ONLINE":
-                node.status = "WARNING"
+            matched.active_alerts_count += 1
+            if severity in ("critical", "high") and matched.status == "ONLINE":
+                matched.status = "WARNING"
 
-            seen = grouped.setdefault(id(node), {})
+            seen = grouped.setdefault(id(matched), {})
             existing = seen.get(alert.title)
             if existing is not None:
                 existing.occurrences += 1
@@ -608,12 +611,12 @@ class NetworkTopologyService:
             entry = TopologyNodeAlert(
                 id=str(alert.id),
                 title=alert.title,
-                severity=severity,  # type: ignore[arg-type]
+                severity=severity,
                 category=alert.category or "security",
                 observed_at=(alert.observed_at.isoformat() if alert.observed_at else now_iso),
             )
             seen[alert.title] = entry
-            node.active_alerts.append(entry)
+            matched.active_alerts.append(entry)
 
     # ── Real relationships only ────────────────────────────────────────────────
 

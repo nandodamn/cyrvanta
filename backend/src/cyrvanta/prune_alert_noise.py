@@ -20,6 +20,7 @@ import asyncio
 from uuid import UUID, uuid4
 
 from sqlalchemy import func, or_, select, update
+from sqlalchemy.sql.elements import ColumnElement
 
 from cyrvanta.modules.identity.infrastructure.models import AuditEventModel, UserModel
 from cyrvanta.modules.incident.infrastructure.models import AlertReferenceModel
@@ -43,7 +44,7 @@ NOISE_TITLES: dict[str, str] = {
 NOISE_CATEGORIES: tuple[str, ...] = ("sca",)
 
 
-def _criteria():
+def _criteria() -> ColumnElement[bool]:
     return or_(
         AlertReferenceModel.title.in_(list(NOISE_TITLES)),
         AlertReferenceModel.category.in_(list(NOISE_CATEGORIES)),

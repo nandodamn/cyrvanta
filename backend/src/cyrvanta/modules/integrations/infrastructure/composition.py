@@ -16,6 +16,7 @@ from cyrvanta.modules.integrations.infrastructure.wazuh.adapter import WazuhSIEM
 from cyrvanta.modules.integrations.infrastructure.wazuh.config import (
     WazuhConnectorConfigV1,
 )
+from cyrvanta.shared.coercion import as_float
 from cyrvanta.shared.config import get_settings
 
 
@@ -53,8 +54,8 @@ async def configured_wazuh_connection(
         index_pattern=settings.opensearch_index_pattern,
         verify_tls=indexer_url.scheme == "https",
         timeout_seconds=min(
-            float(manager.values.get("timeout_seconds", 10)),
-            float(indexer.values.get("timeout_seconds", 10)),
+            as_float(manager.values.get("timeout_seconds"), 10),
+            as_float(indexer.values.get("timeout_seconds"), 10),
         ),
     )
     connector = WazuhSIEMAdapter(

@@ -22,6 +22,7 @@ from cyrvanta.modules.integrations.infrastructure.models import (
     IntegrationHealthHistoryModel,
     IntegrationModel,
 )
+from cyrvanta.shared.coercion import as_int
 from cyrvanta.shared.config import Settings, get_settings
 from cyrvanta.shared.database import tenant_session
 from cyrvanta.shared.target_validation import (
@@ -460,7 +461,7 @@ class IntegrationConnectionService:
                 headers["Authorization"] = f"Bearer {token}"
             if connector_type in {"WAZUH", "OPENSEARCH"} and values.get("username"):
                 auth = httpx.BasicAuth(str(values["username"]), str(values.get("password", "")))
-            timeout = min(30, max(1, int(values.get("timeout_seconds", 10))))
+            timeout = min(30, max(1, as_int(values.get("timeout_seconds"), 10)))
             async with httpx.AsyncClient(timeout=timeout, follow_redirects=False) as client:
                 if connector_type == "WAZUH":
                     token_response = await client.get(
@@ -485,7 +486,7 @@ class IntegrationConnectionService:
     @staticmethod
     def _probe_smtp(values: dict[str, object]) -> None:
         host, port = str(values["host"]), int(values["port"])
-        timeout = min(30, max(1, int(values.get("timeout_seconds", 10))))
+        timeout = min(30, max(1, as_int(values.get("timeout_seconds"), 10)))
         with smtplib.SMTP(host, port, timeout=timeout) as client:
             client.ehlo()
             if bool(values.get("use_starttls", True)):

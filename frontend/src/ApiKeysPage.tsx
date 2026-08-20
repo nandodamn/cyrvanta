@@ -42,14 +42,31 @@ export function ApiKeysPage() {
         }}
       >
         <div>
-          <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "var(--accent)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+          <span
+            style={{
+              fontSize: "0.75rem",
+              fontWeight: 700,
+              color: "var(--accent)",
+              textTransform: "uppercase",
+              letterSpacing: "0.05em",
+            }}
+          >
             🏛️ ARQUITECTURA DE CONEXIONES & SECRETOS DE CYRVANTA
           </span>
           <h2 style={{ margin: "4px 0 0", fontSize: "1.1rem" }}>
             Gestión Centralizada de Credenciales e Integraciones
           </h2>
-          <p style={{ margin: "4px 0 0", fontSize: "0.85rem", color: "var(--text-soft)", maxWidth: "800px" }}>
-            Todas las llaves API (n8n, Wazuh, OpenSearch, Ollama, SMTP, LDAP/AD) deben administrarse directamente dentro de sus respectivas Conexiones en el catálogo de integraciones con cifrado por tenant.
+          <p
+            style={{
+              margin: "4px 0 0",
+              fontSize: "0.85rem",
+              color: "var(--text-soft)",
+              maxWidth: "800px",
+            }}
+          >
+            Todas las llaves API (n8n, Wazuh, OpenSearch, Ollama, SMTP, LDAP/AD) deben administrarse
+            directamente dentro de sus respectivas Conexiones en el catálogo de integraciones con
+            cifrado por tenant.
           </p>
         </div>
         <a

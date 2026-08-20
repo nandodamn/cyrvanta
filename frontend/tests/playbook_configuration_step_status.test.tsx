@@ -32,11 +32,7 @@ function playbook(blocking: string[]): api.PlaybookDefinition {
     impact: "MEDIUM",
     required_parameters: [],
     credential_aliases: [],
-    required_actions: [
-      "host.isolate",
-      "incident.report.generate",
-      "incident.status.transition",
-    ],
+    required_actions: ["host.isolate", "incident.report.generate", "incident.status.transition"],
     target_incident_types: [],
     mitre_codes: [],
     rollback_supported: true,
@@ -105,10 +101,7 @@ describe("playbook step configuration status", () => {
   it("treats a reason it does not recognise as blocking", async () => {
     // A new backend reason must not read as ready just because this file has
     // not been taught about it yet.
-    renderModal([
-      "PLAYBOOK_CONFIGURATION_REQUIRED",
-      "ACTION_SOMETHING_NEW:host.isolate",
-    ]);
+    renderModal(["PLAYBOOK_CONFIGURATION_REQUIRED", "ACTION_SOMETHING_NEW:host.isolate"]);
 
     expect(await screen.findByText(/Falta la conexión Wazuh/i)).toBeVisible();
     const summary = screen.getByText(/Falta un paso/i);

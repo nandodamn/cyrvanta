@@ -96,8 +96,8 @@ function MemoryCard({ item }: { item: MemoryCandidate }) {
                 item.status === "ACTIVE"
                   ? "var(--accent)"
                   : item.status === "DRAFT"
-                  ? "var(--panel-raised)"
-                  : "var(--line)",
+                    ? "var(--panel-raised)"
+                    : "var(--line)",
               color: item.status === "ACTIVE" ? "#041512" : "var(--text)",
             }}
           >
@@ -105,7 +105,14 @@ function MemoryCard({ item }: { item: MemoryCandidate }) {
           </span>
         </div>
 
-        <p style={{ fontSize: "0.9rem", lineHeight: 1.5, margin: "8px 0 14px", color: "var(--text)" }}>
+        <p
+          style={{
+            fontSize: "0.9rem",
+            lineHeight: 1.5,
+            margin: "8px 0 14px",
+            color: "var(--text)",
+          }}
+        >
           {statement}
         </p>
 
@@ -146,7 +153,9 @@ function MemoryCard({ item }: { item: MemoryCandidate }) {
             <dd style={{ margin: 0, fontWeight: 600 }}>{item.source_type}</dd>
           </div>
           <div>
-            <dt style={{ color: "var(--muted)", fontSize: "0.75rem" }}>{t("memory.evidenceCount")}</dt>
+            <dt style={{ color: "var(--muted)", fontSize: "0.75rem" }}>
+              {t("memory.evidenceCount")}
+            </dt>
             <dd style={{ margin: 0, fontWeight: 600 }}>{item.evidence_refs.length}</dd>
           </div>
           <div>
@@ -218,12 +227,17 @@ function MemoryCard({ item }: { item: MemoryCandidate }) {
               <input
                 style={{ width: "100%", marginTop: "4px", padding: "6px 10px" }}
                 value={reason}
-                placeholder={t("memory.actionReasonPlaceholder", { defaultValue: "Justificación de la acción..." })}
+                placeholder={t("memory.actionReasonPlaceholder", {
+                  defaultValue: "Justificación de la acción...",
+                })}
                 maxLength={1000}
                 onChange={(event) => setReason(event.target.value)}
               />
             </label>
-            <div className="form-actions" style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginTop: "4px" }}>
+            <div
+              className="form-actions"
+              style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginTop: "4px" }}
+            >
               {item.status === "DRAFT" && (
                 <button
                   type="button"
@@ -286,7 +300,11 @@ function MemoryCard({ item }: { item: MemoryCandidate }) {
                 </button>
               )}
             </div>
-            {failed && <p className="form-error" style={{ margin: "4px 0 0" }}>{t("memory.separationError")}</p>}
+            {failed && (
+              <p className="form-error" style={{ margin: "4px 0 0" }}>
+                {t("memory.separationError")}
+              </p>
+            )}
           </div>
         )}
     </article>
@@ -361,10 +379,11 @@ export function GovernedMemoryPage() {
     candidateMutation.mutate();
   };
 
-  const filteredCandidates = candidates.data?.filter((item) => {
-    if (statusFilter === "ALL") return true;
-    return item.status === statusFilter;
-  }) ?? [];
+  const filteredCandidates =
+    candidates.data?.filter((item) => {
+      if (statusFilter === "ALL") return true;
+      return item.status === statusFilter;
+    }) ?? [];
 
   return (
     <>
@@ -382,7 +401,9 @@ export function GovernedMemoryPage() {
         <div>
           <p className="eyebrow">OBSERVATIONAL_ONLY</p>
           <h1 style={{ margin: "4px 0" }}>{t("memory.title")}</h1>
-          <p className="muted" style={{ margin: 0 }}>{t("memory.intro")}</p>
+          <p className="muted" style={{ margin: 0 }}>
+            {t("memory.intro")}
+          </p>
         </div>
 
         {/* Enterprise Tab Bar Segmented Control directly in header */}
@@ -417,12 +438,22 @@ export function GovernedMemoryPage() {
             }}
             onClick={() => setActiveTab("base")}
           >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg
+              width="15"
+              height="15"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
               <ellipse cx="12" cy="5" rx="9" ry="3" />
               <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3" />
               <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5" />
             </svg>
-            {t("memory.tabBase", { defaultValue: "Base de Memoria Operacional" })} ({candidates.data?.length ?? 0})
+            {t("memory.tabBase", { defaultValue: "Base de Memoria Operacional" })} (
+            {candidates.data?.length ?? 0})
           </button>
           <button
             type="button"
@@ -442,7 +473,16 @@ export function GovernedMemoryPage() {
             }}
             onClick={() => setActiveTab("capture")}
           >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg
+              width="15"
+              height="15"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
               <path d="M12 5v14M5 12h14" />
             </svg>
             {t("memory.tabCapture", { defaultValue: "Registrar Feedback & Candidato" })}
@@ -465,7 +505,16 @@ export function GovernedMemoryPage() {
             }}
             onClick={() => setActiveTab("governance")}
           >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg
+              width="15"
+              height="15"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
               <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
             </svg>
             {t("memory.tabGovernance", { defaultValue: "Gobernanza & Métricas" })}
@@ -488,12 +537,24 @@ export function GovernedMemoryPage() {
         }}
       >
         <div>
-          <strong style={{ color: "var(--accent)" }}>{t("memory.safetyTitle")}</strong>: {t("memory.safetyBody")}
+          <strong style={{ color: "var(--accent)" }}>{t("memory.safetyTitle")}</strong>:{" "}
+          {t("memory.safetyBody")}
         </div>
-        <div style={{ display: "flex", gap: "16px", fontSize: "0.8rem", color: "var(--text-soft)" }}>
-          <span>{t("memory.candidates")}: <strong style={{ color: "var(--text)" }}>{candidates.data?.length ?? 0}</strong></span>
-          <span>{t("memory.active")}: <strong style={{ color: "var(--text)" }}>{active.data?.length ?? 0}</strong></span>
-          <span>{t("memory.metrics")}: <strong style={{ color: "var(--text)" }}>{metrics.data?.length ?? 0}</strong></span>
+        <div
+          style={{ display: "flex", gap: "16px", fontSize: "0.8rem", color: "var(--text-soft)" }}
+        >
+          <span>
+            {t("memory.candidates")}:{" "}
+            <strong style={{ color: "var(--text)" }}>{candidates.data?.length ?? 0}</strong>
+          </span>
+          <span>
+            {t("memory.active")}:{" "}
+            <strong style={{ color: "var(--text)" }}>{active.data?.length ?? 0}</strong>
+          </span>
+          <span>
+            {t("memory.metrics")}:{" "}
+            <strong style={{ color: "var(--text)" }}>{metrics.data?.length ?? 0}</strong>
+          </span>
         </div>
       </div>
 
@@ -509,7 +570,14 @@ export function GovernedMemoryPage() {
               alignItems: "center",
             }}
           >
-            <span style={{ fontSize: "0.85rem", color: "var(--muted)", fontWeight: 600, marginRight: "4px" }}>
+            <span
+              style={{
+                fontSize: "0.85rem",
+                color: "var(--muted)",
+                fontWeight: 600,
+                marginRight: "4px",
+              }}
+            >
               {t("filter", { defaultValue: "Filtrar por estado:" })}
             </span>
             {["ALL", "ACTIVE", "IN_REVIEW", "DRAFT", "APPROVED", "DISABLED"].map((statusKey) => (
@@ -522,7 +590,10 @@ export function GovernedMemoryPage() {
                   fontSize: "0.8rem",
                   minHeight: "32px",
                   background: statusFilter === statusKey ? "var(--panel-raised)" : "transparent",
-                  border: statusFilter === statusKey ? "1px solid var(--accent)" : "1px solid transparent",
+                  border:
+                    statusFilter === statusKey
+                      ? "1px solid var(--accent)"
+                      : "1px solid transparent",
                   color: statusFilter === statusKey ? "var(--accent)" : "var(--text-soft)",
                 }}
                 onClick={() => setStatusFilter(statusKey)}
@@ -537,7 +608,11 @@ export function GovernedMemoryPage() {
             {candidates.isError && <p className="form-error">{t("loadError")}</p>}
             {!candidates.isLoading && !candidates.isError && filteredCandidates.length === 0 && (
               <div className="panel" style={{ textAlign: "center", padding: "2rem" }}>
-                <p className="muted">{t("memory.noCandidates", { defaultValue: "No hay patrones de memoria registrados en este estado." })}</p>
+                <p className="muted">
+                  {t("memory.noCandidates", {
+                    defaultValue: "No hay patrones de memoria registrados en este estado.",
+                  })}
+                </p>
               </div>
             )}
             <div
@@ -584,9 +659,21 @@ export function GovernedMemoryPage() {
           >
             <h2 style={{ margin: 0 }}>{t("memory.recordFeedback")}</h2>
             <p className="muted" style={{ fontSize: "0.85rem", margin: "4px 0 1rem" }}>
-              {t("memory.feedbackIntro", { defaultValue: "Registra observaciones de campo inmutables sobre recursos autoritativos existentes." })}
+              {t("memory.feedbackIntro", {
+                defaultValue:
+                  "Registra observaciones de campo inmutables sobre recursos autoritativos existentes.",
+              })}
             </p>
-            <label style={{ display: "flex", flexDirection: "column", gap: "4px", marginBottom: "12px", width: "100%", boxSizing: "border-box" }}>
+            <label
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: "4px",
+                marginBottom: "12px",
+                width: "100%",
+                boxSizing: "border-box",
+              }}
+            >
               <span>{t("memory.resourceType")}</span>
               <select
                 style={{ width: "100%", boxSizing: "border-box", padding: "8px 10px" }}
@@ -600,7 +687,16 @@ export function GovernedMemoryPage() {
                 )}
               </select>
             </label>
-            <label style={{ display: "flex", flexDirection: "column", gap: "4px", marginBottom: "12px", width: "100%", boxSizing: "border-box" }}>
+            <label
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: "4px",
+                marginBottom: "12px",
+                width: "100%",
+                boxSizing: "border-box",
+              }}
+            >
               <span>{t("memory.resourceId")}</span>
               <input
                 required
@@ -610,7 +706,16 @@ export function GovernedMemoryPage() {
                 onChange={(e) => setFeedback({ ...feedback, resource_id: e.target.value })}
               />
             </label>
-            <label style={{ display: "flex", flexDirection: "column", gap: "4px", marginBottom: "12px", width: "100%", boxSizing: "border-box" }}>
+            <label
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: "4px",
+                marginBottom: "12px",
+                width: "100%",
+                boxSizing: "border-box",
+              }}
+            >
               <span>{t("memory.outcome")}</span>
               <select
                 style={{ width: "100%", boxSizing: "border-box", padding: "8px 10px" }}
@@ -622,7 +727,16 @@ export function GovernedMemoryPage() {
                 ))}
               </select>
             </label>
-            <label style={{ display: "flex", flexDirection: "column", gap: "4px", marginBottom: "12px", width: "100%", boxSizing: "border-box" }}>
+            <label
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: "4px",
+                marginBottom: "12px",
+                width: "100%",
+                boxSizing: "border-box",
+              }}
+            >
               <span>{t("memory.reason")}</span>
               <textarea
                 required
@@ -634,10 +748,18 @@ export function GovernedMemoryPage() {
                 onChange={(e) => setFeedback({ ...feedback, reason: e.target.value })}
               />
             </label>
-            <button type="submit" disabled={feedbackMutation.isPending} style={{ width: "100%", minHeight: "40px" }}>
+            <button
+              type="submit"
+              disabled={feedbackMutation.isPending}
+              style={{ width: "100%", minHeight: "40px" }}
+            >
               {t("memory.saveFeedback")}
             </button>
-            {feedbackMutation.isError && <p className="form-error" style={{ marginTop: "8px" }}>{t("actionError")}</p>}
+            {feedbackMutation.isError && (
+              <p className="form-error" style={{ marginTop: "8px" }}>
+                {t("actionError")}
+              </p>
+            )}
           </form>
 
           <form
@@ -658,9 +780,21 @@ export function GovernedMemoryPage() {
           >
             <h2 style={{ margin: 0 }}>{t("memory.proposeCandidate")}</h2>
             <p className="muted" style={{ fontSize: "0.85rem", margin: "4px 0 1rem" }}>
-              {t("memory.candidateIntro", { defaultValue: "Crea una propuesta de patrón o lección aprendida para ser revisada por un 2º analista." })}
+              {t("memory.candidateIntro", {
+                defaultValue:
+                  "Crea una propuesta de patrón o lección aprendida para ser revisada por un 2º analista.",
+              })}
             </p>
-            <label style={{ display: "flex", flexDirection: "column", gap: "4px", marginBottom: "12px", width: "100%", boxSizing: "border-box" }}>
+            <label
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: "4px",
+                marginBottom: "12px",
+                width: "100%",
+                boxSizing: "border-box",
+              }}
+            >
               <span>{t("memory.kind")}</span>
               <select
                 style={{ width: "100%", boxSizing: "border-box", padding: "8px 10px" }}
@@ -671,7 +805,16 @@ export function GovernedMemoryPage() {
                 <option>TREND</option>
               </select>
             </label>
-            <label style={{ display: "flex", flexDirection: "column", gap: "4px", marginBottom: "12px", width: "100%", boxSizing: "border-box" }}>
+            <label
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: "4px",
+                marginBottom: "12px",
+                width: "100%",
+                boxSizing: "border-box",
+              }}
+            >
               <span>{t("memory.candidateTitle")}</span>
               <input
                 required
@@ -682,7 +825,16 @@ export function GovernedMemoryPage() {
                 onChange={(e) => setCandidate({ ...candidate, title: e.target.value })}
               />
             </label>
-            <label style={{ display: "flex", flexDirection: "column", gap: "4px", marginBottom: "12px", width: "100%", boxSizing: "border-box" }}>
+            <label
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: "4px",
+                marginBottom: "12px",
+                width: "100%",
+                boxSizing: "border-box",
+              }}
+            >
               <span>{t("memory.statement")}</span>
               <textarea
                 required
@@ -694,7 +846,16 @@ export function GovernedMemoryPage() {
                 onChange={(e) => setCandidate({ ...candidate, statement: e.target.value })}
               />
             </label>
-            <label style={{ display: "flex", flexDirection: "column", gap: "4px", marginBottom: "12px", width: "100%", boxSizing: "border-box" }}>
+            <label
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: "4px",
+                marginBottom: "12px",
+                width: "100%",
+                boxSizing: "border-box",
+              }}
+            >
               <span>{t("memory.evidenceIds")}</span>
               <input
                 required
@@ -704,7 +865,16 @@ export function GovernedMemoryPage() {
                 onChange={(e) => setCandidate({ ...candidate, evidence_refs: e.target.value })}
               />
             </label>
-            <label style={{ display: "flex", flexDirection: "column", gap: "4px", marginBottom: "12px", width: "100%", boxSizing: "border-box" }}>
+            <label
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: "4px",
+                marginBottom: "12px",
+                width: "100%",
+                boxSizing: "border-box",
+              }}
+            >
               <span>{t("memory.validUntil")}</span>
               <input
                 required
@@ -714,10 +884,18 @@ export function GovernedMemoryPage() {
                 onChange={(e) => setCandidate({ ...candidate, valid_until: e.target.value })}
               />
             </label>
-            <button type="submit" disabled={candidateMutation.isPending} style={{ width: "100%", minHeight: "40px" }}>
+            <button
+              type="submit"
+              disabled={candidateMutation.isPending}
+              style={{ width: "100%", minHeight: "40px" }}
+            >
               {t("memory.propose")}
             </button>
-            {candidateMutation.isError && <p className="form-error" style={{ marginTop: "8px" }}>{t("actionError")}</p>}
+            {candidateMutation.isError && (
+              <p className="form-error" style={{ marginTop: "8px" }}>
+                {t("actionError")}
+              </p>
+            )}
           </form>
         </div>
       )}
@@ -727,22 +905,42 @@ export function GovernedMemoryPage() {
           <section className="panel" style={{ padding: "1.25rem" }}>
             <h2>{t("memory.metrics")}</h2>
             <p className="muted" style={{ fontSize: "0.85rem", marginBottom: "1rem" }}>
-              {t("memory.metricsIntro", { defaultValue: "Métricas de tamaño de muestra e idoneidad estadística para patrones de lección aprendida." })}
+              {t("memory.metricsIntro", {
+                defaultValue:
+                  "Métricas de tamaño de muestra e idoneidad estadística para patrones de lección aprendida.",
+              })}
             </p>
-            {(!metrics.data || metrics.data.length === 0) ? (
+            {!metrics.data || metrics.data.length === 0 ? (
               <p className="muted" style={{ margin: "1rem 0" }}>
-                {t("memory.noMetrics", { defaultValue: "No hay métricas registradas en este período." })}
+                {t("memory.noMetrics", {
+                  defaultValue: "No hay métricas registradas en este período.",
+                })}
               </p>
             ) : (
-              <div className="data-list" style={{ marginTop: "1rem", display: "flex", flexDirection: "column", gap: "10px" }}>
+              <div
+                className="data-list"
+                style={{ marginTop: "1rem", display: "flex", flexDirection: "column", gap: "10px" }}
+              >
                 {metrics.data.map((metric) => (
-                  <article key={metric.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 16px", background: "var(--panel-raised)", borderRadius: "6px" }}>
+                  <article
+                    key={metric.id}
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      padding: "12px 16px",
+                      background: "var(--panel-raised)",
+                      borderRadius: "6px",
+                    }}
+                  >
                     <div>
                       <strong style={{ fontSize: "0.95rem" }}>
                         {metric.code} · v{metric.version}
                       </strong>
                       <br />
-                      <small style={{ color: "var(--muted)" }}>{t("memory.sampleSize", { count: metric.sample_size })}</small>
+                      <small style={{ color: "var(--muted)" }}>
+                        {t("memory.sampleSize", { count: metric.sample_size })}
+                      </small>
                     </div>
                     <span
                       style={{

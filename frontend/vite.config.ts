@@ -13,9 +13,7 @@ const vendorChunks: ReadonlyArray<readonly [string, readonly string[]]> = [
 function manualChunks(id: string): string | undefined {
   const normalizedId = id.split("\\").join("/");
   return vendorChunks.find(([, packages]) =>
-    packages.some((packageName) =>
-      normalizedId.includes(`/node_modules/${packageName}/`),
-    ),
+    packages.some((packageName) => normalizedId.includes(`/node_modules/${packageName}/`)),
   )?.[0];
 }
 

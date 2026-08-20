@@ -7,8 +7,10 @@ const app = readFileSync(resolve(process.cwd(), "src", "App.tsx"), "utf-8");
 
 describe("route loading boundaries", () => {
   it("loads modular administration pages on demand behind an accessible fallback", () => {
+    // ApiKeysPage is deliberately absent: the page exists and is tested but
+    // has no route, so there is no boundary to guard. Listing it here made the
+    // dead lazy import look intentional.
     for (const moduleName of [
-      "ApiKeysPage",
       "GovernedMemoryPage",
       "PlaybookLibraryPage",
       "VerifiedIntegrationsPage",

@@ -511,7 +511,9 @@ details summary {
   user-select: none;
   background: color-mix(in srgb, var(--panel-raised) 70%, var(--panel));
   border-bottom: 1px solid transparent;
-  transition: background 0.15s ease, color 0.15s ease;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
   list-style: none;
 }
 
@@ -854,7 +856,9 @@ details > .admin-list {
   padding: 10px 8px 8px;
   margin: 0 -8px;
   cursor: pointer;
-  transition: background 0.15s ease, border-color 0.15s ease;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease;
 }
 
 .admin-list-selectable > div:hover {
@@ -889,7 +893,9 @@ details > .admin-list {
 .admin-list-row-chevron {
   flex-shrink: 0;
   color: var(--muted);
-  transition: color 0.15s ease, transform 0.15s ease;
+  transition:
+    color 0.15s ease,
+    transform 0.15s ease;
 }
 
 .admin-list-hint {
@@ -938,7 +944,10 @@ details > .admin-list {
   color: var(--accent);
   cursor: pointer;
   white-space: nowrap;
-  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease;
 }
 
 .admin-inline-toggle:hover {
@@ -985,7 +994,9 @@ details > .admin-list {
   display: flex;
   flex-direction: column;
   gap: 1.25rem;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
 .admin-user-detail.has-selection {
@@ -1176,8 +1187,6 @@ details > .admin-list {
     400 11px "Space Mono",
     monospace;
 }
-
-
 
 .center {
   min-height: 100vh;
@@ -1943,7 +1952,7 @@ details > .admin-list {
   border: 1px solid var(--panel-border);
   border-radius: 8px;
   padding: 10px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
 
 .admin-sub-tab-button {
@@ -2047,7 +2056,10 @@ details > .admin-list {
   border: 1px solid var(--line);
   border-radius: 8px;
   padding: 1.25rem;
-  transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+  transition:
+    transform 0.15s ease,
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
 }
 
 .integration-card:hover {
@@ -2141,7 +2153,8 @@ details > .admin-list {
 }
 
 .integration-empty-box {
-  background: radial-gradient(circle at 50% 50%, rgba(85, 230, 193, 0.03) 0, transparent 70%), var(--panel);
+  background: radial-gradient(circle at 50% 50%, rgba(85, 230, 193, 0.03) 0, transparent 70%),
+    var(--panel);
   border: 1px dashed var(--line-strong);
   border-radius: 8px;
   padding: 2rem;
@@ -2266,7 +2279,8 @@ details > .admin-list {
 
 .topology-graph-container {
   position: relative;
-  background: radial-gradient(circle at 50% 50%, rgba(85, 230, 193, 0.03) 0, transparent 70%), var(--surface);
+  background: radial-gradient(circle at 50% 50%, rgba(85, 230, 193, 0.03) 0, transparent 70%),
+    var(--surface);
   border: 1px solid var(--line);
   border-radius: 8px;
   padding: 1rem;
@@ -2565,6 +2579,3 @@ details > .admin-list {
   color: var(--text-soft);
   margin-top: 0.5rem;
 }
-
-
-

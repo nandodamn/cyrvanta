@@ -143,7 +143,8 @@ const integrationHealthSchema = z.object({
   mode: z.enum(["disabled", "live"]),
   healthy: z.boolean(),
   detail: z.string(),
-});const integrationConnectionSchema = z.object({
+});
+const integrationConnectionSchema = z.object({
   id: z.string().uuid(),
   connector_type: z.enum(["SMTP", "HTTP_ALLOWLISTED", "N8N", "OPENSEARCH", "OLLAMA", "WAZUH"]),
   name: z.string(),
@@ -342,7 +343,8 @@ const playbookDefinitionSchema = z.object({
 const playbookDefinitionListSchema = z.object({
   items: z.array(playbookDefinitionSchema),
   total: z.number().int().nonnegative(),
-});const nativeActionBindingSchema = z.object({
+});
+const nativeActionBindingSchema = z.object({
   id: z.string().uuid(),
   action_code: z.string(),
   action_version: z.string(),
@@ -702,9 +704,7 @@ export async function updateUser(
   userId: string,
   input: { display_name?: string; is_active?: boolean },
 ): Promise<AdminUser> {
-  return adminUserSchema.parse(
-    await authorizedMutation(`/api/v1/users/${userId}`, "PATCH", input),
-  );
+  return adminUserSchema.parse(await authorizedMutation(`/api/v1/users/${userId}`, "PATCH", input));
 }
 
 export async function replaceUserPassword(userId: string, password: string): Promise<void> {
@@ -757,17 +757,17 @@ export async function unlinkUserDirectoryIdentity(userId: string): Promise<void>
   );
 }
 export async function getDirectoryGroupMappings(): Promise<DirectoryGroupMapping[]> {
-  return z.array(directoryGroupMappingSchema).parse(
-    await authorized("/api/v1/directory/group-mappings"),
-  );
+  return z
+    .array(directoryGroupMappingSchema)
+    .parse(await authorized("/api/v1/directory/group-mappings"));
 }
 
 export async function replaceDirectoryGroupMappings(
   mappings: Array<{ external_group: string; role_id: string }>,
 ): Promise<DirectoryGroupMapping[]> {
-  return z.array(directoryGroupMappingSchema).parse(
-    await authorizedMutation("/api/v1/directory/group-mappings", "PUT", { mappings }),
-  );
+  return z
+    .array(directoryGroupMappingSchema)
+    .parse(await authorizedMutation("/api/v1/directory/group-mappings", "PUT", { mappings }));
 }
 export async function activateDirectoryConfiguration(): Promise<DirectoryConfiguration> {
   return directoryConfigurationSchema.parse(
@@ -969,9 +969,9 @@ export async function getIntegrationHealth(): Promise<IntegrationHealth[]> {
 }
 
 export async function getIntegrationConnections(): Promise<IntegrationConnection[]> {
-  return z.array(integrationConnectionSchema).parse(
-    await authorized("/api/v1/integrations/connections"),
-  );
+  return z
+    .array(integrationConnectionSchema)
+    .parse(await authorized("/api/v1/integrations/connections"));
 }
 
 export async function configureIntegrationConnection(
@@ -1010,19 +1010,12 @@ export async function validateAndPublishPlaybookVersion(
   versionId: string,
   expectedDigest: string,
 ): Promise<void> {
-  await authorizedMutation(
-    `/api/v1/playbook-versions/${versionId}/validate`,
-    "POST",
-    {},
-  );
+  await authorizedMutation(`/api/v1/playbook-versions/${versionId}/validate`, "POST", {});
   await checked(
-    await authenticatedFetch(
-      `/api/v1/playbook-versions/${versionId}/publish`,
-      {
-        method: "POST",
-        headers: { "If-Match": expectedDigest },
-      },
-    ),
+    await authenticatedFetch(`/api/v1/playbook-versions/${versionId}/publish`, {
+      method: "POST",
+      headers: { "If-Match": expectedDigest },
+    }),
   );
 }
 
@@ -1057,11 +1050,7 @@ export async function getPlaybookActions(): Promise<PlaybookAction[]> {
 
 export async function verifyNativeActionBinding(bindingId: string): Promise<NativeActionBinding> {
   return nativeActionBindingSchema.parse(
-    await authorizedMutation(
-      `/api/v1/native-action-bindings/${bindingId}/verify`,
-      "POST",
-      {},
-    ),
+    await authorizedMutation(`/api/v1/native-action-bindings/${bindingId}/verify`, "POST", {}),
   );
 }
 export async function getPlaybooks(options?: ListQuery): Promise<PlaybookCatalog> {
@@ -1309,7 +1298,15 @@ export interface TopologyNodeService {
 export interface TopologyNode {
   id: string;
   name: string;
-  type: "FIREWALL" | "SERVER" | "DATABASE" | "SIEM" | "GATEWAY" | "ENDPOINT" | "EDR" | "WORKSTATION";
+  type:
+    | "FIREWALL"
+    | "SERVER"
+    | "DATABASE"
+    | "SIEM"
+    | "GATEWAY"
+    | "ENDPOINT"
+    | "EDR"
+    | "WORKSTATION";
   category: "CYRVANTA_CORE" | "SECURITY_FEED" | "MONITORED_ASSET";
   ip_address: string;
   ip_addresses?: string[];

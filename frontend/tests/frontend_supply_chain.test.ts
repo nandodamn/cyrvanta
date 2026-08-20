@@ -5,9 +5,7 @@ import { describe, expect, it } from "vitest";
 
 const dockerfile = readFileSync(resolve(process.cwd(), "Dockerfile"), "utf-8");
 const viteConfig = readFileSync(resolve(process.cwd(), "vite.config.ts"), "utf-8");
-const packageJson = JSON.parse(
-  readFileSync(resolve(process.cwd(), "package.json"), "utf-8"),
-) as {
+const packageJson = JSON.parse(readFileSync(resolve(process.cwd(), "package.json"), "utf-8")) as {
   dependencies: Record<string, string>;
   devDependencies: Record<string, string>;
 };

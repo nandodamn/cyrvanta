@@ -6,7 +6,6 @@ import * as api from "../src/api";
 import "../src/i18n";
 import { SecurityTopologyPanel } from "../src/SecurityTopologyPanel";
 
-
 describe("security topology", () => {
   afterEach(() => vi.restoreAllMocks());
 

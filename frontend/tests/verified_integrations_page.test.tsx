@@ -7,7 +7,6 @@ import * as api from "../src/api";
 import "../src/i18n";
 import { VerifiedIntegrationsPage } from "../src/VerifiedIntegrationsPage";
 
-
 // A routed page: it reads the connector to prefill from the query string when
 // a playbook step sends the operator here, so it needs a router in tests too.
 function renderPage(route = "/integrations") {
@@ -19,7 +18,6 @@ function renderPage(route = "/integrations") {
     </QueryClientProvider>,
   );
 }
-
 
 describe("verified integrations page", () => {
   afterEach(() => vi.restoreAllMocks());

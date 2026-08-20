@@ -21,7 +21,10 @@ const CONNECTORS: ConnectorType[] = [
   "WAZUH",
 ];
 
-const PRESETS: Record<string, { type: ConnectorType; name: string; fields: Record<string, string> }> = {
+const PRESETS: Record<
+  string,
+  { type: ConnectorType; name: string; fields: Record<string, string> }
+> = {
   wazuh: {
     type: "WAZUH",
     name: "Wazuh SIEM Manager",
@@ -82,9 +85,7 @@ export function VerifiedIntegrationsPage() {
     setSearchParams({}, { replace: true });
     window.setTimeout(() => {
       // Scrolling is a nicety, and not every environment implements it.
-      document
-        .getElementById("integration-form-section")
-        ?.scrollIntoView?.({ behavior: "smooth" });
+      document.getElementById("integration-form-section")?.scrollIntoView?.({ behavior: "smooth" });
     }, 0);
   }, [requestedType, suggestedName, setSearchParams]);
 
@@ -202,25 +203,43 @@ export function VerifiedIntegrationsPage() {
         <div>
           <p className="eyebrow">{t("securityDataSources")}</p>
           <h1>{t("integrations")}</h1>
-          <p className="muted">
-            {t("integrationConnections.writeOnlyHelp")}
-          </p>
+          <p className="muted">{t("integrationConnections.writeOnlyHelp")}</p>
         </div>
       </div>
 
       {/* TOP SECTION: CONFIGURED INTEGRATIONS */}
       <section style={{ marginBottom: "2rem" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            marginBottom: "1rem",
+          }}
+        >
           <div>
             <h2 style={{ margin: 0, fontSize: "1.25rem" }}>
-              🔌 {i18n.language.startsWith("es") ? "Conexiones de Seguridad Configuradas" : "Configured Security Connections"}
-              <span className="status" style={{ marginLeft: "8px", fontSize: "0.8rem" }}>{items.length}</span>
+              🔌{" "}
+              {i18n.language.startsWith("es")
+                ? "Conexiones de Seguridad Configuradas"
+                : "Configured Security Connections"}
+              <span className="status" style={{ marginLeft: "8px", fontSize: "0.8rem" }}>
+                {items.length}
+              </span>
             </h2>
           </div>
         </div>
 
-        {connections.isLoading && <p className="muted" role="status">{t("loading")}</p>}
-        {connections.isError && <p className="error" role="alert">{t("loadError")}</p>}
+        {connections.isLoading && (
+          <p className="muted" role="status">
+            {t("loading")}
+          </p>
+        )}
+        {connections.isError && (
+          <p className="error" role="alert">
+            {t("loadError")}
+          </p>
+        )}
 
         {!connections.isLoading && !connections.isError && items.length === 0 && (
           <div className="integration-empty-box">
@@ -228,22 +247,41 @@ export function VerifiedIntegrationsPage() {
             <strong style={{ fontSize: "1.1rem", display: "block", color: "var(--text)" }}>
               {t("integrationConnections.none")}
             </strong>
-            <p className="muted" style={{ maxWidth: "600px", margin: "0.5rem auto 1rem auto", fontSize: "0.85rem" }}>
+            <p
+              className="muted"
+              style={{ maxWidth: "600px", margin: "0.5rem auto 1rem auto", fontSize: "0.85rem" }}
+            >
               {i18n.language.startsWith("es")
                 ? "Para que Cyrvanta ingeste alertas SIEM, ejecute playbooks SOAR o sincronice telemetría, configure los conectores disponibles en el formulario inferior o cargue una plantilla rápida."
                 : "To ingest SIEM alerts, execute SOAR playbooks, or sync telemetry, configure connectors below or load a quick preset."}
             </p>
             <div className="integration-templates-row">
-              <button type="button" className="integration-template-btn" onClick={() => applyPreset("wazuh")}>
+              <button
+                type="button"
+                className="integration-template-btn"
+                onClick={() => applyPreset("wazuh")}
+              >
                 🛡️ {i18n.language.startsWith("es") ? "Plantilla Wazuh SIEM" : "Wazuh SIEM Preset"}
               </button>
-              <button type="button" className="integration-template-btn" onClick={() => applyPreset("n8n")}>
+              <button
+                type="button"
+                className="integration-template-btn"
+                onClick={() => applyPreset("n8n")}
+              >
                 ⚡ {i18n.language.startsWith("es") ? "Plantilla n8n SOAR" : "n8n SOAR Preset"}
               </button>
-              <button type="button" className="integration-template-btn" onClick={() => applyPreset("opensearch")}>
+              <button
+                type="button"
+                className="integration-template-btn"
+                onClick={() => applyPreset("opensearch")}
+              >
                 🔍 {i18n.language.startsWith("es") ? "Plantilla OpenSearch" : "OpenSearch Preset"}
               </button>
-              <button type="button" className="integration-template-btn" onClick={() => applyPreset("ollama")}>
+              <button
+                type="button"
+                className="integration-template-btn"
+                onClick={() => applyPreset("ollama")}
+              >
                 🧠 {i18n.language.startsWith("es") ? "Plantilla Ollama LLM" : "Ollama LLM Preset"}
               </button>
               <button
@@ -251,7 +289,8 @@ export function VerifiedIntegrationsPage() {
                 className="integration-template-btn"
                 onClick={() => applyPreset("http_allowlisted")}
               >
-                🌐 {i18n.language.startsWith("es")
+                🌐{" "}
+                {i18n.language.startsWith("es")
                   ? "Plantilla Sistema Externo (HTTPS)"
                   : "External System Preset (HTTPS)"}
               </button>
@@ -266,15 +305,32 @@ export function VerifiedIntegrationsPage() {
                 <div>
                   <div className="integration-card-header">
                     <div>
-                      <strong style={{ fontSize: "1.05rem", color: "var(--text)" }}>{item.name}</strong>
+                      <strong style={{ fontSize: "1.05rem", color: "var(--text)" }}>
+                        {item.name}
+                      </strong>
                       <div style={{ marginTop: "2px" }}>
-                        <span className="status" style={{ fontSize: "0.72rem", textTransform: "uppercase" }}>
+                        <span
+                          className="status"
+                          style={{ fontSize: "0.72rem", textTransform: "uppercase" }}
+                        >
                           {item.connector_type}
                         </span>
                       </div>
                     </div>
-                    <span className={item.status === "active" ? "status success" : item.status === "disabled" ? "status" : "status warning"}>
-                      {item.status === "active" ? "● ACTIVO" : item.status === "disabled" ? "⊘ INACTIVO" : "⚠️ ERROR"}
+                    <span
+                      className={
+                        item.status === "active"
+                          ? "status success"
+                          : item.status === "disabled"
+                            ? "status"
+                            : "status warning"
+                      }
+                    >
+                      {item.status === "active"
+                        ? "● ACTIVO"
+                        : item.status === "disabled"
+                          ? "⊘ INACTIVO"
+                          : "⚠️ ERROR"}
                     </span>
                   </div>
 
@@ -282,17 +338,32 @@ export function VerifiedIntegrationsPage() {
                   {item.capabilities && item.capabilities.length > 0 && (
                     <div className="integration-caps-row">
                       {item.capabilities.map((cap) => (
-                        <span key={cap} className="integration-cap-badge">{cap}</span>
+                        <span key={cap} className="integration-cap-badge">
+                          {cap}
+                        </span>
                       ))}
                     </div>
                   )}
 
                   {/* Configured Parameters Viewer */}
                   <div className="integration-params-box">
-                    <strong style={{ fontSize: "0.75rem", color: "var(--text-soft)", textTransform: "uppercase", display: "block", marginBottom: "4px" }}>
-                      ⚙️ {i18n.language.startsWith("es") ? "Parámetros de Conexión" : "Connection Parameters"}:
+                    <strong
+                      style={{
+                        fontSize: "0.75rem",
+                        color: "var(--text-soft)",
+                        textTransform: "uppercase",
+                        display: "block",
+                        marginBottom: "4px",
+                      }}
+                    >
+                      ⚙️{" "}
+                      {i18n.language.startsWith("es")
+                        ? "Parámetros de Conexión"
+                        : "Connection Parameters"}
+                      :
                     </strong>
-                    {item.sanitized_parameters && Object.keys(item.sanitized_parameters).length > 0 ? (
+                    {item.sanitized_parameters &&
+                    Object.keys(item.sanitized_parameters).length > 0 ? (
                       Object.entries(item.sanitized_parameters).map(([k, v]) => (
                         <div key={k} className="integration-param-row">
                           <span className="integration-param-key">{k}:</span>
@@ -301,14 +372,20 @@ export function VerifiedIntegrationsPage() {
                       ))
                     ) : (
                       <div style={{ color: "var(--muted)", fontSize: "0.78rem" }}>
-                        {item.configured ? `🔒 ${t("integrationConnections.stored")}` : `⚠️ ${t("integrationConnections.pending")}`}
+                        {item.configured
+                          ? `🔒 ${t("integrationConnections.stored")}`
+                          : `⚠️ ${t("integrationConnections.pending")}`}
                       </div>
                     )}
                   </div>
 
                   <dl className="integration-meta-list">
                     <dt>{t("integrationConnections.credentials")}:</dt>
-                    <dd>{item.configured ? `🔒 ${t("integrationConnections.stored")}` : `⚠️ ${t("integrationConnections.pending")}`}</dd>
+                    <dd>
+                      {item.configured
+                        ? `🔒 ${t("integrationConnections.stored")}`
+                        : `⚠️ ${t("integrationConnections.pending")}`}
+                    </dd>
                     <dt>{t("integrationConnections.lastVerification")}:</dt>
                     <dd>
                       {item.last_health_check_at
@@ -333,26 +410,24 @@ export function VerifiedIntegrationsPage() {
                   >
                     ⚡ {t("integrationConnections.testReal")}
                   </button>
-                  <button
-                    type="button"
-                    className="ghost"
-                    onClick={() => startEditing(item)}
-                  >
+                  <button type="button" className="ghost" onClick={() => startEditing(item)}>
                     ✏️ {t("integrationConnections.replaceConfiguration")}
                   </button>
                   <button
                     type="button"
                     className="ghost"
                     disabled={configure.isPending}
-                    onClick={() => configure.mutate({
-                      connectionId: item.id,
-                      payload: {
-                        connector_type: item.connector_type,
-                        name: item.name,
-                        configuration: {},
-                        enabled: item.status === "disabled",
-                      },
-                    })}
+                    onClick={() =>
+                      configure.mutate({
+                        connectionId: item.id,
+                        payload: {
+                          connector_type: item.connector_type,
+                          name: item.name,
+                          configuration: {},
+                          enabled: item.status === "disabled",
+                        },
+                      })
+                    }
                   >
                     {item.status === "disabled"
                       ? `✓ ${t("integrationConnections.enableConnection")}`
@@ -371,7 +446,9 @@ export function VerifiedIntegrationsPage() {
           <div className="integration-editing-banner">
             <div>
               <strong style={{ color: "var(--accent)" }}>
-                ✏️ {i18n.language.startsWith("es") ? "Modificando Conexión:" : "Editing Connection:"} {name}
+                ✏️{" "}
+                {i18n.language.startsWith("es") ? "Modificando Conexión:" : "Editing Connection:"}{" "}
+                {name}
               </strong>
               <p style={{ margin: "2px 0 0", fontSize: "0.8rem", color: "var(--text-soft)" }}>
                 {i18n.language.startsWith("es")
@@ -395,7 +472,9 @@ export function VerifiedIntegrationsPage() {
         )}
 
         <h2 style={{ margin: "0 0 0.5rem", fontSize: "1.2rem" }}>
-          {editingId ? `✏️ ${t("integrationConnections.replaceConfiguration")}` : `➕ ${t("integrationConnections.configureReal")}`}
+          {editingId
+            ? `✏️ ${t("integrationConnections.replaceConfiguration")}`
+            : `➕ ${t("integrationConnections.configureReal")}`}
         </h2>
 
         <form onSubmit={submit} className="integrations-form-grid">
@@ -409,7 +488,9 @@ export function VerifiedIntegrationsPage() {
                 setStartTls(true);
               }}
             >
-              {CONNECTORS.map((item) => <option key={item}>{item}</option>)}
+              {CONNECTORS.map((item) => (
+                <option key={item}>{item}</option>
+              ))}
             </select>
           </label>
           <label>
@@ -438,14 +519,17 @@ export function VerifiedIntegrationsPage() {
                   autoComplete={secret ? "new-password" : "off"}
                   placeholder={
                     secret && editingId
-                      ? (i18n.language.startsWith("es") ? "•••••••• (Sin cambios)" : "•••••••• (Unchanged)")
+                      ? i18n.language.startsWith("es")
+                        ? "•••••••• (Sin cambios)"
+                        : "•••••••• (Unchanged)"
                       : field === "base_url"
                         ? "https://..."
                         : field
                   }
                   value={fields[field] ?? ""}
                   onChange={(event) =>
-                    setFields((current) => ({ ...current, [field]: event.target.value }))}
+                    setFields((current) => ({ ...current, [field]: event.target.value }))
+                  }
                 />
               </label>
             );
@@ -503,11 +587,17 @@ export function VerifiedIntegrationsPage() {
               </button>
             )}
             <button type="submit" disabled={configure.isPending || !name.trim()}>
-              {editingId ? `✓ ${t("integrationConnections.replaceSave")}` : `✓ ${t("integrationConnections.saveWriteOnly")}`}
+              {editingId
+                ? `✓ ${t("integrationConnections.replaceSave")}`
+                : `✓ ${t("integrationConnections.saveWriteOnly")}`}
             </button>
           </div>
         </form>
-        {configure.isError && <p className="error" role="alert" style={{ marginTop: "0.75rem" }}>{t("integrationConnections.saveError")}</p>}
+        {configure.isError && (
+          <p className="error" role="alert" style={{ marginTop: "0.75rem" }}>
+            {t("integrationConnections.saveError")}
+          </p>
+        )}
       </section>
     </>
   );

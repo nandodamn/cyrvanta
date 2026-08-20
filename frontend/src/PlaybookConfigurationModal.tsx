@@ -130,13 +130,14 @@ export function PlaybookConfigurationModal({
     [actions.data, action],
   );
   const isWazuhManaged = WAZUH_ACTIONS.has(action);
-  const connectorType = !descriptor || isWazuhManaged
-    ? null
-    : descriptor.egress === "NONE"
-      ? "INTERNAL"
-      : descriptor.egress === "SMTP"
-        ? "SMTP"
-        : "HTTP_ALLOWLISTED";
+  const connectorType =
+    !descriptor || isWazuhManaged
+      ? null
+      : descriptor.egress === "NONE"
+        ? "INTERNAL"
+        : descriptor.egress === "SMTP"
+          ? "SMTP"
+          : "HTTP_ALLOWLISTED";
 
   const connections = useQuery({
     queryKey: ["integration-connections"],
@@ -144,9 +145,10 @@ export function PlaybookConfigurationModal({
   });
 
   const candidates = useMemo(
-    () => (connections.data ?? []).filter(
-      (item) => item.status === "active" && item.connector_type === connectorType,
-    ),
+    () =>
+      (connections.data ?? []).filter(
+        (item) => item.status === "active" && item.connector_type === connectorType,
+      ),
     [connections.data, connectorType],
   );
 
@@ -181,11 +183,12 @@ export function PlaybookConfigurationModal({
         action_version: "1.0.0",
         connector_type: connectorType,
         credential_key_id: connectorType === "INTERNAL" ? undefined : connectionId,
-        configuration: connectorType === "INTERNAL"
-          ? { target_status: "contained" }
-          : connectorType === "SMTP"
-            ? { to: value }
-            : { path: value, method: "POST" },
+        configuration:
+          connectorType === "INTERNAL"
+            ? { target_status: "contained" }
+            : connectorType === "SMTP"
+              ? { to: value }
+              : { path: value, method: "POST" },
       });
       return verifyNativeActionBinding(binding.id);
     },
@@ -236,9 +239,18 @@ export function PlaybookConfigurationModal({
         }}
         onClick={(event) => event.stopPropagation()}
       >
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "1rem" }}>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "flex-start",
+            marginBottom: "1rem",
+          }}
+        >
           <div>
-            <p className="eyebrow" style={{ margin: 0 }}>Parámetros de Ejecución</p>
+            <p className="eyebrow" style={{ margin: 0 }}>
+              Parámetros de Ejecución
+            </p>
             <h2 id="playbook-config-title" style={{ margin: "4px 0 0", fontSize: "1.3rem" }}>
               ⚙️ Configuración del Playbook
             </h2>
@@ -287,7 +299,14 @@ export function PlaybookConfigurationModal({
 
           {/* Action Selector */}
           <div>
-            <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, marginBottom: "6px" }}>
+            <label
+              style={{
+                display: "block",
+                fontSize: "0.85rem",
+                fontWeight: 600,
+                marginBottom: "6px",
+              }}
+            >
               Paso de Acción a Configurar
             </label>
             <select
@@ -390,9 +409,7 @@ export function PlaybookConfigurationModal({
               >
                 <span>{actionIsBlocked ? "⚠️" : "✓"}</span>
                 <span>
-                  {actionIsBlocked
-                    ? "Falta la conexión Wazuh"
-                    : "Listo mediante la conexión Wazuh"}
+                  {actionIsBlocked ? "Falta la conexión Wazuh" : "Listo mediante la conexión Wazuh"}
                 </span>
               </div>
               <p style={{ margin: "6px 0 0", color: "var(--text-soft)", fontSize: "0.8rem" }}>
@@ -406,8 +423,8 @@ export function PlaybookConfigurationModal({
           {/* Unknown action: never present an empty form as if it were configurable */}
           {!isWazuhManaged && !connectorType && !actions.isLoading && (
             <p style={{ margin: 0, fontSize: "0.8rem", color: "var(--warning)" }}>
-              ⚠️ Esta acción no está registrada en el motor nativo, por lo que no puede
-              configurarse ni ejecutarse.
+              ⚠️ Esta acción no está registrada en el motor nativo, por lo que no puede configurarse
+              ni ejecutarse.
             </p>
           )}
 
@@ -429,8 +446,8 @@ export function PlaybookConfigurationModal({
                     Conexión de Seguridad Asociada
                   </p>
                   <p style={{ margin: "6px 0 0", fontSize: "0.8rem", color: "var(--warning)" }}>
-                    ⚠️ Este paso necesita una conexión {connectorType} activa y verificada, y todavía
-                    no hay ninguna.
+                    ⚠️ Este paso necesita una conexión {connectorType} activa y verificada, y
+                    todavía no hay ninguna.
                   </p>
                   <p
                     style={{ margin: "6px 0 10px", fontSize: "0.78rem", color: "var(--text-soft)" }}
@@ -506,24 +523,35 @@ export function PlaybookConfigurationModal({
           )}
 
           {/* Form Actions */}
-          <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end", marginTop: "0.5rem" }}>
-            <button type="button" className="ghost" onClick={onClose} style={{ padding: "8px 16px" }}>
+          <div
+            style={{
+              display: "flex",
+              gap: "10px",
+              justifyContent: "flex-end",
+              marginTop: "0.5rem",
+            }}
+          >
+            <button
+              type="button"
+              className="ghost"
+              onClick={onClose}
+              style={{ padding: "8px 16px" }}
+            >
               {canSave ? "Cancelar" : "Cerrar"}
             </button>
             {/* Hidden, not just disabled: with nothing to fill in there is
                 nothing to save, and the next step is the link above. */}
             {canSave && (
-            <button
-              type="submit"
-              className="primary"
-              style={{ padding: "8px 18px", fontWeight: 600 }}
-              disabled={
-                (connectorType !== "INTERNAL" && (!connectionId || !value))
-                || save.isPending
-              }
-            >
-              {save.isPending ? "Guardando..." : "Guardar Configuración"}
-            </button>
+              <button
+                type="submit"
+                className="primary"
+                style={{ padding: "8px 18px", fontWeight: 600 }}
+                disabled={
+                  (connectorType !== "INTERNAL" && (!connectionId || !value)) || save.isPending
+                }
+              >
+                {save.isPending ? "Guardando..." : "Guardar Configuración"}
+              </button>
             )}
           </div>
 

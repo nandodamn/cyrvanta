@@ -31,7 +31,8 @@ const resources = {
       pendingReview: "Pendientes de revisión",
       integrations: "Integraciones",
       integrationConnections: {
-        writeOnlyHelp: "Las credenciales son write-only: después de guardarlas solo pueden reemplazarse.",
+        writeOnlyHelp:
+          "Las credenciales son write-only: después de guardarlas solo pueden reemplazarse.",
         configureReal: "Configurar conexión real",
         type: "Tipo",
         name: "Nombre",
@@ -192,7 +193,8 @@ const resources = {
       adminMutationError: "No se pudo guardar el cambio administrativo.",
       assignRoles: "Asignar roles",
       directoryIdentityLink: "Vincular identidad de directorio",
-      directoryIdentityLinkHelp: "Seleccione el usuario interno y vincule su sujeto externo estable; el correo nunca se usa como vínculo automático.",
+      directoryIdentityLinkHelp:
+        "Seleccione el usuario interno y vincule su sujeto externo estable; el correo nunca se usa como vínculo automático.",
       externalSubject: "Sujeto externo estable",
       normalizedUsername: "Usuario normalizado del directorio",
       linkIdentity: "Vincular",
@@ -207,7 +209,8 @@ const resources = {
       activate: "Activar",
       disable: "Desactivar",
       directoryConfiguration: "Configuración de directorio",
-      directoryNotConfigured: "Directorio no configurado. Guarde y verifique una conexión real para activarlo.",
+      directoryNotConfigured:
+        "Directorio no configurado. Guarde y verifique una conexión real para activarlo.",
       status: "Estado",
       provider: "Proveedor",
       serverUri: "URI del servidor",
@@ -231,7 +234,8 @@ const resources = {
       caCertificateOptional: "Opcional: pegue una CA interna en PEM",
       jitProvisioning: "Habilitar alta JIT solo para grupos mapeados",
       directoryGroupMappings: "Mapeo de grupos a roles",
-      directoryGroupMappingsHelp: "Cada grupo externo normalizado concede únicamente el rol seleccionado. tenant-admin no puede derivarse del directorio.",
+      directoryGroupMappingsHelp:
+        "Cada grupo externo normalizado concede únicamente el rol seleccionado. tenant-admin no puede derivarse del directorio.",
       externalDirectoryGroup: "Grupo externo o DN estable",
       mappedRole: "Rol de Cyrvanta",
       addMapping: "Agregar mapping",
@@ -261,12 +265,14 @@ const resources = {
       version: "Versión",
       timeline: "Línea temporal",
       investigationWorkflowTitle: "Registro de investigación y cambio de estado",
-      investigationWorkflowIntro: "Registra hallazgos, evidencia verificada o la justificación del cambio. Las notas quedan guardadas inmutablemente en la línea temporal del SOC.",
+      investigationWorkflowIntro:
+        "Registra hallazgos, evidencia verificada o la justificación del cambio. Las notas quedan guardadas inmutablemente en la línea temporal del SOC.",
       target: "Objetivo",
       approvalSummary: "Aprobaciones: {{approved}}/{{total}} · Evaluación: {{evaluation}}",
       fourEyesApproved: "Aprobado por doble control",
       immutableAuditTimeline: "Registro cronológico e inmutable de auditoría",
-      administrationIntro: "Control de identidades, permisos RBAC, integración LDAP/AD y llaves de API",
+      administrationIntro:
+        "Control de identidades, permisos RBAC, integración LDAP/AD y llaves de API",
       incidentOperations: "Gestión operativa",
       incidentDetails: "Datos y responsabilidad del incidente",
       assignee: "Responsable",
@@ -510,8 +516,7 @@ const resources = {
       approvalGovernanceHelp: {
         AUTOMATIC: "⚡ Disparo automático inmediato, sin retención.",
         SINGLE: "👤 Requiere la firma de 1 analista autorizador antes de ejecutar.",
-        FOUR_EYES:
-          "👥 Requiere la firma independiente de 2 analistas (principio de 4 ojos).",
+        FOUR_EYES: "👥 Requiere la firma independiente de 2 analistas (principio de 4 ojos).",
       },
       approvalModes: {
         AUTOMATIC: "⚡ Automático",
@@ -519,19 +524,16 @@ const resources = {
         FOUR_EYES: "👥 Doble (4 ojos)",
       },
       playbookDisabled: "Deshabilitado",
-      cannotActivateIncomplete:
-        "No se puede activar hasta completar la configuración pendiente.",
+      cannotActivateIncomplete: "No se puede activar hasta completar la configuración pendiente.",
       blockingReasonsTitle: "Falta completar para poder ejecutarlo:",
       blockingReasons: {
-        PLAYBOOK_CONFIGURATION_REQUIRED:
-          "Configuración incompleta: revisá el detalle debajo.",
+        PLAYBOOK_CONFIGURATION_REQUIRED: "Configuración incompleta: revisá el detalle debajo.",
         PLAYBOOK_NOT_PUBLISHED: "La versión todavía no fue publicada.",
         PLAYBOOK_BINDING_UNAVAILABLE:
           "El motor de ejecución no está vinculado o no está sincronizado.",
         PLAYBOOK_LIVE_DISABLED:
           "La ejecución real está desactivada en la configuración de la plataforma.",
-        PLAYBOOK_ACTION_UNAVAILABLE:
-          "Este playbook no tiene una acción real implementada.",
+        PLAYBOOK_ACTION_UNAVAILABLE: "Este playbook no tiene una acción real implementada.",
         ACTION_UNAVAILABLE: "La acción «{{action}}» no está registrada.",
         ACTION_BINDING_MISSING:
           "Falta configurar la acción «{{action}}» (Configurar → parámetros).",
@@ -539,12 +541,10 @@ const resources = {
           "La configuración de «{{action}}» no coincide con su firma; volvé a guardarla.",
         ACTION_CREDENTIAL_MISSING:
           "«{{action}}» necesita una credencial de producción todavía no asignada.",
-        ACTION_CREDENTIAL_DISABLED:
-          "La credencial de «{{action}}» está deshabilitada.",
+        ACTION_CREDENTIAL_DISABLED: "La credencial de «{{action}}» está deshabilitada.",
         ACTION_CREDENTIAL_OUTDATED:
           "La credencial de «{{action}}» usa un esquema viejo; volvé a guardarla.",
-        ACTION_CREDENTIAL_FAILING:
-          "La última verificación de la credencial de «{{action}}» falló.",
+        ACTION_CREDENTIAL_FAILING: "La última verificación de la credencial de «{{action}}» falló.",
         ACTION_CREDENTIAL_UNVERIFIED:
           "La credencial de «{{action}}» nunca superó una prueba de conexión.",
       },
@@ -553,7 +553,8 @@ const resources = {
       scopeNotSpecified: "El alcance por tipo de incidente no está especificado.",
       verifiedForSimulation: "Verificado para simulación",
       configurationPending: "Configuración o verificación pendiente",
-      draftDescriptionUnavailable: "Esta versión está en borrador; su propósito no representa una capacidad ejecutable publicada.",
+      draftDescriptionUnavailable:
+        "Esta versión está en borrador; su propósito no representa una capacidad ejecutable publicada.",
       engineNotBound: "Motor no vinculado",
       approvalMode: "Modo de aprobación",
       lastExecutionAt: "Fecha de última ejecución",
@@ -824,7 +825,8 @@ const resources = {
       adminMutationError: "The administrative change could not be saved.",
       assignRoles: "Assign roles",
       directoryIdentityLink: "Link directory identity",
-      directoryIdentityLinkHelp: "Select the internal user and link the stable external subject; email is never used for automatic linking.",
+      directoryIdentityLinkHelp:
+        "Select the internal user and link the stable external subject; email is never used for automatic linking.",
       externalSubject: "Stable external subject",
       normalizedUsername: "Normalized directory username",
       linkIdentity: "Link",
@@ -839,7 +841,8 @@ const resources = {
       activate: "Activate",
       disable: "Disable",
       directoryConfiguration: "Directory configuration",
-      directoryNotConfigured: "Directory not configured. Save and verify a real connection to activate it.",
+      directoryNotConfigured:
+        "Directory not configured. Save and verify a real connection to activate it.",
       status: "Status",
       provider: "Provider",
       serverUri: "Server URI",
@@ -863,7 +866,8 @@ const resources = {
       caCertificateOptional: "Optional: paste an internal CA in PEM format",
       jitProvisioning: "Enable JIT provisioning only for mapped groups",
       directoryGroupMappings: "Group-to-role mappings",
-      directoryGroupMappingsHelp: "Each normalized external group grants only the selected role. tenant-admin cannot be derived from the directory.",
+      directoryGroupMappingsHelp:
+        "Each normalized external group grants only the selected role. tenant-admin cannot be derived from the directory.",
       externalDirectoryGroup: "External group or stable DN",
       mappedRole: "Cyrvanta role",
       addMapping: "Add mapping",
@@ -893,7 +897,8 @@ const resources = {
       version: "Version",
       timeline: "Timeline",
       investigationWorkflowTitle: "Investigation record and status change",
-      investigationWorkflowIntro: "Record findings, verified evidence, or the change rationale. Notes are stored immutably in the SOC timeline.",
+      investigationWorkflowIntro:
+        "Record findings, verified evidence, or the change rationale. Notes are stored immutably in the SOC timeline.",
       target: "Target",
       approvalSummary: "Approvals: {{approved}}/{{total}} · Evaluation: {{evaluation}}",
       fourEyesApproved: "Approved by dual control",
@@ -1140,8 +1145,7 @@ const resources = {
       approvalGovernanceHelp: {
         AUTOMATIC: "⚡ Immediate automatic trigger, with no hold.",
         SINGLE: "👤 Requires one authorizing analyst's signature before it runs.",
-        FOUR_EYES:
-          "👥 Requires two analysts to sign independently (four-eyes principle).",
+        FOUR_EYES: "👥 Requires two analysts to sign independently (four-eyes principle).",
       },
       approvalModes: {
         AUTOMATIC: "⚡ Automatic",
@@ -1149,16 +1153,13 @@ const resources = {
         FOUR_EYES: "👥 Dual (four eyes)",
       },
       playbookDisabled: "Disabled",
-      cannotActivateIncomplete:
-        "Cannot be activated until the pending configuration is completed.",
+      cannotActivateIncomplete: "Cannot be activated until the pending configuration is completed.",
       blockingReasonsTitle: "Complete these before it can run:",
       blockingReasons: {
         PLAYBOOK_CONFIGURATION_REQUIRED: "Configuration incomplete: see the detail below.",
         PLAYBOOK_NOT_PUBLISHED: "This version has not been published yet.",
-        PLAYBOOK_BINDING_UNAVAILABLE:
-          "The execution engine is not bound or is out of sync.",
-        PLAYBOOK_LIVE_DISABLED:
-          "Real execution is switched off in the platform configuration.",
+        PLAYBOOK_BINDING_UNAVAILABLE: "The execution engine is not bound or is out of sync.",
+        PLAYBOOK_LIVE_DISABLED: "Real execution is switched off in the platform configuration.",
         PLAYBOOK_ACTION_UNAVAILABLE: "This playbook has no real action implemented.",
         ACTION_UNAVAILABLE: "The «{{action}}» action is not registered.",
         ACTION_BINDING_MISSING:
@@ -1170,8 +1171,7 @@ const resources = {
         ACTION_CREDENTIAL_DISABLED: "The «{{action}}» credential is disabled.",
         ACTION_CREDENTIAL_OUTDATED:
           "The «{{action}}» credential uses an outdated schema; save it again.",
-        ACTION_CREDENTIAL_FAILING:
-          "The last health check for the «{{action}}» credential failed.",
+        ACTION_CREDENTIAL_FAILING: "The last health check for the «{{action}}» credential failed.",
         ACTION_CREDENTIAL_UNVERIFIED:
           "The «{{action}}» credential has never passed a connection test.",
       },
@@ -1180,7 +1180,8 @@ const resources = {
       scopeNotSpecified: "Incident-type scope is not specified.",
       verifiedForSimulation: "Verified for simulation",
       configurationPending: "Configuration or verification pending",
-      draftDescriptionUnavailable: "This version is a draft; its purpose does not represent a published executable capability.",
+      draftDescriptionUnavailable:
+        "This version is a draft; its purpose does not represent a published executable capability.",
       engineNotBound: "Engine not bound",
       approvalMode: "Approval mode",
       lastExecutionAt: "Last execution date",

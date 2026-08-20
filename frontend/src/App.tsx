@@ -68,10 +68,6 @@ import { OperationalPulse } from "./OperationalPulse";
 import { SecurityTopologyPanel } from "./SecurityTopologyPanel";
 import { useAuth } from "./AuthContext";
 
-
-const ApiKeysPage = lazy(() =>
-  import("./ApiKeysPage").then((module) => ({ default: module.ApiKeysPage })),
-);
 const GovernedMemoryPage = lazy(() =>
   import("./GovernedMemoryPage").then((module) => ({ default: module.GovernedMemoryPage })),
 );
@@ -83,99 +79,172 @@ const VerifiedIntegrationsPage = lazy(() =>
     default: module.VerifiedIntegrationsPage,
   })),
 );
-const NAV_ITEMS: ReadonlyArray<{ to: string; icon: React.ReactNode; key: string; end?: boolean }> = [
-  {
-    to: "/",
-    key: "overview",
-    end: true,
-    icon: (
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <rect x="3" y="3" width="7" height="7" rx="1.5" />
-        <rect x="14" y="3" width="7" height="7" rx="1.5" />
-        <rect x="14" y="14" width="7" height="7" rx="1.5" />
-        <rect x="3" y="14" width="7" height="7" rx="1.5" />
-      </svg>
-    ),
-  },
-  {
-    to: "/incidents",
-    key: "incidents",
-    icon: (
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-        <line x1="12" y1="8" x2="12" y2="12" />
-        <line x1="12" y1="16" x2="12.01" y2="16" />
-      </svg>
-    ),
-  },
-  {
-    to: "/alerts",
-    key: "alerts",
-    icon: (
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
-        <path d="M13.73 21a2 2 0 0 1-3.46 0" />
-      </svg>
-    ),
-  },
-  {
-    to: "/playbooks",
-    key: "playbooks",
-    icon: (
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <rect x="3" y="3" width="6" height="6" rx="1.5" />
-        <rect x="15" y="15" width="6" height="6" rx="1.5" />
-        <path d="M6 9v3a3 3 0 0 0 3 3h6" />
-        <polyline points="14 12 17 15 14 18" />
-      </svg>
-    ),
-  },
-  {
-    to: "/integrations",
-    key: "integrations",
-    icon: (
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M16 16v1a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h11a2 2 0 0 1 2 2v1" />
-        <path d="M18 8l4 4-4 4" />
-        <line x1="8" y1="12" x2="22" y2="12" />
-      </svg>
-    ),
-  },
-  {
-    to: "/memory",
-    key: "memory.navigation",
-    icon: (
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <ellipse cx="12" cy="5" rx="9" ry="3" />
-        <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3" />
-        <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5" />
-      </svg>
-    ),
-  },
+const NAV_ITEMS: ReadonlyArray<{ to: string; icon: React.ReactNode; key: string; end?: boolean }> =
+  [
+    {
+      to: "/",
+      key: "overview",
+      end: true,
+      icon: (
+        <svg
+          width="18"
+          height="18"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <rect x="3" y="3" width="7" height="7" rx="1.5" />
+          <rect x="14" y="3" width="7" height="7" rx="1.5" />
+          <rect x="14" y="14" width="7" height="7" rx="1.5" />
+          <rect x="3" y="14" width="7" height="7" rx="1.5" />
+        </svg>
+      ),
+    },
+    {
+      to: "/incidents",
+      key: "incidents",
+      icon: (
+        <svg
+          width="18"
+          height="18"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+          <line x1="12" y1="8" x2="12" y2="12" />
+          <line x1="12" y1="16" x2="12.01" y2="16" />
+        </svg>
+      ),
+    },
+    {
+      to: "/alerts",
+      key: "alerts",
+      icon: (
+        <svg
+          width="18"
+          height="18"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+          <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+        </svg>
+      ),
+    },
+    {
+      to: "/playbooks",
+      key: "playbooks",
+      icon: (
+        <svg
+          width="18"
+          height="18"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <rect x="3" y="3" width="6" height="6" rx="1.5" />
+          <rect x="15" y="15" width="6" height="6" rx="1.5" />
+          <path d="M6 9v3a3 3 0 0 0 3 3h6" />
+          <polyline points="14 12 17 15 14 18" />
+        </svg>
+      ),
+    },
+    {
+      to: "/integrations",
+      key: "integrations",
+      icon: (
+        <svg
+          width="18"
+          height="18"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="M16 16v1a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h11a2 2 0 0 1 2 2v1" />
+          <path d="M18 8l4 4-4 4" />
+          <line x1="8" y1="12" x2="22" y2="12" />
+        </svg>
+      ),
+    },
+    {
+      to: "/memory",
+      key: "memory.navigation",
+      icon: (
+        <svg
+          width="18"
+          height="18"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <ellipse cx="12" cy="5" rx="9" ry="3" />
+          <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3" />
+          <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5" />
+        </svg>
+      ),
+    },
 
-  {
-    to: "/audit",
-    key: "audit",
-    icon: (
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-        <polyline points="14 2 14 8 20 8" />
-        <line x1="16" y1="13" x2="8" y2="13" />
-        <line x1="16" y1="17" x2="8" y2="17" />
-      </svg>
-    ),
-  },
-  {
-    to: "/administration",
-    key: "administration",
-    icon: (
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <circle cx="12" cy="12" r="3" />
-        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
-      </svg>
-    ),
-  },
-];
+    {
+      to: "/audit",
+      key: "audit",
+      icon: (
+        <svg
+          width="18"
+          height="18"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+          <polyline points="14 2 14 8 20 8" />
+          <line x1="16" y1="13" x2="8" y2="13" />
+          <line x1="16" y1="17" x2="8" y2="17" />
+        </svg>
+      ),
+    },
+    {
+      to: "/administration",
+      key: "administration",
+      icon: (
+        <svg
+          width="18"
+          height="18"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <circle cx="12" cy="12" r="3" />
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
+        </svg>
+      ),
+    },
+  ];
 
 const loginSchema = z.object({
   tenantSlug: z.string().min(3),
@@ -248,20 +317,31 @@ function LoginPage() {
         </div>
         <label>
           {t("tenant")}
-          <input autoComplete="organization" placeholder={t("tenantSlugPlaceholder")} {...register("tenantSlug")} />
+          <input
+            autoComplete="organization"
+            placeholder={t("tenantSlugPlaceholder")}
+            {...register("tenantSlug")}
+          />
         </label>
         <label>
           {authMode === "local" ? t("email") : t("directoryUsername")}
           <input
             type={authMode === "local" ? "email" : "text"}
             autoComplete="username"
-            placeholder={authMode === "local" ? t("emailPlaceholder") : t("directoryUserPlaceholder")}
+            placeholder={
+              authMode === "local" ? t("emailPlaceholder") : t("directoryUserPlaceholder")
+            }
             {...register("email")}
           />
         </label>
         <label>
           {t("password")}
-          <input type="password" autoComplete="current-password" placeholder="••••••••" {...register("password")} />
+          <input
+            type="password"
+            autoComplete="current-password"
+            placeholder="••••••••"
+            {...register("password")}
+          />
         </label>
         <label className="check-row">
           <input type="checkbox" {...register("rememberMe")} />
@@ -442,18 +522,40 @@ function ListControls({
         state.applySearch();
       }}
     >
-      <div style={{ display: "flex", alignItems: "center", gap: "8px", flex: "1 1 240px", maxWidth: "420px" }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "8px",
+          flex: "1 1 240px",
+          maxWidth: "420px",
+        }}
+      >
         <input
           type="search"
           maxLength={100}
           value={state.draft}
           placeholder={t("searchPlaceholder")}
           onChange={(event) => state.setDraft(event.target.value)}
-          style={{ flex: 1, padding: "6px 12px", fontSize: "0.825rem", borderRadius: "4px", border: "1px solid var(--line)", background: "var(--panel)" }}
+          style={{
+            flex: 1,
+            padding: "6px 12px",
+            fontSize: "0.825rem",
+            borderRadius: "4px",
+            border: "1px solid var(--line)",
+            background: "var(--panel)",
+          }}
         />
         <button
           type="submit"
-          style={{ width: "auto", minWidth: "unset", height: "auto", padding: "6px 14px", fontSize: "0.825rem", whiteSpace: "nowrap" }}
+          style={{
+            width: "auto",
+            minWidth: "unset",
+            height: "auto",
+            padding: "6px 14px",
+            fontSize: "0.825rem",
+            whiteSpace: "nowrap",
+          }}
         >
           {t("search")}
         </button>
@@ -468,11 +570,20 @@ function ListControls({
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-          <span style={{ fontSize: "0.8rem", color: "var(--muted)", whiteSpace: "nowrap" }}>{t("itemsPerPage")}:</span>
+          <span style={{ fontSize: "0.8rem", color: "var(--muted)", whiteSpace: "nowrap" }}>
+            {t("itemsPerPage")}:
+          </span>
           <select
             value={state.pageSize}
             onChange={(event) => state.setPageSize(Number(event.target.value))}
-            style={{ padding: "4px 8px", fontSize: "0.8rem", borderRadius: "4px", border: "1px solid var(--line)", background: "var(--panel)", color: "var(--text)" }}
+            style={{
+              padding: "4px 8px",
+              fontSize: "0.8rem",
+              borderRadius: "4px",
+              border: "1px solid var(--line)",
+              background: "var(--panel)",
+              color: "var(--text)",
+            }}
           >
             {[10, 25, 50].map((size) => (
               <option key={size} value={size}>
@@ -482,7 +593,10 @@ function ListControls({
           </select>
         </div>
 
-        <span className="list-result-count" style={{ fontSize: "0.8rem", color: "var(--muted)", whiteSpace: "nowrap" }}>
+        <span
+          className="list-result-count"
+          style={{ fontSize: "0.8rem", color: "var(--muted)", whiteSpace: "nowrap" }}
+        >
           {compact
             ? t("visibleResultsCompact", { count: visibleCount })
             : t("visibleResults", { count: visibleCount, page: state.page + 1 })}
@@ -495,11 +609,28 @@ function ListControls({
                 type="button"
                 className="ghost"
                 aria-label={t("previous")}
-                style={{ width: "26px", minWidth: "unset", height: "26px", padding: 0, display: "flex", alignItems: "center", justifyContent: "center" }}
+                style={{
+                  width: "26px",
+                  minWidth: "unset",
+                  height: "26px",
+                  padding: 0,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
                 disabled={state.page === 0}
                 onClick={() => state.setPage(Math.max(0, state.page - 1))}
               >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
                   <polyline points="15 18 9 12 15 6" />
                 </svg>
               </button>
@@ -507,11 +638,28 @@ function ListControls({
                 type="button"
                 className="ghost"
                 aria-label={t("next")}
-                style={{ width: "26px", minWidth: "unset", height: "26px", padding: 0, display: "flex", alignItems: "center", justifyContent: "center" }}
+                style={{
+                  width: "26px",
+                  minWidth: "unset",
+                  height: "26px",
+                  padding: 0,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
                 disabled={!hasNext}
                 onClick={() => state.setPage(state.page + 1)}
               >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
                   <polyline points="9 18 15 12 9 6" />
                 </svg>
               </button>
@@ -521,7 +669,14 @@ function ListControls({
               <button
                 type="button"
                 className="ghost"
-                style={{ width: "auto", minWidth: "unset", height: "auto", padding: "4px 10px", fontSize: "0.75rem", whiteSpace: "nowrap" }}
+                style={{
+                  width: "auto",
+                  minWidth: "unset",
+                  height: "auto",
+                  padding: "4px 10px",
+                  fontSize: "0.75rem",
+                  whiteSpace: "nowrap",
+                }}
                 disabled={state.page === 0}
                 onClick={() => state.setPage(Math.max(0, state.page - 1))}
               >
@@ -530,7 +685,14 @@ function ListControls({
               <button
                 type="button"
                 className="ghost"
-                style={{ width: "auto", minWidth: "unset", height: "auto", padding: "4px 10px", fontSize: "0.75rem", whiteSpace: "nowrap" }}
+                style={{
+                  width: "auto",
+                  minWidth: "unset",
+                  height: "auto",
+                  padding: "4px 10px",
+                  fontSize: "0.75rem",
+                  whiteSpace: "nowrap",
+                }}
                 disabled={!hasNext}
                 onClick={() => state.setPage(state.page + 1)}
               >
@@ -557,8 +719,14 @@ function Overview() {
   const open = incidents.data?.filter((item) => item.status !== "closed") ?? [];
   const cards = [
     [t("listedOpenIncidents"), incidents.data ? String(open.length) : "—"],
-    [t("listedCriticalIncidents"), incidents.data ? String(open.filter((item) => item.severity === "critical").length) : "—"],
-    [t("listedPendingReview"), incidents.data ? String(open.filter((item) => item.status === "new").length) : "—"],
+    [
+      t("listedCriticalIncidents"),
+      incidents.data ? String(open.filter((item) => item.severity === "critical").length) : "—",
+    ],
+    [
+      t("listedPendingReview"),
+      incidents.data ? String(open.filter((item) => item.status === "new").length) : "—",
+    ],
     [t("listedAlerts"), alerts.data ? String(alerts.data.length) : "—"],
   ];
   return (
@@ -630,22 +798,19 @@ function AlertsPage() {
     }) => updateAlertTriage(alertId, status),
     onMutate: async ({ alertId, status }) => {
       await queryClient.cancelQueries({ queryKey: ["alerts"] });
-      queryClient.setQueriesData(
-        { queryKey: ["alerts"] },
-        (oldData: Alert[] | undefined) => {
-          if (!oldData || !Array.isArray(oldData)) return oldData;
-          return oldData.map((item) =>
-            item.id === alertId
-              ? {
-                  ...item,
-                  triage_status: status,
-                  reviewed_at: new Date().toISOString(),
-                  reviewer_display_name: me.data?.display_name ?? "Analyst",
-                }
-              : item,
-          );
-        },
-      );
+      queryClient.setQueriesData({ queryKey: ["alerts"] }, (oldData: Alert[] | undefined) => {
+        if (!oldData || !Array.isArray(oldData)) return oldData;
+        return oldData.map((item) =>
+          item.id === alertId
+            ? {
+                ...item,
+                triage_status: status,
+                reviewed_at: new Date().toISOString(),
+                reviewer_display_name: me.data?.display_name ?? "Analyst",
+              }
+            : item,
+        );
+      });
     },
     onSettled: async () => {
       await Promise.all([
@@ -742,8 +907,8 @@ function AlertsPage() {
                   borderLeft: isRelevant
                     ? "4px solid var(--accent)"
                     : isDimmed
-                    ? "4px solid var(--muted)"
-                    : "1px solid var(--panel-border)",
+                      ? "4px solid var(--muted)"
+                      : "1px solid var(--panel-border)",
                   background: isRelevant ? "rgba(13, 209, 155, 0.05)" : "transparent",
                   transition: "all 0.2s ease",
                 }}
@@ -952,7 +1117,8 @@ function AlertsPage() {
                     {alert.reviewed_at && (
                       <p style={{ margin: "10px 0 0", fontSize: "0.85rem", color: "var(--muted)" }}>
                         {t("treatedBy", {
-                          user: alert.reviewer_display_name || alert.reviewed_by_user_id || "Analyst",
+                          user:
+                            alert.reviewer_display_name || alert.reviewed_by_user_id || "Analyst",
                           time: new Date(alert.reviewed_at).toLocaleString(i18n.language),
                         })}
                       </p>
@@ -1007,7 +1173,11 @@ function IncidentsPage() {
                 title: String(data.get("title")).trim(),
                 description: String(data.get("description")).trim(),
                 severity: String(data.get("severity")) as
-                  | "informational" | "low" | "medium" | "high" | "critical",
+                  | "informational"
+                  | "low"
+                  | "medium"
+                  | "high"
+                  | "critical",
                 priority: Number(data.get("priority")),
                 classification: String(data.get("classification")).trim(),
               });
@@ -1024,7 +1194,11 @@ function IncidentsPage() {
               required
               minLength={3}
               maxLength={300}
-              placeholder={i18n.language.startsWith("es") ? "Ej. Intrusión y ejecución de script malicioso" : "e.g. Host intrusion and malicious script"}
+              placeholder={
+                i18n.language.startsWith("es")
+                  ? "Ej. Intrusión y ejecución de script malicioso"
+                  : "e.g. Host intrusion and malicious script"
+              }
             />
           </label>
           <label>
@@ -1034,26 +1208,30 @@ function IncidentsPage() {
               required
               minLength={2}
               maxLength={120}
-              placeholder={i18n.language.startsWith("es") ? "Ej. Malware / Ransomware" : "e.g. Malware / Ransomware"}
+              placeholder={
+                i18n.language.startsWith("es")
+                  ? "Ej. Malware / Ransomware"
+                  : "e.g. Malware / Ransomware"
+              }
             />
           </label>
           <label>
             <span>{t("severity")}</span>
             <select name="severity" defaultValue="medium">
-              {(["informational", "low", "medium", "high", "critical"] as const).map(
-                (value) => (
-                  <option key={value} value={value}>
-                    {t(`severityCodes.${value}`, { defaultValue: value })}
-                  </option>
-                ),
-              )}
+              {(["informational", "low", "medium", "high", "critical"] as const).map((value) => (
+                <option key={value} value={value}>
+                  {t(`severityCodes.${value}`, { defaultValue: value })}
+                </option>
+              ))}
             </select>
           </label>
           <label>
             <span>{t("priority")}</span>
             <select name="priority" defaultValue="3">
               {[1, 2, 3, 4, 5].map((value) => (
-                <option key={value} value={value}>{value}</option>
+                <option key={value} value={value}>
+                  {value}
+                </option>
               ))}
             </select>
           </label>
@@ -1065,7 +1243,11 @@ function IncidentsPage() {
               minLength={3}
               maxLength={5000}
               rows={4}
-              placeholder={i18n.language.startsWith("es") ? "Detalle los hallazgos técnicos, vectores observados o sistemas afectados..." : "Detail technical findings, observed vectors or affected systems..."}
+              placeholder={
+                i18n.language.startsWith("es")
+                  ? "Detalle los hallazgos técnicos, vectores observados o sistemas afectados..."
+                  : "Detail technical findings, observed vectors or affected systems..."
+              }
             />
           </label>
           <div className="form-grid-actions">
@@ -1073,7 +1255,9 @@ function IncidentsPage() {
               ➕ {t("createRealIncident")}
             </button>
             {createMutation.isError && (
-              <p className="form-error" role="alert" style={{ margin: 0 }}>{t("incidentCreateError")}</p>
+              <p className="form-error" role="alert" style={{ margin: 0 }}>
+                {t("incidentCreateError")}
+              </p>
             )}
           </div>
         </form>
@@ -1102,20 +1286,45 @@ function IncidentsPage() {
                 <span className={`severity ${incident.severity}`}>
                   {t(`severityCodes.${incident.severity}`, { defaultValue: incident.severity })}
                 </span>
-                <div style={{ flex: 1, display: "flex", alignItems: "center", gap: "10px", minWidth: 0 }}>
+                <div
+                  style={{
+                    flex: 1,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "10px",
+                    minWidth: 0,
+                  }}
+                >
                   <strong style={{ whiteSpace: "nowrap" }}>
                     {incident.code} · {incident.title}
                   </strong>
-                  <span style={{ color: "var(--muted)", fontSize: "0.85rem", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                  <span
+                    style={{
+                      color: "var(--muted)",
+                      fontSize: "0.85rem",
+                      whiteSpace: "nowrap",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                    }}
+                  >
                     ({incident.classification})
                   </span>
                 </div>
                 {isValidDate && (
-                  <span style={{ fontSize: "0.875rem", color: "var(--text-soft)", whiteSpace: "nowrap", fontFamily: "var(--font-mono, monospace)" }}>
+                  <span
+                    style={{
+                      fontSize: "0.875rem",
+                      color: "var(--text-soft)",
+                      whiteSpace: "nowrap",
+                      fontFamily: "var(--font-mono, monospace)",
+                    }}
+                  >
                     {detectedDate.toLocaleString(i18n.language)}
                   </span>
                 )}
-                <span style={{ whiteSpace: "nowrap" }}>{t(`statusCodes.${incident.status}`, { defaultValue: incident.status })}</span>
+                <span style={{ whiteSpace: "nowrap" }}>
+                  {t(`statusCodes.${incident.status}`, { defaultValue: incident.status })}
+                </span>
               </NavLink>
             );
           })}
@@ -1139,7 +1348,9 @@ function IncidentDetailPage() {
   const { id = "" } = useParams();
   const { t, i18n } = useTranslation();
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState<"overview" | "alerts" | "threatIntel" | "audit">("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "alerts" | "threatIntel" | "audit">(
+    "overview",
+  );
   const [expandedAlertId, setExpandedAlertId] = useState<string | null>(null);
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [selectedPlaybookCode, setSelectedPlaybookCode] = useState("");
@@ -1154,7 +1365,12 @@ function IncidentDetailPage() {
   const [assigneeUserId, setAssigneeUserId] = useState("");
   const [timelineComment, setTimelineComment] = useState("");
   const [claimDraft, setClaimDraft] = useState({
-    claimType: "INFERENCE" as "FACT" | "DERIVED_FACT" | "INFERENCE" | "HYPOTHESIS" | "RECOMMENDATION",
+    claimType: "INFERENCE" as
+      | "FACT"
+      | "DERIVED_FACT"
+      | "INFERENCE"
+      | "HYPOTHESIS"
+      | "RECOMMENDATION",
     statement: "",
     confidence: 0.5,
     explanation: "",
@@ -1172,7 +1388,12 @@ function IncidentDetailPage() {
   const [claimRelation, setClaimRelation] = useState({
     sourceClaimId: "",
     targetClaimId: "",
-    relationshipType: "SUPPORTS" as "SUPPORTS" | "CONTRADICTS" | "DERIVED_FROM" | "SUPERSEDES" | "RESPONDS_TO",
+    relationshipType: "SUPPORTS" as
+      | "SUPPORTS"
+      | "CONTRADICTS"
+      | "DERIVED_FROM"
+      | "SUPERSEDES"
+      | "RESPONDS_TO",
   });
   const [claimPresentation, setClaimPresentation] = useState({
     claimId: "",
@@ -1231,10 +1452,14 @@ function IncidentDetailPage() {
       id: claim.id,
       label: `${claim.claim_type} · ${claim.statement}`,
     })),
-  ].filter((option) => claimDraft.claimType !== "FACT" || ["ALERT_REFERENCE", "INCIDENT_TIMELINE_ENTRY"].includes(option.type));
-  const selectedClaimEvidence = claimEvidenceOptions.find(
-    (option) => option.key === claimDraft.evidenceKey,
-  ) ?? claimEvidenceOptions[0];
+  ].filter(
+    (option) =>
+      claimDraft.claimType !== "FACT" ||
+      ["ALERT_REFERENCE", "INCIDENT_TIMELINE_ENTRY"].includes(option.type),
+  );
+  const selectedClaimEvidence =
+    claimEvidenceOptions.find((option) => option.key === claimDraft.evidenceKey) ??
+    claimEvidenceOptions[0];
 
   const playbookDefinitions = useQuery({
     queryKey: ["playbook-definitions"],
@@ -1243,10 +1468,10 @@ function IncidentDetailPage() {
   });
   const executablePlaybooks = (playbookDefinitions.data?.items ?? []).filter(
     (item) =>
-      item.readiness_status === "READY"
-      && item.publication_status === "PUBLISHED"
-      && item.binding_active
-      && Boolean(item.latest_version),
+      item.readiness_status === "READY" &&
+      item.publication_status === "PUBLISHED" &&
+      item.binding_active &&
+      Boolean(item.latest_version),
   );
   const incidentAttackCodes = useMemo(
     () => new Set((enrichment.data?.mappings ?? []).map((m) => m.external_id)),
@@ -1263,9 +1488,8 @@ function IncidentDetailPage() {
     });
   }, [executablePlaybooks, incidentAttackCodes]);
 
-  const selectedPlaybook = sortedPlaybooks.find(
-    (item) => item.code === selectedPlaybookCode,
-  ) ?? sortedPlaybooks[0];
+  const selectedPlaybook =
+    sortedPlaybooks.find((item) => item.code === selectedPlaybookCode) ?? sortedPlaybooks[0];
   const playbookExecutions = useQuery({
     queryKey: ["playbook-executions", id],
     queryFn: () => getPlaybookExecutions(id),
@@ -1283,6 +1507,12 @@ function IncidentDetailPage() {
     });
     setAssigneeUserId(incident.data.assignee_user_id ?? "");
     setTransitionTarget(INCIDENT_TRANSITIONS[incident.data.status]?.[0] ?? "");
+    // Keyed on version alone, deliberately. This resets the edit form from the
+    // server copy, so depending on `incident.data` would rerun it on every
+    // refetch and wipe whatever the analyst is part-way through typing. The
+    // form should only be reset when the incident it is editing actually
+    // changed underneath them, which is what a new version means.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [incident.data?.version]);
 
   const refreshIncident = async () => {
@@ -1341,19 +1571,20 @@ function IncidentDetailPage() {
         language_code: i18n.language.startsWith("es") ? "es" : "en",
         confidence: nonDeterministic ? claimDraft.confidence : null,
         explanation: nonDeterministic ? claimDraft.explanation.trim() : null,
-        validation_criteria: claimDraft.claimType === "HYPOTHESIS"
-          ? claimDraft.validationCriteria.trim()
-          : null,
-        missing_evidence: claimDraft.claimType === "HYPOTHESIS"
-          ? [claimDraft.missingEvidence.trim()]
-          : [],
+        validation_criteria:
+          claimDraft.claimType === "HYPOTHESIS" ? claimDraft.validationCriteria.trim() : null,
+        missing_evidence:
+          claimDraft.claimType === "HYPOTHESIS" ? [claimDraft.missingEvidence.trim()] : [],
         method_code: claimDraft.claimType === "DERIVED_FACT" ? claimDraft.methodCode.trim() : null,
-        method_version: claimDraft.claimType === "DERIVED_FACT" ? claimDraft.methodVersion.trim() : null,
-        evidence: [{
-          evidence_type: selectedClaimEvidence.type,
-          evidence_id: selectedClaimEvidence.id,
-          relationship: "SUPPORTS",
-        }],
+        method_version:
+          claimDraft.claimType === "DERIVED_FACT" ? claimDraft.methodVersion.trim() : null,
+        evidence: [
+          {
+            evidence_type: selectedClaimEvidence.type,
+            evidence_id: selectedClaimEvidence.id,
+            relationship: "SUPPORTS",
+          },
+        ],
       });
     },
     onSuccess: async () => {
@@ -1369,11 +1600,12 @@ function IncidentDetailPage() {
     },
   });
   const assess = useMutation({
-    mutationFn: () => assessClaim(
-      claimAssessment.claimId,
-      claimAssessment.outcome,
-      claimAssessment.explanation.trim(),
-    ),
+    mutationFn: () =>
+      assessClaim(
+        claimAssessment.claimId,
+        claimAssessment.outcome,
+        claimAssessment.explanation.trim(),
+      ),
     onSuccess: async () => {
       setClaimAssessment({ claimId: "", outcome: "VALIDATED", explanation: "" });
       await queryClient.invalidateQueries({ queryKey: ["claims", id] });
@@ -1381,22 +1613,24 @@ function IncidentDetailPage() {
   });
 
   const relate = useMutation({
-    mutationFn: () => relateClaim(
-      claimRelation.sourceClaimId,
-      claimRelation.targetClaimId,
-      claimRelation.relationshipType,
-    ),
+    mutationFn: () =>
+      relateClaim(
+        claimRelation.sourceClaimId,
+        claimRelation.targetClaimId,
+        claimRelation.relationshipType,
+      ),
     onSuccess: async () => {
       setClaimRelation({ sourceClaimId: "", targetClaimId: "", relationshipType: "SUPPORTS" });
       await queryClient.invalidateQueries({ queryKey: ["claims", id] });
     },
   });
   const presentClaim = useMutation({
-    mutationFn: () => addClaimPresentation(
-      claimPresentation.claimId,
-      claimPresentation.locale,
-      claimPresentation.text.trim(),
-    ),
+    mutationFn: () =>
+      addClaimPresentation(
+        claimPresentation.claimId,
+        claimPresentation.locale,
+        claimPresentation.text.trim(),
+      ),
     onSuccess: async () => {
       setClaimPresentation({ claimId: "", locale: "en", text: "" });
       await queryClient.invalidateQueries({ queryKey: ["claims", id] });
@@ -1461,7 +1695,7 @@ function IncidentDetailPage() {
     },
   });
 
-  const transitionTargets = incident.data ? INCIDENT_TRANSITIONS[incident.data.status] ?? [] : [];
+  const transitionTargets = incident.data ? (INCIDENT_TRANSITIONS[incident.data.status] ?? []) : [];
 
   if (incident.isLoading) return <PageState loading error={false} empty={false} />;
   if (incident.isError || !incident.data) {
@@ -1473,10 +1707,16 @@ function IncidentDetailPage() {
       <div className="page-title">
         <div>
           <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
-            <p className="eyebrow" style={{ margin: 0 }}>{incident.data.code}</p>
+            <p className="eyebrow" style={{ margin: 0 }}>
+              {incident.data.code}
+            </p>
             {incident.data.detected_at && !isNaN(new Date(incident.data.detected_at).getTime()) && (
               <span style={{ fontSize: "0.8rem", color: "var(--muted)", fontWeight: 500 }}>
-                📅 {new Date(incident.data.detected_at).toLocaleString(i18n.language, { dateStyle: "medium", timeStyle: "medium" })}
+                📅{" "}
+                {new Date(incident.data.detected_at).toLocaleString(i18n.language, {
+                  dateStyle: "medium",
+                  timeStyle: "medium",
+                })}
               </span>
             )}
           </div>
@@ -1542,7 +1782,16 @@ function IncidentDetailPage() {
               }}
               onClick={() => setActiveTab("overview")}
             >
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg
+                width="15"
+                height="15"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
                 <rect x="3" y="3" width="7" height="7" rx="1.5" />
                 <rect x="14" y="3" width="7" height="7" rx="1.5" />
                 <rect x="14" y="14" width="7" height="7" rx="1.5" />
@@ -1568,7 +1817,16 @@ function IncidentDetailPage() {
               }}
               onClick={() => setActiveTab("alerts")}
             >
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg
+                width="15"
+                height="15"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
                 <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
                 <path d="M13.73 21a2 2 0 0 1-3.46 0" />
               </svg>
@@ -1592,7 +1850,16 @@ function IncidentDetailPage() {
               }}
               onClick={() => setActiveTab("threatIntel")}
             >
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg
+                width="15"
+                height="15"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
                 <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
               </svg>
               {t("tabThreatIntel")}
@@ -1615,13 +1882,23 @@ function IncidentDetailPage() {
               }}
               onClick={() => setActiveTab("audit")}
             >
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg
+                width="15"
+                height="15"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
                 <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
                 <polyline points="14 2 14 8 20 8" />
                 <line x1="16" y1="13" x2="8" y2="13" />
                 <line x1="16" y1="17" x2="8" y2="17" />
               </svg>
-              {t("tabAudit")} {playbookExecutions.data?.length ? `(${playbookExecutions.data.length})` : ""}
+              {t("tabAudit")}{" "}
+              {playbookExecutions.data?.length ? `(${playbookExecutions.data.length})` : ""}
             </button>
           </div>
 
@@ -1710,7 +1987,9 @@ function IncidentDetailPage() {
                   minLength={3}
                   maxLength={300}
                   value={incidentDraft.title}
-                  onChange={(event) => setIncidentDraft({ ...incidentDraft, title: event.target.value })}
+                  onChange={(event) =>
+                    setIncidentDraft({ ...incidentDraft, title: event.target.value })
+                  }
                 />
               </label>
               <label>
@@ -1720,32 +1999,44 @@ function IncidentDetailPage() {
                   minLength={2}
                   maxLength={120}
                   value={incidentDraft.classification}
-                  onChange={(event) => setIncidentDraft({ ...incidentDraft, classification: event.target.value })}
+                  onChange={(event) =>
+                    setIncidentDraft({ ...incidentDraft, classification: event.target.value })
+                  }
                 />
               </label>
               <label>
                 {t("severity")}
                 <select
                   value={incidentDraft.severity}
-                  onChange={(event) => setIncidentDraft({
-                    ...incidentDraft,
-                    severity: event.target.value as typeof incidentDraft.severity,
-                  })}
+                  onChange={(event) =>
+                    setIncidentDraft({
+                      ...incidentDraft,
+                      severity: event.target.value as typeof incidentDraft.severity,
+                    })
+                  }
                 >
-                  {(["informational", "low", "medium", "high", "critical"] as const).map((value) => (
-                    <option key={value} value={value}>
-                      {t(`severityCodes.${value}`, { defaultValue: value })}
-                    </option>
-                  ))}
+                  {(["informational", "low", "medium", "high", "critical"] as const).map(
+                    (value) => (
+                      <option key={value} value={value}>
+                        {t(`severityCodes.${value}`, { defaultValue: value })}
+                      </option>
+                    ),
+                  )}
                 </select>
               </label>
               <label>
                 {t("priority")}
                 <select
                   value={incidentDraft.priority}
-                  onChange={(event) => setIncidentDraft({ ...incidentDraft, priority: Number(event.target.value) })}
+                  onChange={(event) =>
+                    setIncidentDraft({ ...incidentDraft, priority: Number(event.target.value) })
+                  }
                 >
-                  {[1, 2, 3, 4, 5].map((value) => <option key={value} value={value}>{value}</option>)}
+                  {[1, 2, 3, 4, 5].map((value) => (
+                    <option key={value} value={value}>
+                      {value}
+                    </option>
+                  ))}
                 </select>
               </label>
               <label style={{ gridColumn: "1 / -1" }}>
@@ -1756,10 +2047,14 @@ function IncidentDetailPage() {
                   maxLength={5000}
                   rows={4}
                   value={incidentDraft.description}
-                  onChange={(event) => setIncidentDraft({ ...incidentDraft, description: event.target.value })}
+                  onChange={(event) =>
+                    setIncidentDraft({ ...incidentDraft, description: event.target.value })
+                  }
                 />
               </label>
-              <button type="submit" disabled={updateDetails.isPending}>{t("saveIncident")}</button>
+              <button type="submit" disabled={updateDetails.isPending}>
+                {t("saveIncident")}
+              </button>
             </form>
 
             <div className="form-grid" style={{ marginTop: "1.25rem" }}>
@@ -1771,9 +2066,13 @@ function IncidentDetailPage() {
                   onChange={(event) => setAssigneeUserId(event.target.value)}
                 >
                   <option value="">{t("unassigned")}</option>
-                  {tenantUsers.data?.filter((user) => user.is_active).map((user) => (
-                    <option key={user.id} value={user.id}>{user.display_name} · {user.email}</option>
-                  ))}
+                  {tenantUsers.data
+                    ?.filter((user) => user.is_active)
+                    .map((user) => (
+                      <option key={user.id} value={user.id}>
+                        {user.display_name} · {user.email}
+                      </option>
+                    ))}
                 </select>
               </label>
               <div style={{ alignSelf: "end" }}>
@@ -1804,7 +2103,9 @@ function IncidentDetailPage() {
               </button>
             </div>
             {(updateDetails.isError || assign.isError || addTimelineComment.isError) && (
-              <p className="status-message status-error" role="alert">{t("actionError")}</p>
+              <p className="status-message status-error" role="alert">
+                {t("actionError")}
+              </p>
             )}
           </section>
 
@@ -1826,8 +2127,8 @@ function IncidentDetailPage() {
               </div>
 
               {(() => {
-                const hasExistingProposal = (responseDecisions.data ?? []).some(
-                  (item) => ["AWAITING_APPROVAL", "AUTHORIZED"].includes(item.status),
+                const hasExistingProposal = (responseDecisions.data ?? []).some((item) =>
+                  ["AWAITING_APPROVAL", "AUTHORIZED"].includes(item.status),
                 );
                 return (
                   <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
@@ -1860,9 +2161,7 @@ function IncidentDetailPage() {
                     <button
                       type="button"
                       disabled={
-                        responseProposal.isPending
-                        || hasExistingProposal
-                        || !selectedPlaybook
+                        responseProposal.isPending || hasExistingProposal || !selectedPlaybook
                       }
                       title={
                         hasExistingProposal
@@ -1882,7 +2181,7 @@ function IncidentDetailPage() {
 
             {/* Sub-header Notice Banner for 4-Eye Principle */}
             {responseDecisions.data?.some(
-              (d) => d.status === "AWAITING_APPROVAL" && d.approval_status === "PENDING"
+              (d) => d.status === "AWAITING_APPROVAL" && d.approval_status === "PENDING",
             ) && (
               <div
                 style={{
@@ -1929,8 +2228,7 @@ function IncidentDetailPage() {
                   (entry) => entry.decision === "APPROVE",
                 ).length;
                 const totalApprovals = decision.required_approvals;
-                const hasRequiredApprovals =
-                  totalApprovals > 0 && countApproved >= totalApprovals;
+                const hasRequiredApprovals = totalApprovals > 0 && countApproved >= totalApprovals;
                 return (
                   <article
                     className="claim-card"
@@ -1949,23 +2247,58 @@ function IncidentDetailPage() {
                         <span className="severity">{decision.status}</span>
                         <span>{decision.impact}</span>
                       </div>
-                      <strong style={{ fontSize: "1.15rem", display: "block", marginBottom: "6px" }}>
+                      <strong
+                        style={{ fontSize: "1.15rem", display: "block", marginBottom: "6px" }}
+                      >
                         {decision.action_type}
                       </strong>
-                      <div style={{ background: "var(--panel-raised)", padding: "8px 12px", borderRadius: "6px", margin: "6px 0 10px", borderLeft: "3px solid var(--accent)" }}>
-                        <span style={{ fontSize: "0.75rem", color: "var(--muted)", display: "block", marginBottom: "2px" }}>
-                          🎯 {t("targetBlockedEntity", { defaultValue: "Usuario / Entidad objetivo del bloqueo:" })}
+                      <div
+                        style={{
+                          background: "var(--panel-raised)",
+                          padding: "8px 12px",
+                          borderRadius: "6px",
+                          margin: "6px 0 10px",
+                          borderLeft: "3px solid var(--accent)",
+                        }}
+                      >
+                        <span
+                          style={{
+                            fontSize: "0.75rem",
+                            color: "var(--muted)",
+                            display: "block",
+                            marginBottom: "2px",
+                          }}
+                        >
+                          🎯{" "}
+                          {t("targetBlockedEntity", {
+                            defaultValue: "Usuario / Entidad objetivo del bloqueo:",
+                          })}
                         </span>
-                        <strong style={{ fontSize: "0.9rem", color: "var(--text-bright)", fontFamily: "var(--font-mono, monospace)" }}>
-                          {decision.targets && decision.targets.length > 0 ? decision.targets.join(", ") : t("notAvailable")}
+                        <strong
+                          style={{
+                            fontSize: "0.9rem",
+                            color: "var(--text-bright)",
+                            fontFamily: "var(--font-mono, monospace)",
+                          }}
+                        >
+                          {decision.targets && decision.targets.length > 0
+                            ? decision.targets.join(", ")
+                            : t("notAvailable")}
                         </strong>
                       </div>
                       <p style={{ margin: "6px 0", fontSize: "0.9rem" }}>
                         <strong>{t("approvalProgress")}:</strong> {countApproved}/{totalApprovals}
-                        {totalApprovals >= 2 && hasRequiredApprovals && <span style={{ color: "var(--accent)", marginLeft: "6px", fontWeight: 600 }}>✓ {t("fourEyesApproved")}</span>}
+                        {totalApprovals >= 2 && hasRequiredApprovals && (
+                          <span
+                            style={{ color: "var(--accent)", marginLeft: "6px", fontWeight: 600 }}
+                          >
+                            ✓ {t("fourEyesApproved")}
+                          </span>
+                        )}
                       </p>
                       <small style={{ color: "var(--muted)", display: "block", marginTop: "6px" }}>
-                        {t("policyOutcome")}: {decision.evaluation_outcome} · {decision.reason_codes.join(" · ")}
+                        {t("policyOutcome")}: {decision.evaluation_outcome} ·{" "}
+                        {decision.reason_codes.join(" · ")}
                       </small>
                     </div>
                     <div style={{ marginTop: "16px" }}>
@@ -2028,7 +2361,16 @@ function IncidentDetailPage() {
                             </button>
                           </div>
                         ) : (
-                          <p style={{ margin: 0, fontSize: "0.85rem", color: "var(--text-soft)", background: "var(--panel-raised)", padding: "8px 12px", borderRadius: "6px" }}>
+                          <p
+                            style={{
+                              margin: 0,
+                              fontSize: "0.85rem",
+                              color: "var(--text-soft)",
+                              background: "var(--panel-raised)",
+                              padding: "8px 12px",
+                              borderRadius: "6px",
+                            }}
+                          >
                             🔒 {t("awaitingSecondAnalystNotice")}
                           </p>
                         ))}
@@ -2042,7 +2384,6 @@ function IncidentDetailPage() {
                           ▶ {t("simulateResponse")}
                         </button>
                       )}
-
                     </div>
                   </article>
                 );
@@ -2063,7 +2404,9 @@ function IncidentDetailPage() {
           <section className="panel">
             <div style={{ marginBottom: "1rem" }}>
               <h2>{t("timeline")}</h2>
-              <p style={{ color: "var(--muted)", margin: "4px 0 0" }}>{incident.data.description}</p>
+              <p style={{ color: "var(--muted)", margin: "4px 0 0" }}>
+                {incident.data.description}
+              </p>
             </div>
 
             {analysis.data && (
@@ -2079,13 +2422,19 @@ function IncidentDetailPage() {
                     : analysis.data.summary_en}
                 </p>
                 {analysis.data.grounded && analysis.data.techniques.length > 0 && (
-                  <small>{analysis.data.techniques.map((item) => item.external_id).join(" · ")}</small>
+                  <small>
+                    {analysis.data.techniques.map((item) => item.external_id).join(" · ")}
+                  </small>
                 )}
               </div>
             )}
 
             {(transition.isError || analysis.isError || responseProposal.isError) && (
-              <p className="status-message status-error" role="alert" style={{ marginBottom: "1rem" }}>
+              <p
+                className="status-message status-error"
+                role="alert"
+                style={{ marginBottom: "1rem" }}
+              >
                 {t("actionError")}
               </p>
             )}
@@ -2127,7 +2476,10 @@ function IncidentDetailPage() {
               <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
                 <label style={{ maxWidth: "320px" }}>
                   {t("targetStatus")}
-                  <select value={transitionTarget} onChange={(event) => setTransitionTarget(event.target.value)}>
+                  <select
+                    value={transitionTarget}
+                    onChange={(event) => setTransitionTarget(event.target.value)}
+                  >
                     {transitionTargets.map((target) => (
                       <option key={target} value={target}>
                         {t(`statusCodes.${target}`, { defaultValue: target })}
@@ -2138,12 +2490,23 @@ function IncidentDetailPage() {
                 {transitionTarget === "closed" && (
                   <label style={{ maxWidth: "320px" }}>
                     {t("closeReason")}
-                    <select value={closeReason} onChange={(event) => setCloseReason(
-                      event.target.value as typeof closeReason,
-                    )}>
-                      {(["resolved", "false_positive", "duplicate", "accepted_risk", "other"] as const).map(
-                        (reason) => <option key={reason} value={reason}>{t(`closeReasons.${reason}`)}</option>,
-                      )}
+                    <select
+                      value={closeReason}
+                      onChange={(event) => setCloseReason(event.target.value as typeof closeReason)}
+                    >
+                      {(
+                        [
+                          "resolved",
+                          "false_positive",
+                          "duplicate",
+                          "accepted_risk",
+                          "other",
+                        ] as const
+                      ).map((reason) => (
+                        <option key={reason} value={reason}>
+                          {t(`closeReasons.${reason}`)}
+                        </option>
+                      ))}
                     </select>
                   </label>
                 )}
@@ -2151,7 +2514,11 @@ function IncidentDetailPage() {
                   {t("transitionReason")}
                   <textarea
                     rows={2}
-                    minLength={transitionTarget === "closed" || transitionTarget === "reopened" ? 3 : undefined}
+                    minLength={
+                      transitionTarget === "closed" || transitionTarget === "reopened"
+                        ? 3
+                        : undefined
+                    }
                     maxLength={1000}
                     required={transitionTarget === "closed" || transitionTarget === "reopened"}
                     value={transitionNote}
@@ -2159,20 +2526,30 @@ function IncidentDetailPage() {
                   />
                 </label>
 
-                <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: "10px" }}>
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "flex-end",
+                    alignItems: "center",
+                    gap: "10px",
+                  }}
+                >
                   <button
                     type="button"
                     className="primary"
                     disabled={
-                      transition.isPending
-                      || !transitionTarget
-                      || (["closed", "reopened"].includes(transitionTarget) && transitionNote.trim().length < 3)
+                      transition.isPending ||
+                      !transitionTarget ||
+                      (["closed", "reopened"].includes(transitionTarget) &&
+                        transitionNote.trim().length < 3)
                     }
-                    onClick={() => transition.mutate({
-                      target: transitionTarget,
-                      reason: transitionNote,
-                      closingReason: transitionTarget === "closed" ? closeReason : undefined,
-                    })}
+                    onClick={() =>
+                      transition.mutate({
+                        target: transitionTarget,
+                        reason: transitionNote,
+                        closingReason: transitionTarget === "closed" ? closeReason : undefined,
+                      })
+                    }
                   >
                     {transition.isPending
                       ? t("loading")
@@ -2196,7 +2573,9 @@ function IncidentDetailPage() {
             <PageState
               loading={linkedAlerts.isLoading}
               error={linkedAlerts.isError}
-              empty={!linkedAlerts.isLoading && !linkedAlerts.isError && linkedAlerts.data?.length === 0}
+              empty={
+                !linkedAlerts.isLoading && !linkedAlerts.isError && linkedAlerts.data?.length === 0
+              }
             />
             <div className="data-list" style={{ marginTop: "1rem" }}>
               {linkedAlerts.data?.map((alert) => {
@@ -2229,7 +2608,14 @@ function IncidentDetailPage() {
                         {alert.source} · {alert.category}
                       </small>
                     </div>
-                    <div style={{ display: "flex", alignItems: "center", gap: "10px", justifyContent: "flex-end" }}>
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "10px",
+                        justifyContent: "flex-end",
+                      }}
+                    >
                       <time dateTime={alert.observed_at}>
                         {new Date(alert.observed_at).toLocaleString(i18n.language)}
                       </time>
@@ -2251,7 +2637,14 @@ function IncidentDetailPage() {
                         style={{ gridColumn: "1 / -1", marginTop: "12px", opacity: 1 }}
                         onClick={(e) => e.stopPropagation()}
                       >
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
+                        <div
+                          style={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                            marginBottom: "12px",
+                          }}
+                        >
                           <strong>{t("alertDetails")}</strong>
                           <button
                             type="button"
@@ -2336,7 +2729,9 @@ function IncidentDetailPage() {
                 loading={correlations.isLoading}
                 error={correlations.isError}
                 empty={
-                  !correlations.isLoading && !correlations.isError && correlations.data?.length === 0
+                  !correlations.isLoading &&
+                  !correlations.isError &&
+                  correlations.data?.length === 0
                 }
               />
             </div>
@@ -2346,7 +2741,19 @@ function IncidentDetailPage() {
 
       {activeTab === "threatIntel" && (
         <>
-          <section style={{ display: "flex", flexDirection: "column", minHeight: "unset", gap: "1rem", marginBottom: "1.25rem", background: "var(--panel)", border: "1px solid var(--panel-border)", borderRadius: "8px", padding: "1.5rem" }}>
+          <section
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              minHeight: "unset",
+              gap: "1rem",
+              marginBottom: "1.25rem",
+              background: "var(--panel)",
+              border: "1px solid var(--panel-border)",
+              borderRadius: "8px",
+              padding: "1.5rem",
+            }}
+          >
             <div
               style={{
                 display: "flex",
@@ -2361,13 +2768,21 @@ function IncidentDetailPage() {
               <div>
                 <p className="eyebrow">MITRE ATT&amp;CK</p>
                 <h2 style={{ margin: "2px 0 0", fontSize: "1.25rem" }}>{t("threatEnrichment")}</h2>
-                <p style={{ margin: "4px 0 0", color: "var(--muted)", fontSize: "0.85rem" }}>{t("threatEnrichmentIntro")}</p>
+                <p style={{ margin: "4px 0 0", color: "var(--muted)", fontSize: "0.85rem" }}>
+                  {t("threatEnrichmentIntro")}
+                </p>
               </div>
               <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
                 <button
                   type="button"
                   className="ghost"
-                  style={{ width: "auto", minWidth: "unset", height: "auto", padding: "6px 14px", fontSize: "0.825rem" }}
+                  style={{
+                    width: "auto",
+                    minWidth: "unset",
+                    height: "auto",
+                    padding: "6px 14px",
+                    fontSize: "0.825rem",
+                  }}
                   disabled={recalculateRisk.isPending}
                   onClick={() => recalculateRisk.mutate()}
                 >
@@ -2376,7 +2791,13 @@ function IncidentDetailPage() {
                 <button
                   type="button"
                   className="primary"
-                  style={{ width: "auto", minWidth: "unset", height: "auto", padding: "6px 14px", fontSize: "0.825rem" }}
+                  style={{
+                    width: "auto",
+                    minWidth: "unset",
+                    height: "auto",
+                    padding: "6px 14px",
+                    fontSize: "0.825rem",
+                  }}
                   disabled={generateExplanation.isPending || !enrichment.data}
                   onClick={() => generateExplanation.mutate()}
                 >
@@ -2473,15 +2894,21 @@ function IncidentDetailPage() {
                   {t("claimType")}
                   <select
                     value={claimDraft.claimType}
-                    onChange={(event) => setClaimDraft({
-                      ...claimDraft,
-                      claimType: event.target.value as typeof claimDraft.claimType,
-                      evidenceKey: "",
-                    })}
+                    onChange={(event) =>
+                      setClaimDraft({
+                        ...claimDraft,
+                        claimType: event.target.value as typeof claimDraft.claimType,
+                        evidenceKey: "",
+                      })
+                    }
                   >
-                    {(["FACT", "DERIVED_FACT", "INFERENCE", "HYPOTHESIS", "RECOMMENDATION"] as const).map(
-                      (type) => <option key={type} value={type}>{t(`claimTypes.${type}`)}</option>,
-                    )}
+                    {(
+                      ["FACT", "DERIVED_FACT", "INFERENCE", "HYPOTHESIS", "RECOMMENDATION"] as const
+                    ).map((type) => (
+                      <option key={type} value={type}>
+                        {t(`claimTypes.${type}`)}
+                      </option>
+                    ))}
                   </select>
                 </label>
                 <label>
@@ -2489,11 +2916,17 @@ function IncidentDetailPage() {
                   <select
                     required
                     value={selectedClaimEvidence?.key ?? ""}
-                    onChange={(event) => setClaimDraft({ ...claimDraft, evidenceKey: event.target.value })}
+                    onChange={(event) =>
+                      setClaimDraft({ ...claimDraft, evidenceKey: event.target.value })
+                    }
                   >
-                    {claimEvidenceOptions.length === 0 && <option value="">{t("noDirectEvidence")}</option>}
+                    {claimEvidenceOptions.length === 0 && (
+                      <option value="">{t("noDirectEvidence")}</option>
+                    )}
                     {claimEvidenceOptions.map((option) => (
-                      <option key={option.key} value={option.key}>{option.type} · {option.label}</option>
+                      <option key={option.key} value={option.key}>
+                        {option.type} · {option.label}
+                      </option>
                     ))}
                   </select>
                 </label>
@@ -2505,7 +2938,9 @@ function IncidentDetailPage() {
                     maxLength={2000}
                     rows={3}
                     value={claimDraft.statement}
-                    onChange={(event) => setClaimDraft({ ...claimDraft, statement: event.target.value })}
+                    onChange={(event) =>
+                      setClaimDraft({ ...claimDraft, statement: event.target.value })
+                    }
                   />
                 </label>
                 {["INFERENCE", "HYPOTHESIS", "RECOMMENDATION"].includes(claimDraft.claimType) && (
@@ -2519,7 +2954,9 @@ function IncidentDetailPage() {
                         max={1}
                         step={0.01}
                         value={claimDraft.confidence}
-                        onChange={(event) => setClaimDraft({ ...claimDraft, confidence: Number(event.target.value) })}
+                        onChange={(event) =>
+                          setClaimDraft({ ...claimDraft, confidence: Number(event.target.value) })
+                        }
                       />
                     </label>
                     <label style={{ gridColumn: "1 / -1" }}>
@@ -2530,7 +2967,9 @@ function IncidentDetailPage() {
                         maxLength={4000}
                         rows={3}
                         value={claimDraft.explanation}
-                        onChange={(event) => setClaimDraft({ ...claimDraft, explanation: event.target.value })}
+                        onChange={(event) =>
+                          setClaimDraft({ ...claimDraft, explanation: event.target.value })
+                        }
                       />
                     </label>
                   </>
@@ -2539,11 +2978,25 @@ function IncidentDetailPage() {
                   <>
                     <label>
                       {t("methodCode")}
-                      <input required maxLength={120} value={claimDraft.methodCode} onChange={(event) => setClaimDraft({ ...claimDraft, methodCode: event.target.value })} />
+                      <input
+                        required
+                        maxLength={120}
+                        value={claimDraft.methodCode}
+                        onChange={(event) =>
+                          setClaimDraft({ ...claimDraft, methodCode: event.target.value })
+                        }
+                      />
                     </label>
                     <label>
                       {t("methodVersion")}
-                      <input required maxLength={80} value={claimDraft.methodVersion} onChange={(event) => setClaimDraft({ ...claimDraft, methodVersion: event.target.value })} />
+                      <input
+                        required
+                        maxLength={80}
+                        value={claimDraft.methodVersion}
+                        onChange={(event) =>
+                          setClaimDraft({ ...claimDraft, methodVersion: event.target.value })
+                        }
+                      />
                     </label>
                   </>
                 )}
@@ -2551,18 +3004,38 @@ function IncidentDetailPage() {
                   <>
                     <label style={{ gridColumn: "1 / -1" }}>
                       {t("validationCriteria")}
-                      <textarea required minLength={1} maxLength={2000} rows={2} value={claimDraft.validationCriteria} onChange={(event) => setClaimDraft({ ...claimDraft, validationCriteria: event.target.value })} />
+                      <textarea
+                        required
+                        minLength={1}
+                        maxLength={2000}
+                        rows={2}
+                        value={claimDraft.validationCriteria}
+                        onChange={(event) =>
+                          setClaimDraft({ ...claimDraft, validationCriteria: event.target.value })
+                        }
+                      />
                     </label>
                     <label>
                       {t("missingEvidenceCode")}
-                      <input required pattern="[a-z][a-z0-9_.-]{0,79}" value={claimDraft.missingEvidence} onChange={(event) => setClaimDraft({ ...claimDraft, missingEvidence: event.target.value })} />
+                      <input
+                        required
+                        pattern="[a-z][a-z0-9_.-]{0,79}"
+                        value={claimDraft.missingEvidence}
+                        onChange={(event) =>
+                          setClaimDraft({ ...claimDraft, missingEvidence: event.target.value })
+                        }
+                      />
                     </label>
                   </>
                 )}
                 <button type="submit" disabled={createClaim.isPending || !selectedClaimEvidence}>
                   {t("createClaim")}
                 </button>
-                {createClaim.isError && <p className="form-error" role="alert">{t("actionError")}</p>}
+                {createClaim.isError && (
+                  <p className="form-error" role="alert">
+                    {t("actionError")}
+                  </p>
+                )}
               </form>
             </details>
             <div
@@ -2589,7 +3062,9 @@ function IncidentDetailPage() {
                       </span>
                       <span>{t(`claimStates.${claim.state}`, { defaultValue: claim.state })}</span>
                       <span>
-                        {t(`claimOrigins.${claim.origin_type}`, { defaultValue: claim.origin_type })}
+                        {t(`claimOrigins.${claim.origin_type}`, {
+                          defaultValue: claim.origin_type,
+                        })}
                       </span>
                     </div>
                     <p style={{ margin: "6px 0" }}>{statement}</p>
@@ -2606,20 +3081,27 @@ function IncidentDetailPage() {
                           assess.mutate();
                         }}
                       >
-                        {claim.origin_type === "HUMAN" && claim.origin_actor_user_id === currentUser.data?.id ? (
+                        {claim.origin_type === "HUMAN" &&
+                        claim.origin_actor_user_id === currentUser.data?.id ? (
                           <input type="hidden" value="RETRACTED" />
                         ) : (
                           <label>
                             {t("assessmentOutcome")}
                             <select
                               value={claimAssessment.outcome}
-                              onChange={(event) => setClaimAssessment({
-                                ...claimAssessment,
-                                outcome: event.target.value as typeof claimAssessment.outcome,
-                              })}
+                              onChange={(event) =>
+                                setClaimAssessment({
+                                  ...claimAssessment,
+                                  outcome: event.target.value as typeof claimAssessment.outcome,
+                                })
+                              }
                             >
                               {(["VALIDATED", "REJECTED", "INSUFFICIENT_EVIDENCE"] as const).map(
-                                (outcome) => <option key={outcome} value={outcome}>{t(`claimStates.${outcome}`)}</option>,
+                                (outcome) => (
+                                  <option key={outcome} value={outcome}>
+                                    {t(`claimStates.${outcome}`)}
+                                  </option>
+                                ),
                               )}
                             </select>
                           </label>
@@ -2632,23 +3114,37 @@ function IncidentDetailPage() {
                             maxLength={4000}
                             rows={2}
                             value={claimAssessment.explanation}
-                            onChange={(event) => setClaimAssessment({
-                              ...claimAssessment,
-                              explanation: event.target.value,
-                            })}
+                            onChange={(event) =>
+                              setClaimAssessment({
+                                ...claimAssessment,
+                                explanation: event.target.value,
+                              })
+                            }
                           />
                         </label>
                         <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
-                          <button type="submit" disabled={assess.isPending}>{t("recordAssessment")}</button>
+                          <button type="submit" disabled={assess.isPending}>
+                            {t("recordAssessment")}
+                          </button>
                           <button
                             type="button"
                             className="ghost"
-                            onClick={() => setClaimAssessment({ claimId: "", outcome: "VALIDATED", explanation: "" })}
+                            onClick={() =>
+                              setClaimAssessment({
+                                claimId: "",
+                                outcome: "VALIDATED",
+                                explanation: "",
+                              })
+                            }
                           >
                             {t("cancel")}
                           </button>
                         </div>
-                        {assess.isError && <p className="form-error" role="alert">{t("actionError")}</p>}
+                        {assess.isError && (
+                          <p className="form-error" role="alert">
+                            {t("actionError")}
+                          </p>
+                        )}
                       </form>
                     ) : (
                       <button
@@ -2656,8 +3152,9 @@ function IncidentDetailPage() {
                         className="ghost"
                         style={{ marginTop: "0.75rem" }}
                         onClick={() => {
-                          const ownHumanClaim = claim.origin_type === "HUMAN"
-                            && claim.origin_actor_user_id === currentUser.data?.id;
+                          const ownHumanClaim =
+                            claim.origin_type === "HUMAN" &&
+                            claim.origin_actor_user_id === currentUser.data?.id;
                           setClaimAssessment({
                             claimId: claim.id,
                             outcome: ownHumanClaim ? "RETRACTED" : "VALIDATED",
@@ -2665,13 +3162,15 @@ function IncidentDetailPage() {
                           });
                         }}
                       >
-                        {claim.origin_type === "HUMAN" && claim.origin_actor_user_id === currentUser.data?.id
+                        {claim.origin_type === "HUMAN" &&
+                        claim.origin_actor_user_id === currentUser.data?.id
                           ? t("retractClaim")
                           : t("assessClaim")}
                       </button>
                     )}
-                    {claims.data && claims.data.length > 1 && (
-                      claimRelation.sourceClaimId === claim.id ? (
+                    {claims.data &&
+                      claims.data.length > 1 &&
+                      (claimRelation.sourceClaimId === claim.id ? (
                         <form
                           style={{ marginTop: "0.75rem", display: "grid", gap: "0.5rem" }}
                           onSubmit={(event) => {
@@ -2681,44 +3180,80 @@ function IncidentDetailPage() {
                         >
                           <label>
                             {t("claimRelationship")}
-                            <select value={claimRelation.relationshipType} onChange={(event) => setClaimRelation({
-                              ...claimRelation,
-                              relationshipType: event.target.value as typeof claimRelation.relationshipType,
-                            })}>
-                              {(["SUPPORTS", "CONTRADICTS", "DERIVED_FROM", "SUPERSEDES", "RESPONDS_TO"] as const).map(
-                                (relationship) => <option key={relationship} value={relationship}>{t(`claimRelationships.${relationship}`)}</option>,
-                              )}
+                            <select
+                              value={claimRelation.relationshipType}
+                              onChange={(event) =>
+                                setClaimRelation({
+                                  ...claimRelation,
+                                  relationshipType: event.target
+                                    .value as typeof claimRelation.relationshipType,
+                                })
+                              }
+                            >
+                              {(
+                                [
+                                  "SUPPORTS",
+                                  "CONTRADICTS",
+                                  "DERIVED_FROM",
+                                  "SUPERSEDES",
+                                  "RESPONDS_TO",
+                                ] as const
+                              ).map((relationship) => (
+                                <option key={relationship} value={relationship}>
+                                  {t(`claimRelationships.${relationship}`)}
+                                </option>
+                              ))}
                             </select>
                           </label>
                           <label>
                             {t("targetClaim")}
-                            <select value={claimRelation.targetClaimId} onChange={(event) => setClaimRelation({
-                              ...claimRelation,
-                              targetClaimId: event.target.value,
-                            })}>
-                              {claims.data.filter((item) => item.id !== claim.id).map((item) => (
-                                <option key={item.id} value={item.id}>{item.claim_type} · {item.statement}</option>
-                              ))}
+                            <select
+                              value={claimRelation.targetClaimId}
+                              onChange={(event) =>
+                                setClaimRelation({
+                                  ...claimRelation,
+                                  targetClaimId: event.target.value,
+                                })
+                              }
+                            >
+                              {claims.data
+                                .filter((item) => item.id !== claim.id)
+                                .map((item) => (
+                                  <option key={item.id} value={item.id}>
+                                    {item.claim_type} · {item.statement}
+                                  </option>
+                                ))}
                             </select>
                           </label>
-                          <button type="submit" disabled={relate.isPending || !claimRelation.targetClaimId}>{t("recordRelationship")}</button>
-                          {relate.isError && <p className="form-error" role="alert">{t("actionError")}</p>}
+                          <button
+                            type="submit"
+                            disabled={relate.isPending || !claimRelation.targetClaimId}
+                          >
+                            {t("recordRelationship")}
+                          </button>
+                          {relate.isError && (
+                            <p className="form-error" role="alert">
+                              {t("actionError")}
+                            </p>
+                          )}
                         </form>
                       ) : (
                         <button
                           type="button"
                           className="ghost"
                           style={{ marginTop: "0.5rem" }}
-                          onClick={() => setClaimRelation({
-                            sourceClaimId: claim.id,
-                            targetClaimId: claims.data!.find((item) => item.id !== claim.id)?.id ?? "",
-                            relationshipType: "SUPPORTS",
-                          })}
+                          onClick={() =>
+                            setClaimRelation({
+                              sourceClaimId: claim.id,
+                              targetClaimId:
+                                claims.data!.find((item) => item.id !== claim.id)?.id ?? "",
+                              relationshipType: "SUPPORTS",
+                            })
+                          }
                         >
                           {t("relateClaim")}
                         </button>
-                      )
-                    )}
+                      ))}
                     {claimPresentation.claimId === claim.id ? (
                       <form
                         style={{ marginTop: "0.75rem", display: "grid", gap: "0.5rem" }}
@@ -2729,34 +3264,56 @@ function IncidentDetailPage() {
                       >
                         <label>
                           {t("presentationLocale")}
-                          <select value={claimPresentation.locale} onChange={(event) => setClaimPresentation({
-                            ...claimPresentation,
-                            locale: event.target.value as "es" | "en",
-                          })}>
+                          <select
+                            value={claimPresentation.locale}
+                            onChange={(event) =>
+                              setClaimPresentation({
+                                ...claimPresentation,
+                                locale: event.target.value as "es" | "en",
+                              })
+                            }
+                          >
                             <option value="es">Español</option>
                             <option value="en">English</option>
                           </select>
                         </label>
                         <label>
                           {t("translatedPresentation")}
-                          <textarea required minLength={1} maxLength={2000} rows={3} value={claimPresentation.text} onChange={(event) => setClaimPresentation({
-                            ...claimPresentation,
-                            text: event.target.value,
-                          })} />
+                          <textarea
+                            required
+                            minLength={1}
+                            maxLength={2000}
+                            rows={3}
+                            value={claimPresentation.text}
+                            onChange={(event) =>
+                              setClaimPresentation({
+                                ...claimPresentation,
+                                text: event.target.value,
+                              })
+                            }
+                          />
                         </label>
-                        <button type="submit" disabled={presentClaim.isPending}>{t("savePresentation")}</button>
-                        {presentClaim.isError && <p className="form-error" role="alert">{t("actionError")}</p>}
+                        <button type="submit" disabled={presentClaim.isPending}>
+                          {t("savePresentation")}
+                        </button>
+                        {presentClaim.isError && (
+                          <p className="form-error" role="alert">
+                            {t("actionError")}
+                          </p>
+                        )}
                       </form>
                     ) : (
                       <button
                         type="button"
                         className="ghost"
                         style={{ marginTop: "0.5rem" }}
-                        onClick={() => setClaimPresentation({
-                          claimId: claim.id,
-                          locale: claim.language_code === "es" ? "en" : "es",
-                          text: "",
-                        })}
+                        onClick={() =>
+                          setClaimPresentation({
+                            claimId: claim.id,
+                            locale: claim.language_code === "es" ? "en" : "es",
+                            text: "",
+                          })
+                        }
                       >
                         {t("addPresentation")}
                       </button>
@@ -2802,31 +3359,70 @@ function IncidentDetailPage() {
                   const hasRequiredApprovals =
                     totalApprovals > 0 && countApproved >= totalApprovals;
                   return (
-                    <article className="claim-card" key={decision.id} style={{ borderLeft: "3px solid var(--accent)" }}>
+                    <article
+                      className="claim-card"
+                      key={decision.id}
+                      style={{ borderLeft: "3px solid var(--accent)" }}
+                    >
                       <div className="claim-badges" style={{ marginBottom: "8px" }}>
                         <span className="severity">{decision.status}</span>
                         <span>{decision.impact}</span>
                       </div>
-                      <strong style={{ fontSize: "1.05rem", display: "block", marginBottom: "4px" }}>
+                      <strong
+                        style={{ fontSize: "1.05rem", display: "block", marginBottom: "4px" }}
+                      >
                         {decision.action_type}
                       </strong>
-                      <div style={{ background: "var(--panel-raised)", padding: "6px 10px", borderRadius: "4px", margin: "6px 0", fontSize: "0.825rem" }}>
+                      <div
+                        style={{
+                          background: "var(--panel-raised)",
+                          padding: "6px 10px",
+                          borderRadius: "4px",
+                          margin: "6px 0",
+                          fontSize: "0.825rem",
+                        }}
+                      >
                         🎯 <span style={{ color: "var(--muted)" }}>{t("target")}:</span>{" "}
                         <strong style={{ fontFamily: "var(--font-mono, monospace)" }}>
-                          {decision.targets && decision.targets.length > 0 ? decision.targets.join(", ") : t("notAvailable")}
+                          {decision.targets && decision.targets.length > 0
+                            ? decision.targets.join(", ")
+                            : t("notAvailable")}
                         </strong>
                       </div>
-                      <small style={{ color: "var(--text-soft)", display: "block", marginTop: "4px" }}>
+                      <small
+                        style={{ color: "var(--text-soft)", display: "block", marginTop: "4px" }}
+                      >
                         📅 {new Date(decision.created_at).toLocaleString(i18n.language)}
                       </small>
                       <small style={{ color: "var(--muted)", display: "block", marginTop: "2px" }}>
-                        {t("approvalSummary", { approved: countApproved, total: totalApprovals, evaluation: decision.evaluation_outcome })} {totalApprovals >= 2 && hasRequiredApprovals && <span style={{ color: "var(--accent)", marginLeft: "4px" }}>✓ {t("fourEyesApproved")}</span>}
+                        {t("approvalSummary", {
+                          approved: countApproved,
+                          total: totalApprovals,
+                          evaluation: decision.evaluation_outcome,
+                        })}{" "}
+                        {totalApprovals >= 2 && hasRequiredApprovals && (
+                          <span style={{ color: "var(--accent)", marginLeft: "4px" }}>
+                            ✓ {t("fourEyesApproved")}
+                          </span>
+                        )}
                       </small>
-                      <div style={{ fontSize: "0.8rem", color: "var(--muted)", marginTop: "6px", display: "flex", flexDirection: "column", gap: "2px", background: "var(--panel-raised)", padding: "6px 10px", borderRadius: "4px" }}>
+                      <div
+                        style={{
+                          fontSize: "0.8rem",
+                          color: "var(--muted)",
+                          marginTop: "6px",
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: "2px",
+                          background: "var(--panel-raised)",
+                          padding: "6px 10px",
+                          borderRadius: "4px",
+                        }}
+                      >
                         <span>
                           <strong>{t("requester")}:</strong>{" "}
                           {decision.requester_user_id === currentUser.data?.id
-                            ? currentUser.data?.email ?? decision.requester_user_id
+                            ? (currentUser.data?.email ?? decision.requester_user_id)
                             : decision.requester_user_id}
                         </span>
                         {decision.decisions.map((entry) => (
@@ -2834,13 +3430,23 @@ function IncidentDetailPage() {
                             {t("decisionRecordedBy", {
                               decision: entry.decision,
                               actor: entry.actor_user_id,
-                            })}{" — "}{entry.reason}
+                            })}
+                            {" — "}
+                            {entry.reason}
                           </span>
                         ))}
                       </div>
-                      {decision.approval_request_id && decision.approval_status === "PENDING" && (
-                        currentUser.data?.id !== decision.requester_user_id ? (
-                          <div style={{ display: "flex", gap: "8px", marginTop: "10px", flexWrap: "wrap" }}>
+                      {decision.approval_request_id &&
+                        decision.approval_status === "PENDING" &&
+                        (currentUser.data?.id !== decision.requester_user_id ? (
+                          <div
+                            style={{
+                              display: "flex",
+                              gap: "8px",
+                              marginTop: "10px",
+                              flexWrap: "wrap",
+                            }}
+                          >
                             <textarea
                               aria-label={t("approvalReason")}
                               placeholder={t("approvalReasonPlaceholder")}
@@ -2895,18 +3501,30 @@ function IncidentDetailPage() {
                             </button>
                           </div>
                         ) : (
-                          <p style={{ margin: "8px 0 0", fontSize: "0.8rem", color: "var(--text-soft)", background: "var(--panel-raised)", padding: "6px 10px", borderRadius: "4px" }}>
+                          <p
+                            style={{
+                              margin: "8px 0 0",
+                              fontSize: "0.8rem",
+                              color: "var(--text-soft)",
+                              background: "var(--panel-raised)",
+                              padding: "6px 10px",
+                              borderRadius: "4px",
+                            }}
+                          >
                             🔒 {t("awaitingSecondAnalystNotice")}
                           </p>
-                        )
-                      )}
+                        ))}
                     </article>
                   );
                 })}
                 <PageState
                   loading={responseDecisions.isLoading}
                   error={responseDecisions.isError}
-                  empty={!responseDecisions.isLoading && !responseDecisions.isError && responseDecisions.data?.length === 0}
+                  empty={
+                    !responseDecisions.isLoading &&
+                    !responseDecisions.isError &&
+                    responseDecisions.data?.length === 0
+                  }
                 />
               </div>
             </div>
@@ -2927,11 +3545,24 @@ function IncidentDetailPage() {
                       marginBottom: "8px",
                     }}
                   >
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
-                      <span className="severity" style={{ fontSize: "0.75rem", textTransform: "uppercase" }}>
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        marginBottom: "4px",
+                      }}
+                    >
+                      <span
+                        className="severity"
+                        style={{ fontSize: "0.75rem", textTransform: "uppercase" }}
+                      >
                         {entry.entry_type}
                       </span>
-                      <time dateTime={entry.recorded_at} style={{ fontSize: "0.8rem", color: "var(--muted)" }}>
+                      <time
+                        dateTime={entry.recorded_at}
+                        style={{ fontSize: "0.8rem", color: "var(--muted)" }}
+                      >
                         📅 {new Date(entry.recorded_at).toLocaleString(i18n.language)}
                       </time>
                     </div>
@@ -2997,28 +3628,62 @@ function AuditPage() {
             const actorLabel =
               typeof recordedActor === "string" && recordedActor.trim()
                 ? recordedActor
-                : event.actor_user_id ?? t("systemActor");
+                : (event.actor_user_id ?? t("systemActor"));
             const recordedClientIp = event.details?.client_ip;
             const clientIp =
               typeof recordedClientIp === "string" && recordedClientIp.trim()
                 ? recordedClientIp
                 : t("notAvailable");
             return (
-              <article key={event.id} style={{ display: "grid", gridTemplateColumns: "100px 1.5fr 1.2fr 1fr 160px", alignItems: "center", gap: "12px" }}>
-                <span className="severity" style={{ textAlign: "center" }}>{event.outcome}</span>
+              <article
+                key={event.id}
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "100px 1.5fr 1.2fr 1fr 160px",
+                  alignItems: "center",
+                  gap: "12px",
+                }}
+              >
+                <span className="severity" style={{ textAlign: "center" }}>
+                  {event.outcome}
+                </span>
                 <div>
                   <strong style={{ fontSize: "0.95rem" }}>{event.action}</strong>
-                  <small style={{ display: "block", color: "var(--muted)" }}>{event.resource_type}</small>
+                  <small style={{ display: "block", color: "var(--muted)" }}>
+                    {event.resource_type}
+                  </small>
                 </div>
-                <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: "6px", fontSize: "0.85rem", color: "var(--text-soft)" }}>
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: "6px",
+                    fontSize: "0.85rem",
+                    color: "var(--text-soft)",
+                  }}
+                >
                   <span style={{ fontSize: "0.95rem", lineHeight: 1 }}>👤</span>
                   <strong style={{ whiteSpace: "nowrap" }}>{actorLabel}</strong>
                 </div>
-                <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: "6px", fontSize: "0.85rem", color: "var(--muted)", fontFamily: "var(--font-mono, monospace)" }}>
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: "6px",
+                    fontSize: "0.85rem",
+                    color: "var(--muted)",
+                    fontFamily: "var(--font-mono, monospace)",
+                  }}
+                >
                   <span style={{ fontSize: "0.95rem", lineHeight: 1 }}>🌐</span>
                   <span style={{ whiteSpace: "nowrap" }}>{clientIp}</span>
                 </div>
-                <time dateTime={event.occurred_at} style={{ fontSize: "0.8rem", color: "var(--muted)", textAlign: "right" }}>
+                <time
+                  dateTime={event.occurred_at}
+                  style={{ fontSize: "0.8rem", color: "var(--muted)", textAlign: "right" }}
+                >
                   📅 {new Date(event.occurred_at).toLocaleString(i18n.language)}
                 </time>
               </article>
@@ -3038,10 +3703,12 @@ function Administration() {
   const [selectedUser, setSelectedUser] = useState("");
   const [selectedRole, setSelectedRole] = useState("");
   const [showCreateUser, setShowCreateUser] = useState(false);
-  const [directoryMappingDrafts, setDirectoryMappingDrafts] = useState<Array<{
-    external_group: string;
-    role_id: string;
-  }>>([]);
+  const [directoryMappingDrafts, setDirectoryMappingDrafts] = useState<
+    Array<{
+      external_group: string;
+      role_id: string;
+    }>
+  >([]);
   const userControls = useListControls();
   const tenant = useQuery({ queryKey: ["tenant"], queryFn: getTenant });
   const users = useQuery({
@@ -3249,15 +3916,13 @@ function Administration() {
     },
     onError: () => setFormError(t("adminMutationError")),
   });
-  const mappableDirectoryRoles = (roles.data ?? []).filter(
-    (role) => role.code !== "tenant-admin",
+  const mappableDirectoryRoles = (roles.data ?? []).filter((role) => role.code !== "tenant-admin");
+  const normalizedDirectoryMappings = directoryMappingDrafts.map(
+    (item) => `${item.external_group.trim().toLowerCase()}\u0000${item.role_id}`,
   );
-  const normalizedDirectoryMappings = directoryMappingDrafts.map((item) =>
-    `${item.external_group.trim().toLowerCase()}\u0000${item.role_id}`,
-  );
-  const directoryMappingsInvalid = directoryMappingDrafts.some(
-    (item) => !item.external_group.trim() || !item.role_id,
-  ) || new Set(normalizedDirectoryMappings).size !== normalizedDirectoryMappings.length;
+  const directoryMappingsInvalid =
+    directoryMappingDrafts.some((item) => !item.external_group.trim() || !item.role_id) ||
+    new Set(normalizedDirectoryMappings).size !== normalizedDirectoryMappings.length;
   const failed = tenant.isError || users.isError || roles.isError || audit.isError;
   const submitUser = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -3322,7 +3987,9 @@ function Administration() {
       timeout_seconds: Number(data.get("timeout_seconds")) || 5,
     });
   };
-  const [activeSubTab, setActiveSubTab] = useState<"overview" | "users" | "rbac" | "directory">("overview");
+  const [activeSubTab, setActiveSubTab] = useState<"overview" | "users" | "rbac" | "directory">(
+    "overview",
+  );
 
   return (
     <>
@@ -3353,7 +4020,9 @@ function Administration() {
             onClick={() => setActiveSubTab("users")}
           >
             <span>Usuarios & Cuentas</span>
-            <span style={{ fontSize: "0.75rem", opacity: 0.8, fontWeight: 600 }}>({userOptions.data?.length ?? 0})</span>
+            <span style={{ fontSize: "0.75rem", opacity: 0.8, fontWeight: 600 }}>
+              ({userOptions.data?.length ?? 0})
+            </span>
           </button>
           <button
             type="button"
@@ -3361,7 +4030,9 @@ function Administration() {
             onClick={() => setActiveSubTab("rbac")}
           >
             <span>Roles & RBAC</span>
-            <span style={{ fontSize: "0.75rem", opacity: 0.8, fontWeight: 600 }}>({roles.data?.length ?? 0})</span>
+            <span style={{ fontSize: "0.75rem", opacity: 0.8, fontWeight: 600 }}>
+              ({roles.data?.length ?? 0})
+            </span>
           </button>
           <button
             type="button"
@@ -3369,11 +4040,20 @@ function Administration() {
             onClick={() => setActiveSubTab("directory")}
           >
             <span>Directorio LDAP / AD</span>
-            <span style={{ fontSize: "0.65rem", padding: "2px 6px", borderRadius: "4px", background: directory.data ? "rgba(13,209,155,0.15)" : "rgba(255,255,255,0.08)", color: directory.data ? "var(--accent)" : "var(--muted)", fontWeight: 700, whiteSpace: "nowrap" }}>
+            <span
+              style={{
+                fontSize: "0.65rem",
+                padding: "2px 6px",
+                borderRadius: "4px",
+                background: directory.data ? "rgba(13,209,155,0.15)" : "rgba(255,255,255,0.08)",
+                color: directory.data ? "var(--accent)" : "var(--muted)",
+                fontWeight: 700,
+                whiteSpace: "nowrap",
+              }}
+            >
               {directory.data ? "CONFIGURADO" : "PENDIENTE"}
             </span>
           </button>
-
         </aside>
 
         {/* Dynamic Content Panel */}
@@ -3438,7 +4118,17 @@ function Administration() {
                         aria-expanded={showCreateUser}
                         onClick={() => setShowCreateUser((value) => !value)}
                       >
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="admin-inline-toggle-icon">
+                        <svg
+                          width="15"
+                          height="15"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          className="admin-inline-toggle-icon"
+                        >
                           <line x1="12" y1="5" x2="12" y2="19" />
                           <line x1="5" y1="12" x2="19" y2="12" />
                         </svg>
@@ -3515,7 +4205,17 @@ function Administration() {
                             <span>{user.email}</span>
                             <small>{user.is_active ? t("active") : t("inactive")}</small>
                           </div>
-                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="admin-list-row-chevron">
+                          <svg
+                            width="16"
+                            height="16"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            className="admin-list-row-chevron"
+                          >
                             <polyline points="9 18 15 12 9 6" />
                           </svg>
                         </div>
@@ -3545,14 +4245,25 @@ function Administration() {
                   >
                     <option value="">{t("selectUser")}</option>
                     {userOptions.data?.map((user) => (
-                      <option key={user.id} value={user.id}>{user.display_name}</option>
+                      <option key={user.id} value={user.id}>
+                        {user.display_name}
+                      </option>
                     ))}
                   </select>
                 </div>
 
                 {!selectedUser && (
                   <div className="admin-user-detail-empty">
-                    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                    <svg
+                      width="26"
+                      height="26"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
                       <polyline points="15 18 9 12 15 6" />
                     </svg>
                     <p className="muted">{t("selectedAccountRequired")}</p>
@@ -3742,7 +4453,10 @@ function Administration() {
                   <p className="eyebrow">RBAC</p>
                   <h2>{t("assignPermissions")}</h2>
                 </div>
-                <select value={selectedRole} onChange={(event) => setSelectedRole(event.target.value)}>
+                <select
+                  value={selectedRole}
+                  onChange={(event) => setSelectedRole(event.target.value)}
+                >
                   <option value="">{t("selectRole")}</option>
                   {roles.data?.map((role) => (
                     <option key={role.id} value={role.id} disabled={role.is_system}>
@@ -3762,7 +4476,9 @@ function Administration() {
                     {permission.code}
                   </label>
                 ))}
-                <button disabled={!selectedRole || rolePermissionsMutation.isPending}>{t("save")}</button>
+                <button disabled={!selectedRole || rolePermissionsMutation.isPending}>
+                  {t("save")}
+                </button>
               </form>
             </section>
           )}
@@ -3883,17 +4599,11 @@ function Administration() {
                 </label>
                 <label>
                   {t("groupBaseDn")}
-                  <input
-                    name="group_base_dn"
-                    defaultValue={directory.data?.group_base_dn ?? ""}
-                  />
+                  <input name="group_base_dn" defaultValue={directory.data?.group_base_dn ?? ""} />
                 </label>
                 <label>
                   {t("groupFilter")}
-                  <input
-                    name="group_filter"
-                    defaultValue={directory.data?.group_filter ?? ""}
-                  />
+                  <input name="group_filter" defaultValue={directory.data?.group_filter ?? ""} />
                 </label>
                 <label>
                   {t("directoryTimeout")}
@@ -3979,9 +4689,7 @@ function Administration() {
                 <h2>{t("directoryGroupMappings")}</h2>
                 <p className="muted">{t("directoryGroupMappingsHelp")}</p>
               </div>
-              {directoryMappings.isError && (
-                <p className="form-error">{t("loadError")}</p>
-              )}
+              {directoryMappings.isError && <p className="form-error">{t("loadError")}</p>}
               <div className="form-grid">
                 {directoryMappingDrafts.map((mapping, index) => (
                   <div className="directory-grid" key={`${index}-${mapping.role_id}`}>
@@ -3998,7 +4706,8 @@ function Administration() {
                                 ? { ...item, external_group: event.target.value }
                                 : item,
                             ),
-                          )}
+                          )
+                        }
                       />
                     </label>
                     <label>
@@ -4009,11 +4718,10 @@ function Administration() {
                         onChange={(event) =>
                           setDirectoryMappingDrafts((current) =>
                             current.map((item, itemIndex) =>
-                              itemIndex === index
-                                ? { ...item, role_id: event.target.value }
-                                : item,
+                              itemIndex === index ? { ...item, role_id: event.target.value } : item,
                             ),
-                          )}
+                          )
+                        }
                       >
                         <option value="">{t("selectRole")}</option>
                         {mappableDirectoryRoles.map((role) => (
@@ -4029,7 +4737,8 @@ function Administration() {
                       onClick={() =>
                         setDirectoryMappingDrafts((current) =>
                           current.filter((_, itemIndex) => itemIndex !== index),
-                        )}
+                        )
+                      }
                     >
                       {t("removeMapping")}
                     </button>
@@ -4045,7 +4754,8 @@ function Administration() {
                     setDirectoryMappingDrafts((current) => [
                       ...current,
                       { external_group: "", role_id: "" },
-                    ])}
+                    ])
+                  }
                 >
                   {t("addMapping")}
                 </button>

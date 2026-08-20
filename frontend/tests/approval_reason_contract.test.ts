@@ -3,7 +3,6 @@ import { resolve } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-
 describe("human approval rationale", () => {
   it("requires analyst input and does not synthesize an approval reason", () => {
     const app = readFileSync(resolve(process.cwd(), "src", "App.tsx"), "utf8");

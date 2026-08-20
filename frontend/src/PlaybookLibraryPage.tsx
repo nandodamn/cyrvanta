@@ -21,10 +21,7 @@ import { PlaybookConfigurationModal } from "./PlaybookConfigurationModal";
  * Show the operator what to fix, falling back to the raw code so a new backend
  * reason is never silently swallowed.
  */
-function describeBlockingReason(
-  reason: string,
-  t: ReturnType<typeof useTranslation>["t"],
-): string {
+function describeBlockingReason(reason: string, t: ReturnType<typeof useTranslation>["t"]): string {
   const [code, action] = reason.split(":");
   return t(`blockingReasons.${code}`, { defaultValue: reason, action: action ?? "" });
 }
@@ -33,7 +30,9 @@ export function PlaybookLibraryPage() {
   const { t, i18n } = useTranslation();
   const queryClient = useQueryClient();
   const [selectedDetails, setSelectedDetails] = useState<PlaybookDefinition | null>(null);
-  const [selectedConfiguration, setSelectedConfiguration] = useState<PlaybookDefinition | null>(null);
+  const [selectedConfiguration, setSelectedConfiguration] = useState<PlaybookDefinition | null>(
+    null,
+  );
 
   const nativeLibrary = useQuery({
     queryKey: ["playbook-definitions"],
@@ -71,13 +70,8 @@ export function PlaybookLibraryPage() {
   });
 
   const approvalMutation = useMutation({
-    mutationFn: ({
-      id,
-      mode,
-    }: {
-      id: string;
-      mode: "AUTOMATIC" | "SINGLE" | "FOUR_EYES";
-    }) => updatePlaybookApprovalGovernance(id, mode),
+    mutationFn: ({ id, mode }: { id: string; mode: "AUTOMATIC" | "SINGLE" | "FOUR_EYES" }) =>
+      updatePlaybookApprovalGovernance(id, mode),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["playbook-definitions"] });
     },
@@ -87,17 +81,19 @@ export function PlaybookLibraryPage() {
 
   const items = nativeLibrary.data?.items ?? [];
   const filteredItems = items.filter((pb) => {
-    const isSop = pb.mitre_codes.length > 0 || [
-      "compromised-account",
-      "compromised-endpoint",
-      "phishing-malicious-email",
-      "ransomware-destructive",
-      "lateral-movement",
-      "malicious-indicator",
-      "privilege-escalation",
-      "security-control-disabled",
-      "contain-and-document-incident",
-    ].includes(pb.code);
+    const isSop =
+      pb.mitre_codes.length > 0 ||
+      [
+        "compromised-account",
+        "compromised-endpoint",
+        "phishing-malicious-email",
+        "ransomware-destructive",
+        "lateral-movement",
+        "malicious-indicator",
+        "privilege-escalation",
+        "security-control-disabled",
+        "contain-and-document-incident",
+      ].includes(pb.code);
 
     if (categoryFilter === "SOAR_SOPS") return isSop;
     if (categoryFilter === "TRANSVERSAL") return !isSop;
@@ -151,8 +147,23 @@ export function PlaybookLibraryPage() {
         </div>
 
         {/* Category Tabs */}
-        <div style={{ display: "flex", gap: "8px", margin: "1rem 0", flexWrap: "wrap", alignItems: "center" }}>
-          <span style={{ fontSize: "0.85rem", color: "var(--muted)", fontWeight: 600, marginRight: "4px" }}>
+        <div
+          style={{
+            display: "flex",
+            gap: "8px",
+            margin: "1rem 0",
+            flexWrap: "wrap",
+            alignItems: "center",
+          }}
+        >
+          <span
+            style={{
+              fontSize: "0.85rem",
+              color: "var(--muted)",
+              fontWeight: 600,
+              marginRight: "4px",
+            }}
+          >
             Filtrar por categoría:
           </span>
           <button
@@ -163,7 +174,8 @@ export function PlaybookLibraryPage() {
               fontSize: "0.8rem",
               borderRadius: "6px",
               background: categoryFilter === "ALL" ? "var(--panel-raised)" : "transparent",
-              border: categoryFilter === "ALL" ? "1px solid var(--accent)" : "1px solid transparent",
+              border:
+                categoryFilter === "ALL" ? "1px solid var(--accent)" : "1px solid transparent",
               color: categoryFilter === "ALL" ? "var(--accent)" : "var(--text-soft)",
               fontWeight: categoryFilter === "ALL" ? 700 : 400,
             }}
@@ -179,13 +191,34 @@ export function PlaybookLibraryPage() {
               fontSize: "0.8rem",
               borderRadius: "6px",
               background: categoryFilter === "SOAR_SOPS" ? "var(--panel-raised)" : "transparent",
-              border: categoryFilter === "SOAR_SOPS" ? "1px solid var(--accent)" : "1px solid transparent",
+              border:
+                categoryFilter === "SOAR_SOPS"
+                  ? "1px solid var(--accent)"
+                  : "1px solid transparent",
               color: categoryFilter === "SOAR_SOPS" ? "var(--accent)" : "var(--text-soft)",
               fontWeight: categoryFilter === "SOAR_SOPS" ? 700 : 400,
             }}
             onClick={() => setCategoryFilter("SOAR_SOPS")}
           >
-            🛡️ Procedimientos de Respuesta / SOPs ({items.filter(pb => pb.mitre_codes.length > 0 || ["compromised-account", "compromised-endpoint", "phishing-malicious-email", "ransomware-destructive", "lateral-movement", "malicious-indicator", "privilege-escalation", "security-control-disabled", "contain-and-document-incident"].includes(pb.code)).length})
+            🛡️ Procedimientos de Respuesta / SOPs (
+            {
+              items.filter(
+                (pb) =>
+                  pb.mitre_codes.length > 0 ||
+                  [
+                    "compromised-account",
+                    "compromised-endpoint",
+                    "phishing-malicious-email",
+                    "ransomware-destructive",
+                    "lateral-movement",
+                    "malicious-indicator",
+                    "privilege-escalation",
+                    "security-control-disabled",
+                    "contain-and-document-incident",
+                  ].includes(pb.code),
+              ).length
+            }
+            )
           </button>
           <button
             type="button"
@@ -195,13 +228,34 @@ export function PlaybookLibraryPage() {
               fontSize: "0.8rem",
               borderRadius: "6px",
               background: categoryFilter === "TRANSVERSAL" ? "var(--panel-raised)" : "transparent",
-              border: categoryFilter === "TRANSVERSAL" ? "1px solid var(--accent)" : "1px solid transparent",
+              border:
+                categoryFilter === "TRANSVERSAL"
+                  ? "1px solid var(--accent)"
+                  : "1px solid transparent",
               color: categoryFilter === "TRANSVERSAL" ? "var(--accent)" : "var(--text-soft)",
               fontWeight: categoryFilter === "TRANSVERSAL" ? 700 : 400,
             }}
             onClick={() => setCategoryFilter("TRANSVERSAL")}
           >
-            ⚙️ Tareas Operativas Transversales ({items.filter(pb => pb.mitre_codes.length === 0 && !["compromised-account", "compromised-endpoint", "phishing-malicious-email", "ransomware-destructive", "lateral-movement", "malicious-indicator", "privilege-escalation", "security-control-disabled", "contain-and-document-incident"].includes(pb.code)).length})
+            ⚙️ Tareas Operativas Transversales (
+            {
+              items.filter(
+                (pb) =>
+                  pb.mitre_codes.length === 0 &&
+                  ![
+                    "compromised-account",
+                    "compromised-endpoint",
+                    "phishing-malicious-email",
+                    "ransomware-destructive",
+                    "lateral-movement",
+                    "malicious-indicator",
+                    "privilege-escalation",
+                    "security-control-disabled",
+                    "contain-and-document-incident",
+                  ].includes(pb.code),
+              ).length
+            }
+            )
           </button>
         </div>
 
@@ -223,9 +277,27 @@ export function PlaybookLibraryPage() {
                 className={needsConfiguration ? "playbook-card-disabled" : undefined}
                 aria-disabled={needsConfiguration || undefined}
               >
-                <div className="playbook-heading" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "12px", flexWrap: "wrap", marginBottom: "0.75rem" }}>
+                <div
+                  className="playbook-heading"
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "flex-start",
+                    gap: "12px",
+                    flexWrap: "wrap",
+                    marginBottom: "0.75rem",
+                  }}
+                >
                   <div>
-                    <div style={{ display: "flex", gap: "6px", alignItems: "center", flexWrap: "wrap", marginBottom: "6px" }}>
+                    <div
+                      style={{
+                        display: "flex",
+                        gap: "6px",
+                        alignItems: "center",
+                        flexWrap: "wrap",
+                        marginBottom: "6px",
+                      }}
+                    >
                       {needsConfiguration ? (
                         <span className="playbook-disabled-badge">🚫 {t("playbookDisabled")}</span>
                       ) : (
@@ -271,7 +343,9 @@ export function PlaybookLibraryPage() {
                   </div>
 
                   {/* Top Right Action Button Row */}
-                  <div style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" }}>
+                  <div
+                    style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" }}
+                  >
                     <button
                       type="button"
                       className="ghost"
@@ -290,30 +364,32 @@ export function PlaybookLibraryPage() {
                     >
                       ⚙️ Configurar
                     </button>
-                    {playbook.publication_status === "DRAFT"
-                      && playbook.latest_version_id
-                      && playbook.latest_artifact_sha256 && (
-                      <button
-                        type="button"
-                        className="ghost"
-                        style={{
-                          padding: "6px 12px",
-                          fontSize: "0.775rem",
-                          height: "auto",
-                          minHeight: "unset",
-                          minWidth: "unset",
-                          width: "auto",
-                          whiteSpace: "nowrap",
-                        }}
-                        disabled={publishMutation.isPending}
-                        onClick={() => publishMutation.mutate({
-                          versionId: playbook.latest_version_id!,
-                          digest: playbook.latest_artifact_sha256!,
-                        })}
-                      >
-                        Validar y publicar
-                      </button>
-                    )}
+                    {playbook.publication_status === "DRAFT" &&
+                      playbook.latest_version_id &&
+                      playbook.latest_artifact_sha256 && (
+                        <button
+                          type="button"
+                          className="ghost"
+                          style={{
+                            padding: "6px 12px",
+                            fontSize: "0.775rem",
+                            height: "auto",
+                            minHeight: "unset",
+                            minWidth: "unset",
+                            width: "auto",
+                            whiteSpace: "nowrap",
+                          }}
+                          disabled={publishMutation.isPending}
+                          onClick={() =>
+                            publishMutation.mutate({
+                              versionId: playbook.latest_version_id!,
+                              digest: playbook.latest_artifact_sha256!,
+                            })
+                          }
+                        >
+                          Validar y publicar
+                        </button>
+                      )}
                     <button
                       type="button"
                       className="ghost"
@@ -346,10 +422,10 @@ export function PlaybookLibraryPage() {
                         whiteSpace: "nowrap",
                       }}
                       disabled={
-                        toggleMutation.isPending
-                        || !isPublished
+                        toggleMutation.isPending ||
+                        !isPublished ||
                         // Never allow turning ON a playbook that cannot actually run.
-                        || (!playbook.binding_active && needsConfiguration)
+                        (!playbook.binding_active && needsConfiguration)
                       }
                       title={
                         !playbook.binding_active && needsConfiguration
@@ -378,11 +454,11 @@ export function PlaybookLibraryPage() {
                         whiteSpace: "nowrap",
                       }}
                       disabled={
-                        toggleMutation.isPending
-                        || !isPublished
+                        toggleMutation.isPending ||
+                        !isPublished ||
                         // Switching engines activates the playbook, so it is
                         // blocked for the same reason as activation.
-                        || needsConfiguration
+                        needsConfiguration
                       }
                       title={needsConfiguration ? t("cannotActivateIncomplete") : undefined}
                       onClick={() =>
@@ -395,7 +471,9 @@ export function PlaybookLibraryPage() {
                         })
                       }
                     >
-                      {playbook.engine_type === "N8N" ? t("switchEngineNative") : t("switchEngineN8n")}
+                      {playbook.engine_type === "N8N"
+                        ? t("switchEngineNative")
+                        : t("switchEngineN8n")}
                     </button>
                   </div>
                 </div>
@@ -426,14 +504,31 @@ export function PlaybookLibraryPage() {
                 )}
 
                 {/* Card Action Footer */}
-                <div style={{ borderTop: "1px solid var(--line)", paddingTop: "8px", marginTop: "8px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "8px" }}>
-                  <div style={{ display: "flex", gap: "10px", alignItems: "center", flexWrap: "wrap" }}>
+                <div
+                  style={{
+                    borderTop: "1px solid var(--line)",
+                    paddingTop: "8px",
+                    marginTop: "8px",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    flexWrap: "wrap",
+                    gap: "8px",
+                  }}
+                >
+                  <div
+                    style={{ display: "flex", gap: "10px", alignItems: "center", flexWrap: "wrap" }}
+                  >
                     {playbook.rollback_supported && (
                       <span className="demo-badge active">{t("rollbackSupported")}</span>
                     )}
                     {playbook.mitre_codes.length > 0 ? (
                       <div style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
-                        <span style={{ fontSize: "0.75rem", color: "var(--muted)", fontWeight: 600 }}>🛡️ Mitiga:</span>
+                        <span
+                          style={{ fontSize: "0.75rem", color: "var(--muted)", fontWeight: 600 }}
+                        >
+                          🛡️ Mitiga:
+                        </span>
                         {playbook.mitre_codes.map((code) => (
                           <span
                             key={code}
@@ -458,9 +553,9 @@ export function PlaybookLibraryPage() {
                     )}
                   </div>
                 </div>
-            </article>
-          );
-        })}
+              </article>
+            );
+          })}
         </div>
       </section>
 

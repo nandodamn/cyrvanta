@@ -201,10 +201,15 @@ services:
     profiles: [automation, live-demo]
     entrypoint: ["tini", "--", "/bin/sh", "-c"]
     command:
+      # Imports whatever the manifest ships and activates nothing. Activation is
+      # an operational decision made against a reviewed digest -- see
+      # infrastructure/n8n/scripts/reconcile.py -- not something a container
+      # start-up does on its own. The glob tolerates an empty directory, which
+      # is the shipped state.
       - >-
         for workflow in /opt/cyrvanta/n8n/workflows/*.json;
-        do n8n import:workflow --input="$$workflow" || exit 1; done
-        && n8n update:workflow --id=cyrvanta-simulate-user-block --active=true
+        do [ -e "$$workflow" ] || break;
+        n8n import:workflow --input="$$workflow" || exit 1; done
         && exec n8n start
     environment:
       N8N_HOST: n8n

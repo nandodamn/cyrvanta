@@ -603,8 +603,8 @@
         <tr>
           <td><span class="mono">n8n</span></td>
           <td>5678 · opcional</td>
-          <td>Orquestador de workflows externos.</td>
-          <td>Vínculos adicionales en Playbooks.</td>
+          <td>Orquestador para integraciones sin conector nativo. Se despliega sin workflows.</td>
+          <td>Vínculos adicionales en Playbooks, cuando se cargue alguno.</td>
         </tr>
       </tbody>
     </table>
@@ -695,6 +695,12 @@
     (<span class="mono">DRAFT</span>, <span class="mono">APPROVED</span>,
     <span class="mono">RETIRED</span>). Cada definición declara su modo de gobernanza y su
     impacto. Permite vincular opcionalmente una acción nativa a un workflow de n8n.
+  </p>
+  <p>
+    Los 15 playbooks corren de forma nativa. n8n se despliega sin workflows: es el punto de
+    extensión para integraciones que Cyrvanta no tiene como conector propio, y un workflow
+    llega ahí después de que alguien lo revisó contra su digest. Duplicar en n8n algo que ya
+    corre nativo partiría la traza de auditoría en dos.
   </p>
 
   <h3>3.5 Integraciones</h3>
@@ -1139,7 +1145,8 @@
   </header>
 
   <p>
-    Cada playbook declara un modo de aprobación acorde a su impacto. Estos son los modos:
+    La biblioteca tiene <strong>15 playbooks</strong>, todos con clasificación
+    <span class="mono">LIVE</span>. Cada uno declara un modo de aprobación acorde a su impacto:
   </p>
 
   <ul>
@@ -1147,6 +1154,20 @@
     <li><strong>Simple</strong> — una sola firma. Notificaciones, tickets, correos.</li>
     <li><strong>Automático</strong> — sin firma. Solo para acciones que recolectan contexto o sellan evidencia, sin alterar infraestructura.</li>
   </ul>
+
+  <div class="note">
+    <span class="label">Ningún playbook simulado</span>
+    <p>
+      La biblioteca no contiene procedimientos de demostración. Los dos que había
+      —<span class="mono">simulate-user-block</span> y
+      <span class="mono">request-dual-approval</span>— estaban clasificados como sintéticos y
+      no tenían un solo paso: proponerlos montaba toda la ceremonia de gobernanza alrededor
+      de una acción que no hacía nada. Bloquear una cuenta de verdad es
+      <span class="mono">compromised-account</span>, cuyo paso es
+      <span class="mono">account.disable</span>. Sus definiciones se conservan retiradas
+      porque las ejecuciones registradas bajo ellas son historia inmutable.
+    </p>
+  </div>
 
   <div class="table-wrap">
     <table>
@@ -1160,8 +1181,6 @@
         <tr><td><span class="mono">privilege-escalation</span></td><td>Cuatro ojos</td><td>Revoca permisos de cuenta privilegiada.</td></tr>
         <tr><td><span class="mono">ransomware-destructive</span></td><td>Cuatro ojos</td><td>Contención de cifrado en curso.</td></tr>
         <tr><td><span class="mono">security-control-disabled</span></td><td>Cuatro ojos</td><td>Reactiva agentes ante posible evasión.</td></tr>
-        <tr><td><span class="mono">simulate-user-block</span></td><td>Cuatro ojos</td><td>Bloqueo de usuario en el laboratorio de demostración.</td></tr>
-        <tr><td><span class="mono">request-dual-approval</span></td><td>Cuatro ojos</td><td>Solicitud explícita de doble firma.</td></tr>
         <tr><td><span class="mono">contain-and-document-incident</span></td><td>Simple</td><td>Contención documental sin corte de servicio.</td></tr>
         <tr><td><span class="mono">notify-critical-incident</span></td><td>Simple</td><td>Notificación por SMTP, Teams o Slack.</td></tr>
         <tr><td><span class="mono">escalation-notification</span></td><td>Simple</td><td>Escalamiento a guardia o responsable.</td></tr>

@@ -20,17 +20,18 @@ def test_external_integrations_use_secure_defaults() -> None:
     assert defaults["decision_automatic_response_enabled"] is False
 
 
-def test_default_n8n_allowlist_contains_only_approved_workflows() -> None:
+def test_the_n8n_allowlist_permits_nothing_by_default() -> None:
+    """An empty allowlist admits no workflow at all.
+
+    It used to name the five synthetic demo artifacts, which is the habit worth
+    breaking rather than the list worth curating: a workflow belongs here after
+    somebody reviewed it against a digest, and a default that arrives with
+    entries invites operators to trust names they never checked.
+    """
     raw_allowlist = Settings.model_fields["n8n_allowed_workflow_ids"].default
 
     assert isinstance(raw_allowlist, str)
-    assert set(raw_allowlist.split(",")) == {
-        "cyrvanta-simulate-user-block",
-        "cyrvanta-notify-critical-incident",
-        "cyrvanta-create-security-ticket",
-        "cyrvanta-request-dual-approval",
-        "cyrvanta-incident-report-email",
-    }
+    assert raw_allowlist == ""
 
 
 def production_settings(**overrides: object) -> Settings:

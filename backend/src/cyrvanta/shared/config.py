@@ -80,11 +80,13 @@ class Settings(BaseSettings):
     n8n_api_key: str = ""
     # Must match the "id" field baked into infrastructure/n8n/workflows/*.json --
     # those are the real, deployed n8n workflow ids (cyrvanta- prefixed).
-    n8n_allowed_workflow_ids: str = (
-        "cyrvanta-simulate-user-block,cyrvanta-notify-critical-incident,"
-        "cyrvanta-create-security-ticket,cyrvanta-request-dual-approval,"
-        "cyrvanta-incident-report-email"
-    )
+    #
+    # Empty by default, and an empty allowlist permits nothing. The five entries
+    # that used to be here were the synthetic demo artifacts; four were webhooks
+    # that answered "fail closed" and the fifth reported a simulated success. An
+    # allowlist naming workflows that do nothing is not a smaller risk than one
+    # naming real ones -- it is a habit of listing things nobody checked.
+    n8n_allowed_workflow_ids: str = ""
     n8n_dispatch_key: str = ""
     n8n_callback_key: str = ""
     n8n_key_id: str = "local-demo-v1"

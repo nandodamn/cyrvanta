@@ -1,41 +1,38 @@
-import hashlib
 import json
 from pathlib import Path
-from typing import Any
 
 ROOT = Path(__file__).parents[3]
-RUNTIME_FIELDS = {
-    "active",
-    "createdAt",
-    "id",
-    "shared",
-    "tags",
-    "updatedAt",
-    "versionId",
-}
 
 
-def canonical_workflow(workflow: dict[str, Any]) -> bytes:
-    material = {key: value for key, value in workflow.items() if key not in RUNTIME_FIELDS}
-    return json.dumps(material, ensure_ascii=False, separators=(",", ":"), sort_keys=True).encode()
+def test_the_simulated_user_block_is_no_longer_offered() -> None:
+    """Migration 0017 released a SYNTHETIC playbook with no steps at all.
 
+    Proposing it produced the whole four-eyes ceremony around an action that
+    did nothing, which teaches an analyst that dispatching a response is
+    theatre. Blocking an account for real is compromised-account 1.0.2, whose
+    step is account.disable.
 
-def test_released_simulation_digest_matches_migration_and_manifest() -> None:
-    workflow = ROOT / "infrastructure" / "n8n" / "workflows" / "simulate-user-block.json"
-    digest = hashlib.sha256(
-        canonical_workflow(json.loads(workflow.read_text(encoding="utf-8"))[0])
-    ).hexdigest()
+    The migration stays -- it is history, and executions recorded under it are
+    immutable. What must not survive is the catalogue offering the playbook or
+    the manifest claiming to manage its artifact.
+    """
+    retired = (
+        ROOT
+        / "backend"
+        / "src"
+        / "cyrvanta"
+        / "modules"
+        / "playbooks"
+        / "application"
+        / "administration_service.py"
+    ).read_text(encoding="utf-8")
+    assert '"simulate-user-block",' in retired.split("RETIRED_PLAYBOOK_CODES")[1]
+
     manifest = json.loads(
         (ROOT / "infrastructure" / "n8n" / "manifest.json").read_text(encoding="utf-8")
     )
-    entry = next(item for item in manifest["workflows"] if item["code"] == "simulate-user-block")
-    migration = (
-        ROOT / "backend" / "alembic" / "versions" / "0017_finalize_simulated_user_block.py"
-    ).read_text(encoding="utf-8")
-    assert digest in migration
-    assert entry["sha256"] == digest
-    assert entry["file"] == "workflows/simulate-user-block.json"
-    assert entry["version"] == "1.0.0"
+    assert all(item["code"] != "simulate-user-block" for item in manifest["workflows"])
+    assert not (ROOT / "infrastructure" / "n8n" / "workflows" / "simulate-user-block.json").exists()
 
 
 def test_simulation_migration_is_additive_tenant_scoped_and_non_destructive() -> None:

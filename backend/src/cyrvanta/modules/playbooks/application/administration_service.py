@@ -311,6 +311,15 @@ PLAYBOOK_ROLLBACK_ACTIONS: dict[str, str] = {
 # closure-controlled-learning was retired separately: its only registered action
 # transitioned the incident status, while its stated purpose (recording human
 # feedback and governance metrics) belongs to the governed_memory module.
+#
+# simulate-user-block and request-dual-approval are retired for the same reason
+# as each other: both were classified SYNTHETIC and both carried zero steps, so
+# proposing either one produced a governance ceremony around an action that did
+# nothing. What they demonstrated is done for real elsewhere -- blocking an
+# account is compromised-account 1.0.2, whose step is account.disable, and dual
+# approval is exercised by the eight FOUR_EYES playbooks that actually contain
+# something. A library that lists a playbook which cannot act teaches an analyst
+# that proposing a response is theatre.
 RETIRED_PLAYBOOK_CODES: frozenset[str] = frozenset(
     {
         "compromised-account-rollback",
@@ -319,6 +328,8 @@ RETIRED_PLAYBOOK_CODES: frozenset[str] = frozenset(
         "lateral-movement-rollback",
         "ransomware-destructive-rollback",
         "closure-controlled-learning",
+        "simulate-user-block",
+        "request-dual-approval",
     }
 )
 
@@ -393,8 +404,6 @@ IMPLEMENTED_REAL_PLAYBOOKS = {
     "automated-enrichment",
     "escalation-notification",
     "evidence-preservation",
-    "simulate-user-block",
-    "request-dual-approval",
 }
 
 SENSITIVE_KEY = re.compile(
@@ -415,9 +424,7 @@ PLAYBOOK_GOVERNANCE_TAXONOMY: dict[str, str] = {
     "contain-and-document-incident": "SINGLE",
     # FOUR_EYES: critical identity containment and host-isolation actions,
     # including evasion and ransomware response.
-    "simulate-user-block": "FOUR_EYES",
     "compromised-account": "FOUR_EYES",
-    "simulate-host-isolation": "FOUR_EYES",
     "compromised-endpoint": "FOUR_EYES",
     "privilege-escalation": "FOUR_EYES",
     "ransomware-destructive": "FOUR_EYES",
@@ -425,12 +432,10 @@ PLAYBOOK_GOVERNANCE_TAXONOMY: dict[str, str] = {
     "security-control-disabled": "FOUR_EYES",
     # Rollbacks: siempre FOUR_EYES (re-apertura de acceso requiere doble aprobación)
     # 👤 SINGLE: Notificaciones de incidentes críticos, tickets SecOps/ITSM y filtrado de IoCs
-    "simulate-critical-incident-notification": "SINGLE",
     "escalation-notification": "SINGLE",
     "notify-critical-incident": "SINGLE",
     "create-security-ticket": "SINGLE",
     "incident-report-email": "SINGLE",
-    "simulate-itsm-ticket-creation": "SINGLE",
     "phishing-malicious-email": "SINGLE",
     "malicious-indicator": "SINGLE",
     # ⚡ AUTOMATIC: Tareas transversales de análisis y preservación inmutable
@@ -845,9 +850,9 @@ class PlaybookAdministrationService:
 
         This includes SYNTHETIC versions of a catalog playbook: a demo artifact
         left armed on a real entry means running it reports a simulated success
-        while nothing happens. Demo playbooks of their own (simulate-user-block)
-        have their own definitions and never reach this list. Rows are kept so
-        executions remain immutable history.
+        while nothing happens. Demo playbooks with definitions of their own are
+        retired through RETIRED_PLAYBOOK_CODES instead and never reach this
+        list. Rows are kept so executions remain immutable history.
         """
         for version in superseded:
             if version.status == "RETIRED":

@@ -2,12 +2,19 @@
 
 This directory is the source of truth for managed n8n workflow artifacts.
 Artifacts remain inactive in Git. Reconciliation may activate only a released
-synthetic workflow whose digest matches its tenant binding. LIVE workflows need
-a separate operational approval.
+workflow whose digest matches its tenant binding. LIVE workflows need a
+separate operational approval.
 
-`simulate-user-block` `1.0.0` replaces the provisional
-`cyrvanta-demo-response` artifact. The legacy JSON remains in Git for the
-documented compatibility window, but Compose no longer imports or activates it.
+**The manifest is empty, and that is the shipped state.** n8n is the extension
+point for integrations Cyrvanta has no native connector for; nothing is plugged
+into it yet. It previously held five synthetic demo artifacts -- four webhooks
+that answered "fail closed" and one that reported a simulated success -- which
+demonstrated the mechanism and could not do anything. A product that ships
+workflows unable to act teaches an operator that dispatching one is theatre.
+
+The mechanism itself is unchanged: declare a workflow in `manifest.json` with
+its digest, its schemas and its credential aliases, put the artifact under
+`workflows/`, and reconcile.
 
 Run `python infrastructure/n8n/scripts/validate_workflows.py` before import.
 Credentials are referenced by aliases in `manifest.json`; secret values never

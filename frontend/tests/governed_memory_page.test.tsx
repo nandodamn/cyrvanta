@@ -106,7 +106,7 @@ describe("governed memory", () => {
   it("shows provenance and the immutable state history", async () => {
     show(["memory.read"]);
     expect(await screen.findByText("Patrón de laboratorio")).toBeVisible();
-    expect(screen.getByText(/sin aprendizaje autónomo/i)).toBeVisible();
+    expect(screen.getByText(/nada se activa solo/i)).toBeVisible();
     expect(screen.getByText(/candidate_created/)).toBeInTheDocument();
   });
 
@@ -147,14 +147,14 @@ describe("governed memory", () => {
     // 403 as "no metrics recorded", which told every analyst the SOC had
     // measured nothing.
     show(["memory.read"]);
-    fireEvent.click(await screen.findByRole("button", { name: /gobernanza/i }));
+    fireEvent.click(await screen.findByRole("button", { name: /métricas/i }));
     expect(screen.getByText(/no puede ver las métricas/i)).toBeVisible();
     expect(api.getMemoryMetrics).not.toHaveBeenCalled();
   });
 
   it("lets someone who may read metrics actually fetch them", async () => {
     show(["memory.read", "memory.metrics.read"]);
-    fireEvent.click(await screen.findByRole("button", { name: /gobernanza/i }));
+    fireEvent.click(await screen.findByRole("button", { name: /métricas/i }));
     expect(api.getMemoryMetrics).toHaveBeenCalled();
   });
 
@@ -175,7 +175,7 @@ describe("governed memory", () => {
     // influence on -- a claim about the product where a reader sees a claim
     // about the system in front of them.
     show(["memory.read"]);
-    expect(await screen.findByText(/influencia activa en esta instalación/i)).toBeVisible();
+    expect(await screen.findByText(/se muestran en los incidentes/i)).toBeVisible();
   });
 
   it("marks a memory the AI drafted, and says it has no human author", async () => {

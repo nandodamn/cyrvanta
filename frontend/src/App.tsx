@@ -1163,8 +1163,13 @@ function IncidentMemory({ incidentId }: { incidentId: string }) {
 
   // Nothing to say is better said by saying nothing: an empty panel on every
   // incident would be furniture people learn to scroll past.
+  //
+  // "Nothing matched" and "nothing was consulted" are different facts, and
+  // with influence off the second always produces the first -- so checking
+  // for matches alone made the notice below unreachable, and an installation
+  // that had switched memory off looked like one that simply had no lessons.
   if (context.isError) return null;
-  if (context.data && context.data.matches.length === 0) return null;
+  if (context.data?.influence_enabled && context.data.matches.length === 0) return null;
 
   const spanish = i18n.language.startsWith("es");
   return (

@@ -542,19 +542,34 @@ function AccountMenu({
               <option value="en">English</option>
             </select>
           </div>
-          <div className="account-actions">
+          <div className="account-section account-row">
+            <span className="account-label" id="account-theme-label">
+              {t("theme")}
+            </span>
+            {/* A switch, not a button that renames itself. The old control
+                said "tema claro" while the dark theme was on, so it read
+                equally well as a label for the current theme and as an offer
+                to change it. A switch shows both ends at once and where it
+                currently sits. */}
             <button
               type="button"
-              className="ghost"
-              aria-pressed={lightTheme}
+              role="switch"
+              className="theme-switch"
+              aria-checked={lightTheme}
+              aria-labelledby="account-theme-label"
               onClick={onToggleTheme}
             >
-              {lightTheme ? t("darkTheme") : t("lightTheme")}
-            </button>
-            <button type="button" className="ghost" onClick={onSignOut}>
-              {t("signOut")}
+              <span className="theme-dot is-dark" aria-hidden="true" />
+              <span className="theme-dot is-light" aria-hidden="true" />
+              <span className="theme-knob" aria-hidden="true" />
             </button>
           </div>
+          {/* Last, and on its own: leaving is not one of the settings, and
+              putting it beside them invites the mis-click. */}
+          <button type="button" className="account-exit" onClick={onSignOut}>
+            <span aria-hidden="true">⏻</span>
+            {t("signOut")}
+          </button>
         </div>
       )}
     </div>

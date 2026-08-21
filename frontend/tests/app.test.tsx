@@ -80,8 +80,12 @@ describe("protected application", () => {
     expect(screen.getByRole("link", { name: /auditoría|audit/i })).toBeVisible();
     // The theme switch lives with the account controls now, one click deeper.
     fireEvent.click(screen.getByRole("button", { expanded: false }));
-    const themeButton = screen.getByRole("button", { name: /tema claro|light theme/i });
-    fireEvent.click(themeButton);
+    // A switch rather than a button that renames itself, so it reports which
+    // theme is on rather than which one clicking would bring.
+    const themeSwitch = screen.getByRole("switch", { name: /tema|theme/i });
+    expect(themeSwitch).toHaveAttribute("aria-checked", "false");
+    fireEvent.click(themeSwitch);
+    expect(themeSwitch).toHaveAttribute("aria-checked", "true");
     expect(document.documentElement).toHaveClass("light");
     expect(sessionStorage.getItem("theme")).toBe("light");
     expect(sessionStorage.getItem("access_token")).toBeNull();

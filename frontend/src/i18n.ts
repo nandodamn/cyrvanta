@@ -31,6 +31,11 @@ const resources = {
       password: "Contraseña",
       rememberSession: "Recordar sesión en este equipo",
       securityOperations: "Operaciones de seguridad",
+      themeChoice: {
+        system: "Seguir al sistema",
+        light: "Tema claro",
+        dark: "Tema oscuro",
+      },
       yourRoles: "Tus roles",
       noRoleAssigned: "Sin rol asignado",
       resolutionReview: "Revision de la resolucion",
@@ -829,6 +834,11 @@ const resources = {
       password: "Password",
       rememberSession: "Remember session on this device",
       securityOperations: "Security operations",
+      themeChoice: {
+        system: "Follow the system",
+        light: "Light theme",
+        dark: "Dark theme",
+      },
       yourRoles: "Your roles",
       noRoleAssigned: "No role assigned",
       resolutionReview: "Resolution review",

@@ -78,14 +78,14 @@ describe("protected application", () => {
     expect(await screen.findByRole("link", { name: /incidentes|incidents/i })).toBeVisible();
     expect(screen.getByRole("link", { name: /playbooks/i })).toBeVisible();
     expect(screen.getByRole("link", { name: /auditoría|audit/i })).toBeVisible();
-    // The theme switch lives with the account controls now, one click deeper.
+    // The theme controls live with the account now, one click deeper.
     fireEvent.click(screen.getByRole("button", { expanded: false }));
-    // A switch rather than a button that renames itself, so it reports which
-    // theme is on rather than which one clicking would bring.
-    const themeSwitch = screen.getByRole("switch", { name: /tema|theme/i });
-    expect(themeSwitch).toHaveAttribute("aria-checked", "false");
-    fireEvent.click(themeSwitch);
-    expect(themeSwitch).toHaveAttribute("aria-checked", "true");
+    // Three states, not two: following the machine is the default and has to
+    // be distinguishable from having chosen the theme it currently shows.
+    const follow = screen.getByRole("radio", { name: /seguir al sistema|follow the system/i });
+    expect(follow).toHaveAttribute("aria-checked", "true");
+    fireEvent.click(screen.getByRole("radio", { name: /tema claro|light theme/i }));
+    expect(follow).toHaveAttribute("aria-checked", "false");
     expect(document.documentElement).toHaveClass("light");
     expect(sessionStorage.getItem("theme")).toBe("light");
     expect(sessionStorage.getItem("access_token")).toBeNull();

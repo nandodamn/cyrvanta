@@ -373,22 +373,77 @@ function ProtectedRoute() {
   return auth.authenticated ? <Outlet /> : <Navigate to="/login" replace />;
 }
 
+type ThemePreference = "system" | "light" | "dark";
+
+const SYSTEM_LIGHT = "(prefers-color-scheme: light)";
+
+/** Line icons for the three theme choices: a screen, a sun, a moon.
+ *
+ * Drawn rather than written, because the three fit on one row as glyphs and
+ * would not as words -- and because "system" has no short label that says
+ * what it does better than a picture of a screen does.
+ */
+const THEME_ICONS: Record<ThemePreference, JSX.Element> = {
+  system: (
+    <svg viewBox="0 0 20 20" width="15" height="15" fill="none" stroke="currentColor">
+      <rect x="2.5" y="3.5" width="15" height="10" rx="1.5" strokeWidth="1.4" />
+      <path d="M7 16.5h6" strokeWidth="1.4" strokeLinecap="round" />
+    </svg>
+  ),
+  light: (
+    <svg viewBox="0 0 20 20" width="15" height="15" fill="none" stroke="currentColor">
+      <circle cx="10" cy="10" r="3.4" strokeWidth="1.4" />
+      <path
+        d="M10 2.2v1.9M10 15.9v1.9M2.2 10h1.9M15.9 10h1.9M4.5 4.5l1.3 1.3M14.2 14.2l1.3 1.3M15.5 4.5l-1.3 1.3M5.8 14.2l-1.3 1.3"
+        strokeWidth="1.4"
+        strokeLinecap="round"
+      />
+    </svg>
+  ),
+  dark: (
+    <svg viewBox="0 0 20 20" width="15" height="15" fill="none" stroke="currentColor">
+      <path
+        d="M16.2 12.3A6.8 6.8 0 0 1 7.7 3.8a6.8 6.8 0 1 0 8.5 8.5Z"
+        strokeWidth="1.4"
+        strokeLinejoin="round"
+      />
+    </svg>
+  ),
+};
+
 function Layout() {
   const { t, i18n } = useTranslation();
   const auth = useAuth();
   const signOut = auth.signOut;
-  const [lightTheme, setLightTheme] = useState(() => sessionStorage.getItem("theme") === "light");
+  // Only an explicit choice is stored. Absence means "follow the system",
+  // which is the default: an operator who has already told their machine how
+  // they want to read at 3am should not have to tell this one as well.
+  const [theme, setTheme] = useState<ThemePreference>(() => {
+    const stored = sessionStorage.getItem("theme");
+    return stored === "light" || stored === "dark" ? stored : "system";
+  });
   const me = useQuery({ queryKey: ["me"], queryFn: getMe, retry: false });
   useEffect(() => {
     if (me.isError) void signOut();
   }, [me.isError, signOut]);
   useEffect(() => {
-    document.documentElement.classList.toggle("light", lightTheme);
-  }, [lightTheme]);
-  const toggleTheme = () => {
-    const next = !lightTheme;
-    sessionStorage.setItem("theme", next ? "light" : "dark");
-    setLightTheme(next);
+    const media = window.matchMedia(SYSTEM_LIGHT);
+    const apply = () =>
+      document.documentElement.classList.toggle(
+        "light",
+        theme === "light" || (theme === "system" && media.matches),
+      );
+    apply();
+    if (theme !== "system") return;
+    // Following the system means following it as it changes -- machines flip
+    // at dusk on their own -- not only reading it once at load.
+    media.addEventListener("change", apply);
+    return () => media.removeEventListener("change", apply);
+  }, [theme]);
+  const chooseTheme = (next: ThemePreference) => {
+    if (next === "system") sessionStorage.removeItem("theme");
+    else sessionStorage.setItem("theme", next);
+    setTheme(next);
   };
   const setLanguage = (language: string) => {
     sessionStorage.setItem("locale", language);
@@ -420,8 +475,8 @@ function Layout() {
             me={me.data}
             language={i18n.language}
             onLanguage={setLanguage}
-            lightTheme={lightTheme}
-            onToggleTheme={toggleTheme}
+            theme={theme}
+            onTheme={chooseTheme}
             onSignOut={() => void signOut()}
           />
         </div>
@@ -461,15 +516,15 @@ function AccountMenu({
   me,
   language,
   onLanguage,
-  lightTheme,
-  onToggleTheme,
+  theme,
+  onTheme,
   onSignOut,
 }: {
   me: CurrentUser | undefined;
   language: string;
   onLanguage: (value: string) => void;
-  lightTheme: boolean;
-  onToggleTheme: () => void;
+  theme: ThemePreference;
+  onTheme: (value: ThemePreference) => void;
   onSignOut: () => void;
 }) {
   const { t } = useTranslation();
@@ -546,23 +601,26 @@ function AccountMenu({
             <span className="account-label" id="account-theme-label">
               {t("theme")}
             </span>
-            {/* A switch, not a button that renames itself. The old control
-                said "tema claro" while the dark theme was on, so it read
-                equally well as a label for the current theme and as an offer
-                to change it. A switch shows both ends at once and where it
-                currently sits. */}
-            <button
-              type="button"
-              role="switch"
-              className="theme-switch"
-              aria-checked={lightTheme}
-              aria-labelledby="account-theme-label"
-              onClick={onToggleTheme}
-            >
-              <span className="theme-dot is-dark" aria-hidden="true" />
-              <span className="theme-dot is-light" aria-hidden="true" />
-              <span className="theme-knob" aria-hidden="true" />
-            </button>
+            {/* Three states, all three visible. A two-way switch cannot show
+                that a theme is being followed rather than chosen, and the
+                button this replaced named the theme you would get rather than
+                the one you had -- so you clicked it to find out. */}
+            <div className="theme-choice" role="radiogroup" aria-labelledby="account-theme-label">
+              {(["system", "light", "dark"] as const).map((choice) => (
+                <button
+                  key={choice}
+                  type="button"
+                  role="radio"
+                  aria-checked={theme === choice}
+                  aria-label={t(`themeChoice.${choice}`)}
+                  title={t(`themeChoice.${choice}`)}
+                  className={theme === choice ? "is-selected" : undefined}
+                  onClick={() => onTheme(choice)}
+                >
+                  {THEME_ICONS[choice]}
+                </button>
+              ))}
+            </div>
           </div>
           {/* Last, and on its own: leaving is not one of the settings, and
               putting it beside them invites the mis-click. */}

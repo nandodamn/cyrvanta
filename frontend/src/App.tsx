@@ -4823,7 +4823,11 @@ function AuditPage() {
               typeof recordedActor === "string" && recordedActor.trim()
                 ? recordedActor
                 : (event.actor_user_id ?? t("systemActor"));
-            const recordedClientIp = event.details?.client_ip;
+            // The column first. `details.client_ip` was the slot this screen
+            // read for months while nothing ever wrote it, so every row showed
+            // "not available" -- and the manual claimed the audit recorded an
+            // address. Kept as a fallback for any entry that does carry one.
+            const recordedClientIp = event.source_address ?? event.details?.client_ip;
             const clientIp =
               typeof recordedClientIp === "string" && recordedClientIp.trim()
                 ? recordedClientIp

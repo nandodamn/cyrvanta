@@ -7,6 +7,7 @@ from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from cyrvanta.shared.database import Base
+from cyrvanta.shared.request_context import current_source_address
 
 
 class TenantModel(Base):
@@ -43,6 +44,13 @@ class AuditEventModel(Base):
     outcome: Mapped[str] = mapped_column(String, nullable=False)
     correlation_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), nullable=False)
     details: Mapped[dict[str, object]] = mapped_column(JSONB, nullable=False, default=dict)
+    # Filled from the request being served, so the fifty-odd places that write
+    # an audit record need not pass it and cannot forget to. Null is the honest
+    # answer for background work: a scheduler expiring a memory has no client
+    # address, and must not inherit one from whoever last made a request.
+    source_address: Mapped[str | None] = mapped_column(
+        String(45), default=lambda: current_source_address()
+    )
     occurred_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

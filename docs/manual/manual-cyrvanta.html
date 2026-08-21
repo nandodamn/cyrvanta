@@ -720,9 +720,19 @@
   <p>
     Bitácora de cumplimiento. Cada fila muestra resultado
     (<span class="mono">SUCCESS</span> / <span class="mono">FAILURE</span>), acción, fecha y
-    hora UTC, email del ejecutor e IP de origen. Es la fuente para reportes de auditoría
-    externa.
+    hora UTC, email del ejecutor y la dirección desde la que actuó. Es la fuente para
+    reportes de auditoría externa.
   </p>
+  <div class="note">
+    <span class="label">Cuándo no hay dirección</span>
+    <p>
+      Las acciones que ejecuta la propia plataforma —expirar una lección, calcular una
+      métrica, correlacionar alertas— no tienen dirección de origen, y el registro lo deja
+      vacío en lugar de heredar la del último pedido atendido. Las entradas anteriores a la
+      versión que agregó la columna tampoco la tienen. Una dirección inventada en la única
+      tabla que existe para ser creída es peor que su ausencia.
+    </p>
+  </div>
 
   <h3>3.8 Administración</h3>
   <p>
@@ -1557,6 +1567,10 @@
         <tr>
           <td>El segundo firmante del ejemplo es <span class="mono">ldap-demo@cyrvanta.uy</span>.</td>
           <td>Esa cuenta es hoy Auditor, de solo lectura, y no puede firmar. El flujo de demostración usa una cuenta de supervisor.</td>
+        </tr>
+        <tr>
+          <td>La auditoría registra la IP de origen.</td>
+          <td>No lo hacía: la tabla no tenía columna para eso y la pantalla mostraba siempre «no disponible». Ahora sí, y las acciones automáticas la dejan vacía en vez de inventarla.</td>
         </tr>
         <tr>
           <td>Nada sobre expediente técnico, colaboradores, revisión de resolución, métricas del SOC ni sugerencias de la IA.</td>

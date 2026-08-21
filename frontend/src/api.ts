@@ -38,6 +38,9 @@ const auditEventSchema = z.object({
   outcome: z.string(),
   correlation_id: z.string().uuid(),
   details: z.record(z.unknown()),
+  // Where the action came from. Null for anything the platform did on its own
+  // and for entries written before the column existed.
+  source_address: z.string().nullable().optional(),
   occurred_at: z.string(),
 });
 const directoryConfigurationSchema = z.object({

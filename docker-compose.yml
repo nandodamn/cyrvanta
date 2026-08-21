@@ -51,7 +51,16 @@ services:
     build: {context: ., dockerfile: backend/Dockerfile}
     profiles: [core]
     env_file: .env
-    command: ["/bin/sh", "-c", "DATABASE_URL=$${DATABASE_ADMIN_URL} alembic upgrade head && uvicorn cyrvanta.main:app --host 0.0.0.0 --port 8000"]
+    # --proxy-headers so the application sees the real client instead of the
+    # reverse proxy: the audit records where an action came from, and without
+    # this every entry would name the proxy's container address. It also lets
+    # the app know the connection was HTTPS once TLS terminates in front of it.
+    #
+    # --forwarded-allow-ips=* is safe here only because this service publishes
+    # no port: nothing outside the compose networks can reach it, so the proxy
+    # is the only source of those headers. Publishing a port would make this
+    # setting a way to forge an audit trail.
+    command: ["/bin/sh", "-c", "DATABASE_URL=$${DATABASE_ADMIN_URL} alembic upgrade head && uvicorn cyrvanta.main:app --host 0.0.0.0 --port 8000 --proxy-headers --forwarded-allow-ips='*'"]
     depends_on:
       postgres: { condition: service_healthy }
       redis: { condition: service_healthy }

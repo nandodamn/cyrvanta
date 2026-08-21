@@ -7,6 +7,8 @@ from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import Response
 
+from cyrvanta.shared.request_context import set_source_address
+
 
 class RequestContextMiddleware(BaseHTTPMiddleware):
     async def dispatch(
@@ -16,6 +18,11 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
         correlation_id = request.headers.get("X-Correlation-ID", request_id)
         request.state.request_id = request_id
         request.state.correlation_id = correlation_id
+        # Taken from the connection, not from a header. uvicorn runs with
+        # --proxy-headers, so behind the reverse proxy this is already the real
+        # client rather than the proxy; reading X-Forwarded-For here instead
+        # would trust a value any caller can set.
+        set_source_address(request.client.host if request.client else None)
         response = await call_next(request)
         response.headers["X-Request-ID"] = request_id
         response.headers["X-Correlation-ID"] = correlation_id

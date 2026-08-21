@@ -78,4 +78,7 @@ class AuditEventResponse(BaseModel):
     outcome: str
     correlation_id: UUID
     details: dict[str, object]
+    # Null for anything the platform did on its own, and for rows written
+    # before the column existed. Not "unknown" -- absent.
+    source_address: str | None = None
     occurred_at: datetime

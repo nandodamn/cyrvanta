@@ -1,0 +1,1558 @@
+<title>Manual Maestro Cyrvanta</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Serif:wght@400;600;700&display=swap">
+
+<style>
+  :root {
+    --paper: #fbfbfa;
+    --panel: #f2f5f4;
+    --ink: #10201f;
+    --ink-soft: #354a48;
+    --muted: #5b716f;
+    --rule: #dae3e1;
+    --rule-strong: #b6c6c3;
+    --accent: #0a7a67;
+    --accent-soft: #e4f2ee;
+    --warn-ink: #8a5300;
+    --warn-bg: #fcf5e9;
+    --warn-rule: #e0c79a;
+    --stop-ink: #9c2233;
+    --stop-bg: #fcefef;
+    --stop-rule: #e2b3b8;
+    --measure: 34rem;
+  }
+
+  :root:not([data-theme="light"]) {
+    color-scheme: light dark;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper: #0b1416;
+      --panel: #121f22;
+      --ink: #e7efee;
+      --ink-soft: #c2d3d1;
+      --muted: #90a7a5;
+      --rule: #22383a;
+      --rule-strong: #375254;
+      --accent: #4fd6b8;
+      --accent-soft: #102b28;
+      --warn-ink: #e6b566;
+      --warn-bg: #241d10;
+      --warn-rule: #4a3a1c;
+      --stop-ink: #f0929c;
+      --stop-bg: #26161a;
+      --stop-rule: #4d2830;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --paper: #0b1416;
+    --panel: #121f22;
+    --ink: #e7efee;
+    --ink-soft: #c2d3d1;
+    --muted: #90a7a5;
+    --rule: #22383a;
+    --rule-strong: #375254;
+    --accent: #4fd6b8;
+    --accent-soft: #102b28;
+    --warn-ink: #e6b566;
+    --warn-bg: #241d10;
+    --warn-rule: #4a3a1c;
+    --stop-ink: #f0929c;
+    --stop-bg: #26161a;
+    --stop-rule: #4d2830;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    padding: 0 1.5rem 5rem;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+    font-size: 15px;
+    line-height: 1.62;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .sheet {
+    max-width: 52rem;
+    margin: 0 auto;
+  }
+
+  /* ---- Portada ---- */
+
+  .cover {
+    padding: 4rem 0 2.5rem;
+    border-bottom: 3px solid var(--accent);
+    display: grid;
+    gap: 1.25rem;
+  }
+
+  .wordmark {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+
+  .cover h1 {
+    font-family: "IBM Plex Serif", Georgia, serif;
+    font-size: clamp(2.1rem, 5vw, 3.1rem);
+    font-weight: 700;
+    line-height: 1.08;
+    letter-spacing: -0.015em;
+    margin: 0;
+    text-wrap: balance;
+  }
+
+  .cover .standfirst {
+    max-width: var(--measure);
+    font-size: 1.06rem;
+    color: var(--ink-soft);
+    margin: 0;
+  }
+
+  .spec {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+    gap: 0.1rem 2rem;
+    margin-top: 0.75rem;
+    padding-top: 1.25rem;
+    border-top: 1px solid var(--rule);
+    font-size: 0.85rem;
+  }
+
+  .spec div { padding: 0.3rem 0; }
+  .spec dt {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 0.66rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .spec dd { margin: 0.1rem 0 0; }
+
+  /* ---- Estructura ---- */
+
+  .chapter {
+    padding-top: 3rem;
+    margin-top: 2.5rem;
+    border-top: 1px solid var(--rule);
+  }
+
+  .chapter:first-of-type { border-top: 0; }
+
+  .chapter > header {
+    display: grid;
+    gap: 0.35rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .chapter-number {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 0.68rem;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+
+  h2 {
+    font-family: "IBM Plex Serif", Georgia, serif;
+    font-size: 1.72rem;
+    font-weight: 700;
+    line-height: 1.16;
+    letter-spacing: -0.012em;
+    margin: 0;
+    text-wrap: balance;
+  }
+
+  h3 {
+    font-family: "IBM Plex Serif", Georgia, serif;
+    font-size: 1.16rem;
+    font-weight: 600;
+    line-height: 1.3;
+    margin: 2rem 0 0.6rem;
+    text-wrap: balance;
+  }
+
+  h4 {
+    font-size: 0.95rem;
+    font-weight: 600;
+    margin: 1.4rem 0 0.4rem;
+  }
+
+  p, ul, ol { max-width: var(--measure); }
+  p { margin: 0 0 0.9rem; }
+  ul, ol { margin: 0 0 0.9rem; padding-left: 1.1rem; }
+  li { margin: 0.28rem 0; }
+  li::marker { color: var(--accent); }
+
+  strong { font-weight: 600; }
+
+  code, .mono {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 0.86em;
+  }
+
+  code {
+    background: var(--panel);
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+    padding: 0.05em 0.34em;
+    white-space: nowrap;
+  }
+
+  a { color: var(--accent); }
+
+  /* ---- Tablas ---- */
+
+  .table-wrap {
+    overflow-x: auto;
+    margin: 1.1rem 0 1.4rem;
+    border-top: 2px solid var(--ink);
+    border-bottom: 1px solid var(--rule-strong);
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+    font-variant-numeric: tabular-nums;
+  }
+
+  th {
+    text-align: left;
+    vertical-align: bottom;
+    padding: 0.6rem 0.85rem 0.5rem 0;
+    border-bottom: 1px solid var(--rule-strong);
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 0.64rem;
+    font-weight: 600;
+    letter-spacing: 0.11em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  td {
+    padding: 0.55rem 0.85rem 0.55rem 0;
+    border-bottom: 1px solid var(--rule);
+    vertical-align: top;
+  }
+
+  tr:last-child td { border-bottom: 0; }
+  th:last-child, td:last-child { padding-right: 0; }
+
+  td .mono { color: var(--ink-soft); }
+
+  /* ---- Avisos ---- */
+
+  .note, .correction, .rule-box {
+    max-width: var(--measure);
+    margin: 1.2rem 0;
+    padding: 0.9rem 1.1rem;
+    border-left: 3px solid var(--accent);
+    background: var(--accent-soft);
+    border-radius: 0 4px 4px 0;
+  }
+
+  .correction {
+    border-left-color: var(--warn-rule);
+    background: var(--warn-bg);
+  }
+
+  .rule-box {
+    border-left-color: var(--stop-rule);
+    background: var(--stop-bg);
+  }
+
+  .note p, .correction p, .rule-box p { margin: 0 0 0.5rem; max-width: none; }
+  .note p:last-child, .correction p:last-child, .rule-box p:last-child { margin: 0; }
+
+  .label {
+    display: block;
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 0.63rem;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    margin-bottom: 0.3rem;
+  }
+
+  .note .label { color: var(--accent); }
+  .correction .label { color: var(--warn-ink); }
+  .rule-box .label { color: var(--stop-ink); }
+
+  /* ---- Diagramas de estado ---- */
+
+  .flow {
+    max-width: var(--measure);
+    margin: 1.1rem 0 1.4rem;
+    padding: 1rem 1.1rem;
+    background: var(--panel);
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 0.78rem;
+    line-height: 1.75;
+    white-space: pre;
+    overflow-x: auto;
+  }
+
+  /* ---- Cronograma ---- */
+
+  .cadence {
+    display: grid;
+    gap: 0;
+    margin: 1.1rem 0 1.4rem;
+    border-top: 2px solid var(--ink);
+  }
+
+  .cadence > div {
+    display: grid;
+    grid-template-columns: 7.5rem 1fr;
+    gap: 0 1.25rem;
+    padding: 0.7rem 0;
+    border-bottom: 1px solid var(--rule);
+  }
+
+  .cadence .when {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--accent);
+    padding-top: 0.1rem;
+  }
+
+  .cadence .what { font-size: 0.9rem; }
+  .cadence .what strong { display: block; }
+  .cadence .what span { color: var(--muted); font-size: 0.85rem; }
+
+  @media (max-width: 34rem) {
+    .cadence > div { grid-template-columns: 1fr; gap: 0.15rem; }
+  }
+
+  /* ---- Pie ---- */
+
+  .colophon {
+    margin-top: 3rem;
+    padding-top: 1.25rem;
+    border-top: 1px solid var(--rule);
+    font-size: 0.8rem;
+    color: var(--muted);
+    max-width: var(--measure);
+  }
+
+  /* ---- Impresión ---- */
+
+  @page {
+    size: A4;
+    margin: 18mm 16mm 20mm;
+  }
+
+  @media print {
+    body {
+      padding: 0;
+      font-size: 10.2pt;
+      line-height: 1.5;
+      background: #fff;
+      color: #10201f;
+    }
+    .sheet { max-width: none; }
+    :root {
+      --paper: #fff;
+      --panel: #f4f7f6;
+      --ink: #10201f;
+      --ink-soft: #354a48;
+      --muted: #5b716f;
+      --rule: #d7e0de;
+      --rule-strong: #a9bcb9;
+      --accent: #076455;
+      --accent-soft: #eaf4f1;
+    }
+    .cover { padding-top: 0; }
+    .chapter { break-before: page; padding-top: 0; margin-top: 0; border-top: 0; }
+    .chapter:first-of-type { break-before: avoid; }
+    h2, h3, h4 { break-after: avoid; }
+    /* Long tables may run across sheets; a row may not be split in half.
+       Holding a whole table together instead pushed it to the next page and
+       left the previous one two thirds empty. */
+    .flow, .note, .correction, .rule-box, .cadence > div { break-inside: avoid; }
+    tr, thead { break-inside: avoid; }
+    thead { display: table-header-group; }
+    /* Paper does not scroll. A horizontal overflow container prints as a
+       clipped box with a scrollbar drawn into it, so on paper the content
+       has to fit instead: diagrams shrink and wrap, tables run full width. */
+    .table-wrap, .flow { overflow: visible; }
+    .flow {
+      font-size: 7.4pt;
+      line-height: 1.6;
+      white-space: pre-wrap;
+      max-width: none;
+    }
+    table { font-size: 8.4pt; }
+    a { color: inherit; text-decoration: none; }
+    /* Repeated on every sheet by Chrome. Anchored to the bottom of the
+       content box, with matching padding on the page so long text never
+       flows underneath it -- fixed elements reserve no space of their own. */
+    .print-foot {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 6.4pt;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: #8fa3a1;
+      border-top: 0.5pt solid #e2e9e7;
+      padding-top: 1.5mm;
+      background: #fff;
+      display: flex;
+      justify-content: space-between;
+    }
+    .sheet { padding-bottom: 8mm; }
+  }
+
+  .print-foot { display: none; }
+  @media print { .print-foot { display: flex; } }
+</style>
+
+<div class="print-foot">
+  <span>Cyrvanta — Manual Maestro v2.0</span>
+  <span>Documento técnico y operativo — Confidencial</span>
+</div>
+
+<div class="sheet">
+
+<header class="cover">
+  <p class="wordmark">Cyrvanta · Plataforma SOC</p>
+  <h1>Manual maestro de arquitectura, operación y gobernanza</h1>
+  <p class="standfirst">
+    Cómo funciona Cyrvanta de punta a punta: sus contenedores, sus ocho pantallas,
+    el ciclo de vida de un incidente, la separación de funciones que impide que una
+    sola persona decida sola, y el circuito de lecciones aprendidas que convierte lo
+    que el SOC concluyó en contexto que reaparece cuando hace falta.
+  </p>
+  <dl class="spec">
+    <div><dt>Versión del documento</dt><dd>v2.0 — reemplaza a v1.0 Master Enterprise</dd></div>
+    <div><dt>Fecha de emisión</dt><dd>Agosto de 2026</dd></div>
+    <div><dt>Arquitectura</dt><dd>Monolito modular, Clean Architecture, Puertos y Adaptadores</dd></div>
+    <div><dt>Aislamiento</dt><dd>PostgreSQL con RLS forzada por tenant</dd></div>
+    <div><dt>Taxonomía</dt><dd>MITRE ATT&amp;CK — tácticas y técnicas</dd></div>
+    <div><dt>Idiomas</dt><dd>Español e inglés, nativos en toda la interfaz</dd></div>
+  </dl>
+</header>
+
+<!-- ============================================================ -->
+<section class="chapter">
+  <header>
+    <p class="chapter-number">Capítulo 1</p>
+    <h2>Qué es Cyrvanta y qué decide un humano</h2>
+  </header>
+
+  <p>
+    Cyrvanta es una plataforma de operaciones de seguridad para SOC: ingesta telemetría,
+    correlaciona eventos dispersos en incidentes, los enriquece contra MITRE ATT&amp;CK,
+    propone respuestas de contención y deja registro auditable de todo. Está pensada para
+    desplegarse on-premise y para no atar al cliente a ningún proveedor.
+  </p>
+
+  <p>
+    Lo que la distingue de un SIEM con automatización no es que use IA. Es <strong>dónde
+    pone el límite de la IA</strong>: la inteligencia artificial redacta, sugiere y explica;
+    nunca autoriza, ejecuta ni cierra. Cada acción con consecuencia sobre la infraestructura
+    del cliente tiene un nombre y un apellido detrás.
+  </p>
+
+  <h3>1.1 Los seis principios que gobiernan el diseño</h3>
+
+  <ul>
+    <li>
+      <strong>Aislamiento multitenant estricto.</strong> Cada organización opera aislada.
+      PostgreSQL aplica <em>Row Level Security</em> forzada: ninguna consulta ni mutación
+      puede cruzar datos entre clientes, ni siquiera ejecutada por el dueño de las tablas.
+      La identidad del tenant sale del contexto de seguridad autenticado, nunca del cuerpo
+      de una petición.
+    </li>
+    <li>
+      <strong>Separación de funciones.</strong> Quien propone no aprueba; quien resuelve un
+      caso no lo cierra; quien escribe una lección no la revisa ni la activa. Estas reglas
+      viven en el código y en <em>triggers</em> de la base, no en la configuración de roles.
+      Un administrador puede reasignar permisos; no puede desactivarlas.
+    </li>
+    <li>
+      <strong>Auditoría inmutable.</strong> Toda mutación, inicio de sesión, propuesta,
+      aprobación o reversión genera un registro con marca de tiempo UTC, identificador de
+      usuario, IP de origen y correlación. El historial se agrega; nunca se edita.
+    </li>
+    <li>
+      <strong>La salida de la IA es dato no confiable.</strong> Todo lo que devuelve un
+      modelo pasa por esquema estricto y validación determinista antes de guardarse. Si el
+      modelo no responde, o responde mal, el sistema cae a un resultado determinista y lo
+      deja registrado.
+    </li>
+    <li>
+      <strong>Bilingüe por construcción.</strong> Interfaz, respuestas de la API, eventos de
+      auditoría y notificaciones tienen español e inglés nativos. No hay texto de interfaz
+      fuera del sistema de traducción.
+    </li>
+    <li>
+      <strong>Respuesta automática apagada por defecto.</strong> La plataforma puede ejecutar
+      contenciones, y de fábrica no lo hace sin firma humana.
+    </li>
+  </ul>
+
+  <div class="rule-box">
+    <span class="label">Lo que Cyrvanta nunca hace sola</span>
+    <p>
+      No cierra incidentes, no suprime alertas, no modifica puntajes de riesgo, no revoca
+      accesos ni ejecuta contenciones sin autorización humana explícita. Ninguna función de
+      aprendizaje altera estas reglas: lo que el sistema aprende se muestra, no se aplica.
+    </p>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<section class="chapter">
+  <header>
+    <p class="chapter-number">Capítulo 2</p>
+    <h2>Arquitectura de contenedores y redes</h2>
+  </header>
+
+  <p>
+    Cyrvanta se despliega con Docker Compose sobre tres redes. La red <code>internal</code>
+    no tiene salida: es donde viven la base, la caché y el broker. La red
+    <code>host-access</code> es la única que permite alcanzar servicios del anfitrión —
+    en particular Ollama. La red <code>edge</code> expone únicamente el proxy inverso.
+  </p>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Contenedor</th><th>Puerto / red</th><th>Qué hace</th><th>Qué se ve en la interfaz</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span class="mono">reverse-proxy</span></td>
+          <td>8080 · edge</td>
+          <td>Nginx: termina TLS y enruta la SPA y las peticiones REST.</td>
+          <td>Es la única puerta. Todo lo demás es interno.</td>
+        </tr>
+        <tr>
+          <td><span class="mono">frontend</span></td>
+          <td>80 · internal</td>
+          <td>SPA compilada en React 18, TypeScript y Vite.</td>
+          <td>Renderiza las ocho pantallas.</td>
+        </tr>
+        <tr>
+          <td><span class="mono">backend</span></td>
+          <td>8000 · internal + host-access</td>
+          <td>FastAPI: dominio, validación Pydantic v2, correlación, autorización.</td>
+          <td>Atiende toda acción del usuario.</td>
+        </tr>
+        <tr>
+          <td><span class="mono">postgres</span></td>
+          <td>5432 · internal</td>
+          <td>PostgreSQL 16 con RLS forzada. Sistema de registro autoritativo.</td>
+          <td>Usuarios, incidentes, claims, memoria, auditoría.</td>
+        </tr>
+        <tr>
+          <td><span class="mono">redis</span></td>
+          <td>6379 · internal</td>
+          <td>Caché de sesión y control de tasa. No es sistema de registro.</td>
+          <td>Autenticación y navegación instantáneas.</td>
+        </tr>
+        <tr>
+          <td><span class="mono">rabbitmq</span></td>
+          <td>5672 · internal</td>
+          <td>Broker de eventos de dominio con bandeja de entrada durable.</td>
+          <td>Absorbe ráfagas de alertas sin bloquear la pantalla.</td>
+        </tr>
+        <tr>
+          <td><span class="mono">worker</span></td>
+          <td>internal + host-access</td>
+          <td>Consume eventos: correlación, enriquecimiento MITRE, riesgo, explicaciones.</td>
+          <td>Puebla incidentes y explicaciones sin intervención.</td>
+        </tr>
+        <tr>
+          <td><span class="mono">scheduler</span></td>
+          <td>internal + host-access</td>
+          <td>Ciclo cada 15 s: despacho de playbooks, ingesta Wazuh, expiraciones, métricas y sugerencias de memoria.</td>
+          <td>Todo lo que aparece solo, aparece desde acá.</td>
+        </tr>
+        <tr>
+          <td><span class="mono">opensearch</span></td>
+          <td>9200 · internal · opcional</td>
+          <td>Índice de telemetría de alto volumen.</td>
+          <td>Búsqueda de evidencia en Alertas.</td>
+        </tr>
+        <tr>
+          <td><span class="mono">wazuh-manager</span></td>
+          <td>1514-1515 · opcional</td>
+          <td>SIEM que recibe eventos de agentes en hosts.</td>
+          <td>Puebla la consola de Alertas.</td>
+        </tr>
+        <tr>
+          <td><span class="mono">n8n</span></td>
+          <td>5678 · opcional</td>
+          <td>Orquestador de workflows externos.</td>
+          <td>Vínculos adicionales en Playbooks.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note">
+    <span class="label">Ollama no es un contenedor</span>
+    <p>
+      El modelo corre en el anfitrión y se alcanza por URL configurable
+      (<code>http://host.docker.internal:11434</code> en desarrollo). Nunca se empaqueta como
+      dependencia, y se accede a través de un puerto <span class="mono">AIProvider</span>, de
+      modo que mover la inferencia a otra máquina o a una GPU dedicada no toca la API.
+      El modelo se configura por URL y nombre, jamás cableado en el código.
+    </p>
+  </div>
+
+  <div class="correction">
+    <span class="label">Corrección respecto de la v1</span>
+    <p>
+      La v1 describía a <span class="mono">worker</span> y <span class="mono">scheduler</span>
+      solo en la red interna. Con esa configuración declaraban el alias del anfitrión pero no
+      tenían ruta hacia él: el nombre resolvía, la conexión fallaba, y toda explicación
+      redactada por IA caía en silencio al texto determinista. Ambos están hoy en
+      <code>host-access</code>.
+    </p>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<section class="chapter">
+  <header>
+    <p class="chapter-number">Capítulo 3</p>
+    <h2>Las ocho pantallas</h2>
+  </header>
+
+  <p>
+    El menú lateral tiene ocho entradas. Cada una se muestra solo si el rol del usuario tiene
+    el permiso que la pantalla necesita: un rol sin <code>memory.read</code> no ve la entrada
+    de Lecciones aprendidas, en lugar de verla y encontrarse con un error.
+  </p>
+
+  <h3>3.1 Resumen</h3>
+  <p>
+    Pantalla de inicio. Muestra la topología del SOC y los nodos perimetrales del laboratorio,
+    el puntaje de riesgo global, los incidentes críticos activos, la salud de los servicios, y
+    el <strong>pulso operativo</strong>: un gráfico de barras de alertas e incidentes de las
+    últimas 24 horas, con el detalle exacto al pasar el puntero sobre cada barra.
+  </p>
+
+  <h3>3.2 Incidentes</h3>
+  <p>
+    La consola central. Es la pantalla que más creció respecto de la v1 y la que concentra
+    la separación de funciones. Al abrir un incidente el analista encuentra:
+  </p>
+  <ul>
+    <li><strong>Resumen y causa raíz</strong> — explicación determinista de los vectores correlacionados, severidad y prioridad.</li>
+    <li><strong>Matriz de claims</strong> — qué se afirma sobre el caso, con qué tipo epistémico (hecho, inferencia, hipótesis, recomendación), qué evidencia lo sostiene y quién lo evaluó.</li>
+    <li><strong>Expediente técnico</strong> — lo que el caso debe poder mostrar antes de darse por resuelto. Ver §4.3.</li>
+    <li><strong>Memoria operativa aplicable</strong> — lecciones ya aprobadas que aplican a este caso. Solo lectura.</li>
+    <li><strong>Qué resultó ser este caso</strong> — registro de feedback inmutable sobre el desenlace real.</li>
+    <li><strong>Colaboradores</strong> — gente que trabaja en el caso sin quedar a cargo de él.</li>
+    <li><strong>Proponer respuesta segura</strong> — propone la ejecución de un playbook de contención.</li>
+    <li><strong>Historial y auditoría</strong> — auditoría y línea de tiempo fusionadas en orden cronológico, diciendo quién actuó, qué era esa persona para el caso en ese momento, qué cambió y por qué.</li>
+  </ul>
+
+  <div class="note">
+    <span class="label">El menú de acciones lo decide el servidor</span>
+    <p>
+      Los botones disponibles en un incidente no se calculan en el navegador: se piden al
+      servidor, que responde qué puede hacer <em>esta</em> persona sobre <em>este</em> caso.
+      Una acción que el usuario nunca podría ejecutar no se muestra; una que se muestra y
+      luego se rechaza enseña a desconfiar de la pantalla.
+    </p>
+  </div>
+
+  <h3>3.3 Alertas</h3>
+  <p>
+    Consola de ingesta y triaje de la telemetría de Wazuh y OpenSearch. Filtros por estado
+    (<span class="mono">UNREVIEWED</span>, <span class="mono">RELEVANT</span>,
+    <span class="mono">DISCARDED</span>), severidad y orden. El detalle forense muestra IPs de
+    origen y destino, categoría de la regla, severidad, resumen de activo e identidad, y el
+    incidente correlacionado si existe.
+  </p>
+
+  <h3>3.4 Playbooks</h3>
+  <p>
+    Biblioteca de procedimientos de respuesta con versionado y estados
+    (<span class="mono">DRAFT</span>, <span class="mono">APPROVED</span>,
+    <span class="mono">RETIRED</span>). Cada definición declara su modo de gobernanza y su
+    impacto. Permite vincular opcionalmente una acción nativa a un workflow de n8n.
+  </p>
+
+  <h3>3.5 Integraciones</h3>
+  <p>
+    Configuración y prueba de conectividad con Wazuh, OpenSearch, MISP, Ollama, n8n,
+    ServiceNow y SMTP, más los adaptadores empresariales de EDR y firewall (Microsoft
+    Defender, CrowdStrike Falcon, SentinelOne, Palo Alto, FortiGate). Cada tarjeta permite
+    cargar credenciales y ejecutar una prueba de conexión en vivo.
+  </p>
+
+  <h3>3.6 Lecciones aprendidas</h3>
+  <p>
+    El circuito completo de conocimiento del SOC. Tiene capítulo propio: ver el Capítulo 5.
+  </p>
+
+  <h3>3.7 Auditoría</h3>
+  <p>
+    Bitácora de cumplimiento. Cada fila muestra resultado
+    (<span class="mono">SUCCESS</span> / <span class="mono">FAILURE</span>), acción, fecha y
+    hora UTC, email del ejecutor e IP de origen. Es la fuente para reportes de auditoría
+    externa.
+  </p>
+
+  <h3>3.8 Administración</h3>
+  <p>
+    Gestión de usuarios y roles, matriz de permisos por rol, y configuración de LDAP /
+    Active Directory (URI del servidor, Base DN, Bind DN, StartTLS) con mapeo de grupos del
+    dominio a roles de Cyrvanta y aprovisionamiento <em>just-in-time</em>.
+  </p>
+
+  <h3>3.9 El menú de cuenta</h3>
+  <p>
+    Al pie del panel lateral, detrás de las iniciales del usuario: nombre, correo,
+    <strong>los roles que tiene la sesión</strong>, idioma y tema. El tema ofrece tres
+    opciones — seguir al sistema, claro, oscuro — y seguir al sistema significa reaccionar a
+    los cambios del sistema operativo, no leerlos una vez al iniciar sesión.
+  </p>
+
+  <div class="correction">
+    <span class="label">Corrección respecto de la v1</span>
+    <p>
+      La v1 describía nueve secciones e incluía un menú de <em>Llaves API</em>. Esa pantalla
+      existe en el código pero <strong>no tiene ruta</strong>: hoy no es alcanzable desde la
+      navegación. Se documenta como pendiente de decisión de producto, no como funcionalidad
+      disponible.
+    </p>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<section class="chapter">
+  <header>
+    <p class="chapter-number">Capítulo 4</p>
+    <h2>Ciclo de vida de un incidente</h2>
+  </header>
+
+  <h3>4.1 Estados</h3>
+
+  <div class="flow">nuevo → triado → investigando → contenido → resuelto → cerrado
+                                  ↘──────────────↗        ↘ reabierto
+</div>
+
+  <p>
+    Cada transición exige un motivo. Cerrar y reabrir además exigen un motivo de al menos
+    tres caracteres, porque son las dos decisiones que alguien va a tener que justificar
+    después.
+  </p>
+
+  <h3>4.2 Quién puede qué, y por qué no alcanza con los permisos</h3>
+
+  <p>
+    Un permiso responde «¿esta persona puede hacer X alguna vez?». Es configuración: un
+    administrador de tenant la edita. Una regla contextual responde «¿puede hacerlo
+    <em>acá</em>?» y vive en el código, donde nadie la puede aflojar.
+  </p>
+
+  <div class="rule-box">
+    <span class="label">Las tres reglas que no son permisos</span>
+    <p>
+      <strong>Quien tiene el caso a cargo no puede cerrarlo.</strong> No porque le falte
+      autoridad — un supervisor con el caso asignado conserva <code>incident.close</code> —
+      sino porque aceptar una resolución es un juicio sobre el trabajo de otro, y nadie puede
+      emitirlo sobre el propio.
+    </p>
+    <p>
+      <strong>Quien resolvió un caso no puede cerrarlo</strong>, aunque no estuviera
+      asignado. Un incidente sin responsable puede resolverlo cualquiera que lo levante;
+      cerrarlo después sería la misma persona diciendo que el trabajo está hecho y aceptando
+      que lo está.
+    </p>
+    <p>
+      <strong>Un colaborador aporta, no decide.</strong> Puede agregar notas y evidencia. No
+      puede dar el caso por resuelto, cerrarlo ni reasignarlo: eso no es aportar al caso, es
+      juzgarlo, y de eso responde el responsable.
+    </p>
+  </div>
+
+  <p>
+    Reabrir está exento de la regla del cierre: es lo contrario de aprobar el trabajo propio,
+    es admitir que el caso no terminó.
+  </p>
+
+  <h3>4.3 El expediente técnico y la compuerta de resolución</h3>
+
+  <p>
+    Dar un caso por resuelto es pedirle a otra persona que acepte tu trabajo. Hecho contra un
+    expediente vacío es irrevisable: el supervisor aprueba una conclusión sin nada detrás, y
+    meses después nadie puede reconstruir qué se hizo ni por qué.
+  </p>
+
+  <p>Antes de pasar a <em>resuelto</em>, el caso debe tener:</p>
+
+  <ul>
+    <li><strong>Diagnóstico</strong> — qué pasó.</li>
+    <li><strong>Causa raíz</strong>, o el registro explícito de que no pudo determinarse.</li>
+    <li><strong>Resolución</strong> — qué se hizo.</li>
+    <li><strong>Una nota escrita por una persona.</strong></li>
+    <li><strong>Al menos una evidencia vinculada.</strong></li>
+  </ul>
+
+  <p>
+    La pantalla muestra la lista con lo que falta, para que el analista sepa qué ir a hacer
+    en vez de apretar un botón y que se lo nieguen. El servidor la vuelve a verificar al
+    entrar a <em>resuelto</em> y rechaza con <code>409</code>: la persona sí tiene permiso, el
+    caso todavía no está en estado de significar algo.
+  </p>
+
+  <div class="note">
+    <span class="label">Por qué la causa raíz admite «no determinada»</span>
+    <p>
+      Algunos incidentes terminan genuinamente sin causa. Exigir una igual produce causas
+      inventadas, que es peor que un honesto «no pudo determinarse» que un revisor puede
+      sopesar. Dejarla en blanco, en cambio, no satisface la compuerta.
+    </p>
+  </div>
+
+  <p>
+    El expediente vive en el registro de claims, no en columnas planas. Una columna puede
+    guardar una causa raíz; no puede decir quién la afirmó, sobre qué evidencia, ni si
+    alguien la evaluó — que es la razón por la que esta plataforma registra afirmaciones.
+  </p>
+
+  <h3>4.4 La revisión de la resolución</h3>
+
+  <p>
+    Cuando un caso queda en <em>resuelto</em>, la pantalla le dice al revisor <strong>de quién
+    es el trabajo que está por aceptar</strong> y cuándo lo hizo, y qué significa cada salida:
+    cerrar acepta la resolución; reabrir la rechaza, y el motivo escrito vuelve al analista y
+    queda en el registro. Si quien mira es justamente la persona que no puede cerrar, la
+    pantalla explica por qué en lugar de mostrar un menú vacío.
+  </p>
+</section>
+
+<!-- ============================================================ -->
+<section class="chapter">
+  <header>
+    <p class="chapter-number">Capítulo 5</p>
+    <h2>Lecciones aprendidas</h2>
+  </header>
+
+  <p>
+    Es el lugar donde el SOC convierte lo que aprendió de un caso en algo que reaparece la
+    próxima vez. Tres pestañas: las lecciones, el registro, las métricas.
+  </p>
+
+  <h3>5.1 Registrar — el libro de casos evaluados</h3>
+
+  <p>
+    Todo empieza acá, o en el propio incidente, que es donde conviene usarlo. Un analista
+    dice qué resultó ser el caso eligiendo de una taxonomía cerrada de ocho resultados que
+    separa deliberadamente dos preguntas distintas:
+  </p>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>¿La detección estuvo bien?</th><th>¿La respuesta funcionó?</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Verdadero positivo</td><td>Acción efectiva</td></tr>
+        <tr><td>Falso positivo</td><td>Acción inefectiva</td></tr>
+        <tr><td>Positivo benigno</td><td>Acción parcial</td></tr>
+        <tr><td>No concluyente</td><td>Sin evaluar</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>
+    El caso se elige de una lista de incidentes y alertas reales del tenant. Los simulados no
+    aparecen: el servidor los rechaza porque contaminarían las métricas, y ofrecer una opción
+    que va a ser rechazada enseña a desconfiar de la pantalla.
+  </p>
+
+  <div class="rule-box">
+    <span class="label">Inmutable</span>
+    <p>
+      Una entrada de feedback no se edita ni se borra. Es el cimiento de todo lo demás: si se
+      pudiera reescribir, ninguna métrica ni lección apoyada en ella significaría nada. Es
+      también el único activo de la plataforma que no se puede reconstruir si se pierde.
+    </p>
+  </div>
+
+  <h3>5.2 Lecciones — la base operativa</h3>
+
+  <p>
+    Una lección es un enunciado con <strong>condiciones</strong> (severidad, clasificación,
+    estado del incidente), <strong>evidencia</strong> — las entradas de feedback que la
+    sostienen — y <strong>vigencia</strong>. Recorre estos estados:
+  </p>
+
+  <div class="flow">borrador → en revisión → aprobada → en uso → vencida
+                 ├──────→ rechazada       ↘ desactivada
+                 └──────→ borrador           reemplazada
+                          (cambios pedidos)
+</div>
+
+  <p>
+    Una lección sin condiciones aplica a todos los incidentes mientras esté en uso, y la
+    pantalla lo dice explícitamente al escribirla. Las clasificaciones que ofrece son las que
+    ese tenant usa de verdad, no una lista inventada que no coincidiría con ningún caso suyo.
+  </p>
+
+  <h4>Corregir sin editar</h4>
+  <p>
+    Una lección no se edita: se corrige escribiendo una versión nueva. La anterior conserva su
+    texto, sus revisiones y su historial — un enunciado aprobado que se puede reescribir es
+    una aprobación de nada. Si la versión vigente estaba en uso, la corrección la reemplaza en
+    el mismo acto: dejarla activa mientras su reemplazo espera revisión seguiría mostrando un
+    consejo que su propio autor ya juzgó equivocado.
+  </p>
+  <p>
+    Cada versión tiene su <strong>propio autor</strong>, no el del candidato original, porque
+    es a quien escribió <em>esa</em> versión a quien las reglas de separación deben impedir
+    revisarla.
+  </p>
+
+  <h3>5.3 Métricas</h3>
+
+  <p>Dos razones, calculadas sobre una ventana de 30 días:</p>
+
+  <ul>
+    <li><strong>Tasa de falsos positivos</strong> — falsos positivos sobre detecciones evaluadas.</li>
+    <li><strong>Efectividad de la respuesta</strong> — acciones efectivas sobre acciones evaluadas.</li>
+  </ul>
+
+  <p>
+    Los resultados no evaluados quedan fuera del denominador: contar «nunca miramos» como
+    «acertamos» halagaría todos los números. Cada lectura guarda su ventana, sus conteos, la
+    versión de la definición usada y una huella de sus entradas, de modo que se puede
+    recalcular y discutir. Por debajo de <strong>20 casos</strong> evaluados en la ventana, la
+    métrica se muestra igual pero etiquetada como <em>muestra insuficiente</em>.
+  </p>
+
+  <p>
+    Son instantáneas diarias, no una consulta viva. Una métrica leída en vivo cambia bajo el
+    lector, y dos personas mirando el mismo número el mismo día verían cosas distintas sin
+    poder decir cuál tenía razón. Una ventana sin casos evaluados no se guarda: cero sobre
+    cero no es una tasa.
+  </p>
+
+  <p>
+    Visible para <strong>auditor, supervisor y administrador</strong>. Un analista ve un
+    mensaje que dice que no tiene permiso — no un «no hay métricas», que sería reportar una
+    ausencia de datos donde solo hay una ausencia de permiso.
+  </p>
+
+  <h3>5.4 La sugerencia automática</h3>
+
+  <p>
+    Es la única forma de aprendizaje que la plataforma automatiza: lee lo que el SOC ya
+    concluyó, encuentra una forma en ello y escribe un borrador para que una persona lo acepte
+    o lo descarte.
+  </p>
+
+  <p>
+    <strong>Qué proponer lo decide un conteo, no un modelo.</strong> Cuatro o más casos
+    juzgados igual sobre la misma clasificación son un patrón; tres son una coincidencia, y
+    una cola llena de coincidencias es una cola que la gente deja de leer. Solo la
+    <em>redacción</em> queda en manos del modelo, y todo lo que devuelve se valida antes de
+    guardarse: si contesta un número, un nulo o una cadena vacía, se usa la redacción
+    determinista.
+  </p>
+
+  <div class="note">
+    <span class="label">Qué ve el modelo</span>
+    <p>
+      Un conteo y una clasificación. <strong>Nunca el texto que escribió el analista</strong>,
+      que nombra hosts, cuentas e indicadores reales: un asistente de redacción no los
+      necesita, y lo que no se manda no se filtra. La auditoría guarda qué modelo produjo las
+      frases, o nulo si se usó la redacción de respaldo.
+    </p>
+  </div>
+
+  <p>
+    Una sugerencia entra como borrador <strong>sin autor</strong> — no hay humano a quien
+    excluir, así que cualquier analista puede revisarla — y no gana nada por venir de una
+    máquina: misma cola, misma revisión humana, misma activación por una tercera persona. La
+    tarjeta la marca, porque un revisor lee distinto una frase sabiendo que la escribió un
+    modelo.
+  </p>
+
+  <h3>5.5 El interruptor de influencia</h3>
+
+  <p>
+    <code>MEMORY_INFLUENCE_ENABLED</code> controla <strong>una sola cosa</strong>: si las
+    lecciones en uso se muestran en el incidente. Todo lo demás funciona igual con el
+    interruptor apagado — se registra feedback, se proponen lecciones, se revisan, se activan,
+    vencen solas, se calculan las métricas, la IA sigue sugiriendo. Lo único que no pasa es
+    que el analista las vea cuando está trabajando el caso.
+  </p>
+
+  <p>
+    Como la influencia es solo mostrar texto ya aprobado por dos personas, encenderla no puede
+    alterar ninguna decisión, puntaje ni acción. El interruptor existe como palanca de reversa
+    — si alguna vez se activa una lección equivocada, se apaga sin borrar evidencia — y como
+    compromiso previo por si la influencia creciera más allá de mostrar.
+  </p>
+
+  <p>
+    La pantalla informa el estado <em>de esta instalación</em>. Cuando las lecciones no están
+    llegando a los incidentes, lo advierte junto al contador de las que están en uso — que es
+    exactamente donde ese número deja de significar lo que el lector supone.
+  </p>
+
+  <div class="correction">
+    <span class="label">Corrección importante respecto de la v1</span>
+    <p>
+      La v1 afirmaba que al aprobarse, una memoria «pasa a estado ACTIVE y enriquece de
+      inmediato el motor de correlación para suprimir falsos positivos automáticamente».
+      <strong>Eso es falso y describe exactamente lo que la plataforma está diseñada para no
+      hacer.</strong> La memoria no suprime alertas, no toca el motor de correlación y no
+      cambia ninguna decisión. Aprender de feedback sin gobierno es un canal de envenenamiento:
+      un atacante genera ruido con una técnica hasta que el SOC la marca como falso positivo,
+      el sistema «aprende» a bajarle prioridad, y entra por ahí.
+    </p>
+    <p>
+      Además, aprobar y activar son actos separados que hacen personas distintas, y el estado
+      inicial se llama <span class="mono">DRAFT</span>, no <span class="mono">PROPOSED</span>.
+    </p>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<section class="chapter">
+  <header>
+    <p class="chapter-number">Capítulo 6</p>
+    <h2>Roles y permisos</h2>
+  </header>
+
+  <p>
+    El catálogo tiene <strong>56 permisos</strong> agrupados por área. Los cuatro roles
+    operativos son <strong>de sistema</strong>: existen en cada tenant, no se pueden borrar ni
+    renombrar, y su conjunto de permisos no se edita. Un tenant puede crear roles propios
+    además de estos.
+  </p>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Rol</th><th>Código</th><th>Permisos</th><th>Para qué existe</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Tenant Administrator</strong></td>
+          <td><span class="mono">tenant-admin</span></td>
+          <td>56</td>
+          <td>Configuración de la organización: integraciones, usuarios, roles, LDAP. Acceso total.</td>
+        </tr>
+        <tr>
+          <td><strong>Supervisor SOC</strong></td>
+          <td><span class="mono">soc-supervisor</span></td>
+          <td>39</td>
+          <td>Acepta el trabajo de otros: cierra casos, aprueba respuestas, revisa y activa lecciones, ve métricas.</td>
+        </tr>
+        <tr>
+          <td><strong>Analista SOC</strong></td>
+          <td><span class="mono">soc-analyst</span></td>
+          <td>26</td>
+          <td>Trabaja los casos: triaje, investigación, resolución, propuesta de respuesta y de lecciones.</td>
+        </tr>
+        <tr>
+          <td><strong>Auditor</strong></td>
+          <td><span class="mono">auditor</span></td>
+          <td>21</td>
+          <td>Solo lectura, incluidas las métricas. Perfil de supervisión AGESIC / ISO 27001.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>6.1 Matriz operativa</h3>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Acción</th><th>Analista</th><th>Supervisor</th><th>Auditor</th><th>Admin</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Ver incidentes, alertas, claims</td><td>Sí</td><td>Sí</td><td>Sí</td><td>Sí</td></tr>
+        <tr><td>Crear y actualizar incidentes</td><td>Sí</td><td>Sí</td><td>—</td><td>Sí</td></tr>
+        <tr><td>Asignar responsable</td><td>—</td><td>Sí</td><td>—</td><td>Sí</td></tr>
+        <tr><td>Dar por resuelto</td><td>Sí</td><td>Sí</td><td>—</td><td>Sí</td></tr>
+        <tr><td>Cerrar o reabrir</td><td>—</td><td>Sí</td><td>—</td><td>Sí</td></tr>
+        <tr><td>Proponer respuesta</td><td>Sí</td><td>Sí</td><td>—</td><td>Sí</td></tr>
+        <tr><td>Aprobar o revocar respuesta</td><td>—</td><td>Sí</td><td>—</td><td>Sí</td></tr>
+        <tr><td>Registrar feedback</td><td>Sí</td><td>Sí</td><td>—</td><td>Sí</td></tr>
+        <tr><td>Proponer lección</td><td>Sí</td><td>Sí</td><td>—</td><td>Sí</td></tr>
+        <tr><td>Revisar lección</td><td>—</td><td>Sí</td><td>—</td><td>Sí</td></tr>
+        <tr><td>Activar o desactivar lección</td><td>—</td><td>Sí</td><td>—</td><td>Sí</td></tr>
+        <tr><td>Ver métricas del SOC</td><td>—</td><td>Sí</td><td>Sí</td><td>Sí</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note">
+    <span class="label">Un usuario puede tener más de un rol</span>
+    <p>
+      La suma de permisos es la unión de los roles asignados. Las reglas contextuales del
+      Capítulo 4 siguen aplicando por encima: acumular roles amplía lo que se puede intentar,
+      nunca permite aprobar el trabajo propio.
+    </p>
+  </div>
+
+  <div class="correction">
+    <span class="label">Corrección respecto de la v1</span>
+    <p>
+      La v1 describía tres roles (<span class="mono">admin</span>,
+      <span class="mono">analyst</span>, <span class="mono">auditor</span>) y atribuía la
+      segunda firma exclusivamente al administrador. Hoy hay cuatro roles de sistema y la
+      segunda firma es del <strong>Supervisor SOC</strong>, que es el rol de operación de
+      seguridad diseñado para aceptar el trabajo del analista. El administrador conserva el
+      permiso, pero no es su trabajo hacerlo a diario.
+    </p>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<section class="chapter">
+  <header>
+    <p class="chapter-number">Capítulo 7</p>
+    <h2>Gobernanza de la respuesta</h2>
+  </header>
+
+  <p>
+    Cada playbook declara un modo de aprobación acorde a su impacto. Estos son los modos:
+  </p>
+
+  <ul>
+    <li><strong>Cuatro ojos</strong> — un analista propone, un supervisor independiente firma. Requerido para todo lo que corta acceso o aísla infraestructura.</li>
+    <li><strong>Simple</strong> — una sola firma. Notificaciones, tickets, correos.</li>
+    <li><strong>Automático</strong> — sin firma. Solo para acciones que recolectan contexto o sellan evidencia, sin alterar infraestructura.</li>
+  </ul>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Playbook</th><th>Modo</th><th>Por qué</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><span class="mono">compromised-account</span></td><td>Cuatro ojos</td><td>Contención de identidad: desactiva una cuenta.</td></tr>
+        <tr><td><span class="mono">compromised-endpoint</span></td><td>Cuatro ojos</td><td>Aislamiento de red de un host de producción.</td></tr>
+        <tr><td><span class="mono">lateral-movement</span></td><td>Cuatro ojos</td><td>Interrumpe tráfico SMB/WinRM entre servidores.</td></tr>
+        <tr><td><span class="mono">privilege-escalation</span></td><td>Cuatro ojos</td><td>Revoca permisos de cuenta privilegiada.</td></tr>
+        <tr><td><span class="mono">ransomware-destructive</span></td><td>Cuatro ojos</td><td>Contención de cifrado en curso.</td></tr>
+        <tr><td><span class="mono">security-control-disabled</span></td><td>Cuatro ojos</td><td>Reactiva agentes ante posible evasión.</td></tr>
+        <tr><td><span class="mono">simulate-user-block</span></td><td>Cuatro ojos</td><td>Bloqueo de usuario en el laboratorio de demostración.</td></tr>
+        <tr><td><span class="mono">request-dual-approval</span></td><td>Cuatro ojos</td><td>Solicitud explícita de doble firma.</td></tr>
+        <tr><td><span class="mono">contain-and-document-incident</span></td><td>Simple</td><td>Contención documental sin corte de servicio.</td></tr>
+        <tr><td><span class="mono">notify-critical-incident</span></td><td>Simple</td><td>Notificación por SMTP, Teams o Slack.</td></tr>
+        <tr><td><span class="mono">escalation-notification</span></td><td>Simple</td><td>Escalamiento a guardia o responsable.</td></tr>
+        <tr><td><span class="mono">incident-report-email</span></td><td>Simple</td><td>Envío del informe del incidente.</td></tr>
+        <tr><td><span class="mono">create-security-ticket</span></td><td>Simple</td><td>Apertura de ticket ITSM.</td></tr>
+        <tr><td><span class="mono">phishing-malicious-email</span></td><td>Simple</td><td>Tratamiento de correo malicioso reportado.</td></tr>
+        <tr><td><span class="mono">malicious-indicator</span></td><td>Simple</td><td>Registro y difusión de un indicador.</td></tr>
+        <tr><td><span class="mono">automated-enrichment</span></td><td>Automático</td><td>Recolecta contexto; no altera infraestructura.</td></tr>
+        <tr><td><span class="mono">evidence-preservation</span></td><td>Automático</td><td>Sella hashes y logs en almacenamiento inmutable.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>7.1 El flujo de cuatro ojos</h3>
+
+  <div class="flow">Analista propone  →  AWAITING_APPROVAL  →  Supervisor firma  →  2/2  →  Ejecución
+                                                    ↘ rechaza (con motivo)
+</div>
+
+  <p>
+    Al recibir la doble autorización, el backend ejecuta la contención. Toda ejecución es
+    reversible desde el propio incidente cuando el playbook define una acción de reversión, y
+    la reversión también queda auditada con la atribución explícita de quién la accionó.
+  </p>
+
+  <p>
+    Quien propone no puede firmar su propia propuesta. Es la misma regla que rige el cierre de
+    incidentes y la activación de lecciones, aplicada al plano de la respuesta.
+  </p>
+</section>
+
+<!-- ============================================================ -->
+<section class="chapter">
+  <header>
+    <p class="chapter-number">Capítulo 8</p>
+    <h2>Correlación multifuente y MITRE ATT&amp;CK</h2>
+  </header>
+
+  <h3>8.1 El motor de correlación</h3>
+
+  <p>
+    El problema de fondo de un SOC es la fatiga de alertas: un solo ataque de fuerza bruta
+    genera miles de entradas de log en minutos. El motor de Cyrvanta agrupa por
+    <strong>ventana temporal configurable</strong> y por <strong>entidad de dominio</strong>
+    (IP de origen o activo afectado), aplica un umbral de severidad mínima y un mínimo de
+    eventos, deduplica, y unifica el resultado en un incidente correlacionado con severidad y
+    prioridad.
+  </p>
+
+  <p>
+    Las reglas de correlación son <strong>propias de cada tenant</strong>. Una organización
+    ajusta sus ventanas y umbrales sin afectar a ninguna otra.
+  </p>
+
+  <h3>8.2 Etiquetado MITRE</h3>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Técnica</th><th>Táctica</th><th>Uso en Cyrvanta</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><span class="mono">T1078</span></td><td>Defense Evasion / Valid Accounts</td><td>Credenciales legítimas usadas para acceso no autorizado.</td></tr>
+        <tr><td><span class="mono">T1110</span></td><td>Credential Access / Brute Force</td><td>Autenticación repetida contra SSH, RDP o Active Directory.</td></tr>
+        <tr><td><span class="mono">T1059</span></td><td>Execution / Command &amp; Scripting</td><td>Ejecución de scripts en endpoints.</td></tr>
+        <tr><td><span class="mono">T1021</span></td><td>Lateral Movement / Remote Services</td><td>Desplazamiento por SMB o WinRM.</td></tr>
+        <tr><td><span class="mono">T1486</span></td><td>Impact / Data Encrypted for Impact</td><td>Cifrado de archivos por ransomware.</td></tr>
+        <tr><td><span class="mono">T1071</span></td><td>Command &amp; Control / Application Protocol</td><td>Tráfico de C2 sobre HTTPS o DNS.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>8.3 Explicaciones fundadas</h3>
+
+  <p>
+    El motor de exposición calcula deterministamente las tácticas involucradas y genera una
+    explicación <em>fundada</em> que indica qué técnica neutraliza el playbook propuesto. Si
+    hay un modelo disponible, la IA reescribe esa explicación para que se lea mejor —
+    <strong>sin agregar, quitar ni interpretar ningún hecho, puntaje, factor, técnica ni
+    incertidumbre</strong>. Si el modelo no responde, se muestra el texto determinista. El
+    analista entiende la efectividad de la respuesta antes de pedir la segunda firma.
+  </p>
+</section>
+
+<!-- ============================================================ -->
+<section class="chapter">
+  <header>
+    <p class="chapter-number">Capítulo 9</p>
+    <h2>Qué corre solo, y cada cuánto</h2>
+  </header>
+
+  <p>
+    El <span class="mono">scheduler</span> ejecuta un ciclo cada <strong>15 segundos</strong>.
+    El <span class="mono">worker</span> consume eventos a medida que llegan. Esto es todo lo
+    que ocurre sin que nadie lo pida:
+  </p>
+
+  <div class="cadence">
+    <div>
+      <span class="when">continuo</span>
+      <span class="what"><strong>Correlación de alertas en incidentes</strong>
+      <span>El worker agrupa la telemetría normalizada según las reglas del tenant.</span></span>
+    </div>
+    <div>
+      <span class="when">continuo</span>
+      <span class="what"><strong>Enriquecimiento MITRE, riesgo y explicación</strong>
+      <span>Mapeo de técnicas, evaluación determinista de riesgo y redacción asistida.</span></span>
+    </div>
+    <div>
+      <span class="when">15 s</span>
+      <span class="what"><strong>Ingesta desde Wazuh</strong>
+      <span>La detección ya ocurrió en el manager; este intervalo es cuánto espera un hallazgo antes de quedar registrado en Cyrvanta.</span></span>
+    </div>
+    <div>
+      <span class="when">15 s</span>
+      <span class="what"><strong>Despacho y reconciliación de playbooks</strong>
+      <span>Ejecuciones pendientes y vencimiento de las que se colgaron.</span></span>
+    </div>
+    <div>
+      <span class="when">15 s</span>
+      <span class="what"><strong>Expiración de autorizaciones y de lecciones</strong>
+      <span>Una lección vencida deja de mostrarse dentro de los 15 s de su fecha de vigencia.</span></span>
+    </div>
+    <div>
+      <span class="when">15 s</span>
+      <span class="what"><strong>Sugerencia de lecciones</strong>
+      <span>Barrido del feedback de los últimos 30 días. Una sugerencia nueva aparece dentro de los 15 s del cuarto caso con el mismo veredicto y la misma clasificación.</span></span>
+    </div>
+    <div>
+      <span class="when">5 min</span>
+      <span class="what"><strong>Barrido de riesgo por entidad</strong>
+      <span>Relee las alarmas de la ventana; es mucho más trabajo que el resto del ciclo y no necesita hacerse cada quince segundos.</span></span>
+    </div>
+    <div>
+      <span class="when">1 día</span>
+      <span class="what"><strong>Instantánea de métricas</strong>
+      <span>Una lectura por definición y por tenant, con su ventana y su huella de entradas.</span></span>
+    </div>
+  </div>
+
+  <h3>9.1 Los umbrales que gobiernan el comportamiento</h3>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Umbral</th><th>Valor</th><th>Qué gobierna</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Patrón mínimo</td><td>4 casos</td><td>Cuántos casos iguales hacen que la IA proponga una lección.</td></tr>
+        <tr><td>Muestra suficiente</td><td>20 casos</td><td>A partir de cuántos casos una métrica deja de estar etiquetada como insuficiente.</td></tr>
+        <tr><td>Ventana de análisis</td><td>30 días</td><td>Período de las métricas y de la detección de patrones.</td></tr>
+        <tr><td>Vigencia máxima</td><td>90 días</td><td>Cuánto puede durar una lección antes de tener que revalidarse.</td></tr>
+        <tr><td>Ciclo del scheduler</td><td>15 s</td><td>Cadencia de todo lo automático.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>9.2 Costo de lo automático</h3>
+
+  <p>
+    La expiración usa una función SQL que devuelve solo lo vencido. Las métricas están
+    protegidas por una comprobación diaria: en la práctica son dos conteos por tenant por
+    ciclo. El panel de memoria del incidente hace una consulta por vista y registra la
+    consulta una sola vez por caso y huella.
+  </p>
+
+  <div class="note">
+    <span class="label">A tener en cuenta al escalar</span>
+    <p>
+      El barrido de sugerencias consulta el feedback de la ventana de 30 días en cada ciclo,
+      por tenant, sin la guarda diaria que sí tienen las métricas. Con volúmenes chicos es
+      trivial. Con miles de entradas y muchos tenants conviene ponerle la misma guarda: un
+      patrón no cambia en quince segundos.
+    </p>
+  </div>
+
+  <p>
+    Ollama solo se invoca cuando hay un patrón nuevo o una explicación que redactar. El modelo
+    queda residente treinta minutos, de modo que la segunda invocación no paga la carga
+    inicial. La inferencia nunca está en el camino crítico: si no responde, el sistema sigue
+    con su resultado determinista.
+  </p>
+</section>
+
+<!-- ============================================================ -->
+<section class="chapter">
+  <header>
+    <p class="chapter-number">Capítulo 10</p>
+    <h2>Despliegue, respaldo y escalamiento</h2>
+  </header>
+
+  <h3>10.1 ¿Hay que instalar todos los contenedores?</h3>
+  <p>
+    No. El núcleo — <span class="mono">backend</span>, <span class="mono">frontend</span>,
+    <span class="mono">reverse-proxy</span>, <span class="mono">postgres</span>,
+    <span class="mono">redis</span>, <span class="mono">rabbitmq</span>,
+    <span class="mono">worker</span> y <span class="mono">scheduler</span> — es obligatorio.
+    OpenSearch, Wazuh Manager y n8n son opcionales: si el cliente ya tiene su propio SIEM o su
+    propio n8n, se deshabilitan los contenedores locales y se conecta Cyrvanta a los servidores
+    existentes por configuración.
+  </p>
+
+  <h3>10.2 ¿Detecta los nodos de la red solo?</h3>
+  <p>
+    Modelo híbrido. La <strong>telemetría se detecta sola</strong>: cada dispositivo que envía
+    logs al SIEM es ingestado a medida que genera eventos, y el mapa de activos se construye sin
+    configuración nodo por nodo. La <strong>capacidad de responder</strong> se configura una vez
+    por tipo de servicio: la API del firewall o del EDR en Integraciones, el URI del Active
+    Directory en Administración.
+  </p>
+
+  <h3>10.3 ¿Cómo actúa detrás de un firewall sin ser bloqueada?</h3>
+  <p>
+    Cyrvanta no escanea ni ataca. Actúa por dos vías: una solicitud HTTPS REST autenticada al
+    plano de administración del firewall — es el propio firewall quien ejecuta el bloqueo — o
+    el canal de gestión saliente TLS que el agente EDR o SIEM ya mantiene abierto. El firewall
+    no la bloquea porque la IP del servidor está en la lista blanca del plano de administración
+    con tokens autorizados previamente.
+  </p>
+
+  <h3>10.4 ¿Qué se respalda?</h3>
+  <p>
+    Git guarda el <strong>código y las recetas</strong>: fuentes, Dockerfile,
+    <span class="mono">docker-compose.yml</span>, configuración base y documentación.
+    <strong>No guarda la base viva ni la telemetría.</strong> Los contenedores son efímeros: si
+    uno falla, Docker lo reconstruye idéntico desde la receta.
+  </p>
+  <p>Lo que sí se respalda son los volúmenes:</p>
+  <ul>
+    <li><span class="mono">postgres_data</span> — usuarios, incidentes, claims, memoria, auditoría.</li>
+    <li><span class="mono">opensearch_data</span> — telemetría histórica.</li>
+    <li><span class="mono">wazuh_data</span> — reglas y llaves de agentes.</li>
+    <li><span class="mono">n8n_data</span> — credenciales y flujos.</li>
+  </ul>
+  <p>
+    En producción se aplica un <span class="mono">pg_dumpall</span> nocturno hacia
+    almacenamiento externo seguro, más instantáneas periódicas del disco.
+  </p>
+
+  <div class="rule-box">
+    <span class="label">Desplegar exige reconstruir</span>
+    <p>
+      Cyrvanta no tiene integración continua. Un <span class="mono">git push</span> por sí solo
+      no cambia nada de lo que ve el usuario: hay que reconstruir la imagen y recrear el
+      contenedor afectado.
+    </p>
+  </div>
+
+  <h3>10.5 Cuellos de botella y mitigación</h3>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Punto de saturación</th><th>Síntoma</th><th>Mitigación</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Ingesta y E/S de disco</td>
+          <td>Ráfagas de miles de eventos por segundo saturan los IOPS.</td>
+          <td>Separación estricta: telemetría cruda en OpenSearch, control en PostgreSQL. Rotación de índices y discos NVMe.</td>
+        </tr>
+        <tr>
+          <td>Tareas asíncronas</td>
+          <td>Retraso del worker ante escaneos masivos.</td>
+          <td>Réplicas horizontales del worker y deduplicación por ventana.</td>
+        </tr>
+        <tr>
+          <td>Inferencia de IA</td>
+          <td>Explicaciones simultáneas agotan VRAM o CPU.</td>
+          <td>Invocación asíncrona no bloqueante, GPU dedicada, y caída limpia al resultado determinista.</td>
+        </tr>
+        <tr>
+          <td>Conexiones a PostgreSQL</td>
+          <td>Decenas de analistas consultando en paralelo.</td>
+          <td>Pooling con PgBouncer y réplicas de lectura.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<section class="chapter">
+  <header>
+    <p class="chapter-number">Capítulo 11</p>
+    <h2>Integraciones y licenciamiento en clientes</h2>
+  </header>
+
+  <p>
+    Instalar Cyrvanta en un entorno corporativo real exige adaptarse a la infraestructura
+    existente sin forzar licencias nuevas. Los tres escenarios que cubren casi todos los casos:
+  </p>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Infraestructura del cliente</th><th>Cómo se conecta</th><th>¿Agentes en PCs?</th><th>Costo de licencia</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Ya tiene SIEM (Wazuh, Splunk, Elastic, Sentinel)</td>
+          <td>Cyrvanta consume la API REST del SIEM existente, que ya recolecta los eventos.</td>
+          <td>No</td>
+          <td>Sin costo adicional</td>
+        </tr>
+        <tr>
+          <td>Tiene Microsoft 365 E5 o Defender for Endpoint</td>
+          <td>Conexión HTTPS a Microsoft Graph Security API.</td>
+          <td>No</td>
+          <td>Incluido en la suscripción</td>
+        </tr>
+        <tr>
+          <td>Sin SIEM ni nube Microsoft</td>
+          <td>Despliegue del agente Wazuh por directiva de grupo de Active Directory.</td>
+          <td>Sí, automático por GPO</td>
+          <td>Sin costo — Wazuh es open source</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>11.1 Estado de los conectores empresariales</h3>
+  <p>
+    Las clases Python, los esquemas, el almacenamiento cifrado de claves, los formularios y las
+    pruebas de conexión están desarrollados. En esta versión responden en <strong>modo simulado
+    seguro</strong>. Conectar una tecnología real consiste en completar la llamada REST
+    específica de la versión de API que tenga contratada el cliente; no requiere rehacer la
+    arquitectura ni la interfaz.
+  </p>
+</section>
+
+<!-- ============================================================ -->
+<section class="chapter">
+  <header>
+    <p class="chapter-number">Anexo</p>
+    <h2>Qué cambió respecto del manual v1</h2>
+  </header>
+
+  <p>
+    Este anexo existe para quien conozca la versión anterior. Lo que sigue ya no es cierto, o
+    no lo era.
+  </p>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Decía la v1</th><th>Realidad</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Una memoria aprobada «enriquece de inmediato el motor de correlación para suprimir falsos positivos automáticamente».</td>
+          <td><strong>Falso.</strong> La memoria solo se muestra. No toca la correlación, no suprime alertas y no cambia ninguna decisión.</td>
+        </tr>
+        <tr>
+          <td>Aprobar una memoria la deja activa.</td>
+          <td>Aprobar y activar son actos separados que hacen personas distintas.</td>
+        </tr>
+        <tr>
+          <td>El estado inicial es <span class="mono">PROPOSED</span>.</td>
+          <td>Es <span class="mono">DRAFT</span>.</td>
+        </tr>
+        <tr>
+          <td>Tres roles: admin, analyst, auditor.</td>
+          <td>Cuatro roles de sistema, con Supervisor SOC como firmante de la segunda autorización.</td>
+        </tr>
+        <tr>
+          <td>Nueve secciones de menú, incluida «Llaves API».</td>
+          <td>Ocho. La pantalla de llaves API existe en el código pero no tiene ruta.</td>
+        </tr>
+        <tr>
+          <td>El filtro de memoria sintética se etiqueta desde la interfaz.</td>
+          <td>La API no puede crear memoria sintética. El filtro es una condición del servidor, no un control de pantalla.</td>
+        </tr>
+        <tr>
+          <td>El segundo firmante del ejemplo es <span class="mono">ldap-demo@cyrvanta.uy</span>.</td>
+          <td>Esa cuenta es hoy Auditor, de solo lectura, y no puede firmar. El flujo de demostración usa una cuenta de supervisor.</td>
+        </tr>
+        <tr>
+          <td>Nada sobre expediente técnico, colaboradores, revisión de resolución, métricas del SOC ni sugerencias de la IA.</td>
+          <td>Todo eso existe y está documentado en los capítulos 4, 5 y 9.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p class="colophon">
+    Cyrvanta — Manual maestro de arquitectura, operación y gobernanza, versión 2.0.
+    Documento técnico y operativo, confidencial. Los umbrales, roles, permisos y cadencias
+    citados fueron verificados contra el código y la base de datos de la versión desplegada al
+    momento de emisión.
+  </p>
+</section>
+
+</div>

@@ -411,30 +411,22 @@ function Layout() {
             </NavLink>
           ))}
         </nav>
-        <p className="tenant-code">TENANT · {me.data?.tenant_id.slice(0, 8) ?? "—"}</p>
+        {/* The account sits at the foot of the navigation, with the tenant it
+            belongs to. Both answer the same question -- where am I and as
+            whom -- and it is the corner people already look in. */}
+        <div className="sidebar-footer">
+          <p className="tenant-code">TENANT · {me.data?.tenant_id.slice(0, 8) ?? "—"}</p>
+          <AccountMenu
+            me={me.data}
+            language={i18n.language}
+            onLanguage={setLanguage}
+            lightTheme={lightTheme}
+            onToggleTheme={toggleTheme}
+            onSignOut={() => void signOut()}
+          />
+        </div>
       </aside>
       <section className="workspace">
-        <header>
-          <div className="header-identity">
-            <img
-              className="mobile-logo"
-              src="/cyrvanta-logo-192.png"
-              alt=""
-              width="42"
-              height="42"
-            />
-          </div>
-          <div className="actions">
-            <AccountMenu
-              me={me.data}
-              language={i18n.language}
-              onLanguage={setLanguage}
-              lightTheme={lightTheme}
-              onToggleTheme={toggleTheme}
-              onSignOut={() => void signOut()}
-            />
-          </div>
-        </header>
         <main className="content">
           <Outlet />
         </main>

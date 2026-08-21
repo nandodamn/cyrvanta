@@ -284,17 +284,6 @@ aside {
   object-fit: contain;
 }
 
-.header-identity {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.mobile-logo {
-  display: none;
-  object-fit: contain;
-}
-
 nav {
   display: grid;
   gap: 6px;
@@ -344,8 +333,17 @@ nav a.active {
   letter-spacing: 0.02em;
 }
 
+/* Pinned to the foot of the sidebar: where you are and who you are, together
+   and out of the way of the navigation above them. */
+.sidebar-footer {
+  margin-top: auto;
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
 .tenant-code {
-  margin: auto 0 0;
+  margin: 0;
   overflow: hidden;
   color: var(--muted);
   font:
@@ -357,31 +355,6 @@ nav a.active {
 
 .workspace {
   min-width: 0;
-}
-
-.workspace > header {
-  min-height: 84px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 20px;
-  padding: 16px 36px;
-  background: var(--bg);
-  border-bottom: 1px solid var(--line);
-}
-
-.workspace header p {
-  margin: 0 0 5px;
-}
-
-.actions {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.actions select {
-  width: auto;
 }
 
 .content {
@@ -1621,7 +1594,8 @@ details > .admin-list {
 
   .brand strong,
   .nav-label,
-  .tenant-code {
+  .tenant-code,
+  .account-name {
     position: absolute;
     width: 1px;
     height: 1px;
@@ -1631,6 +1605,13 @@ details > .admin-list {
     clip: rect(0, 0, 0, 0);
     white-space: nowrap;
     border: 0;
+  }
+
+  /* Icons only at this width, so the initials carry the account on their own
+     and the panel is free to be wider than the rail it hangs off. */
+  .account-button {
+    justify-content: center;
+    padding: 0.3rem;
   }
 
   nav a {
@@ -1671,12 +1652,8 @@ details > .admin-list {
     display: contents;
   }
 
-  .workspace > header {
-    order: 1;
-  }
-
   aside {
-    order: 2;
+    order: 1;
     position: sticky;
     width: 100%;
     height: auto;
@@ -1687,21 +1664,32 @@ details > .admin-list {
     border-bottom: 1px solid var(--line);
   }
 
+  /* One bar: mark, navigation, account. The logo used to live in a header of
+     its own, which is now an empty row once the account left it. */
   .brand {
-    display: none;
-  }
-
-  .mobile-logo {
-    display: block;
-    flex: 0 0 42px;
+    flex: 0 0 auto;
   }
 
   nav {
-    width: 100%;
+    flex: 1 1 auto;
+    min-width: 0;
     display: flex;
     gap: 5px;
     margin: 0;
     overflow-x: auto;
+  }
+
+  /* Anchored right, and opening downward again: up here the space is below. */
+  .sidebar-footer {
+    flex: 0 0 auto;
+    margin: 0 0 0 8px;
+  }
+
+  .account-panel {
+    top: calc(100% + 8px);
+    right: 0;
+    bottom: auto;
+    left: auto;
   }
 
   nav a {
@@ -1711,33 +1699,6 @@ details > .admin-list {
 
   .content {
     order: 3;
-  }
-
-  .workspace > header {
-    min-height: auto;
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    align-items: center;
-    gap: 10px;
-    padding: 14px 18px;
-  }
-
-  .actions {
-    display: grid;
-    grid-template-columns: 58px auto auto;
-    gap: 6px;
-  }
-
-  .actions select {
-    width: 58px;
-    padding: 8px 6px;
-  }
-
-  .actions .ghost {
-    min-height: 40px;
-    padding: 8px 10px;
-    font-size: 14px;
-    white-space: nowrap;
   }
 
   .content {
@@ -1819,17 +1780,6 @@ details > .admin-list {
 
   .login-card {
     padding: 26px;
-  }
-}
-
-@media (max-width: 480px) {
-  .workspace > header {
-    grid-template-columns: 1fr;
-  }
-
-  .actions {
-    width: 100%;
-    grid-template-columns: 58px repeat(2, minmax(0, 1fr));
   }
 }
 
@@ -2861,6 +2811,7 @@ details > .admin-list {
 }
 
 .account-button {
+  width: 100%;
   display: flex;
   align-items: center;
   gap: 0.55rem;
@@ -2870,6 +2821,7 @@ details > .admin-list {
   background: transparent;
   color: inherit;
   cursor: pointer;
+  text-align: left;
 }
 
 .account-button:hover,
@@ -2891,22 +2843,20 @@ details > .admin-list {
 }
 
 .account-name {
+  min-width: 0;
+  overflow: hidden;
   font-size: 0.88rem;
   font-weight: 600;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-/* The name alone is enough on a narrow screen; the initials carry it. */
-@media (max-width: 640px) {
-  .account-name {
-    display: none;
-  }
-}
-
+/* Opens upward: the button sits at the bottom of the sidebar, so a panel
+   dropping down would fall off the screen. */
 .account-panel {
   position: absolute;
-  top: calc(100% + 8px);
-  right: 0;
+  bottom: calc(100% + 8px);
+  left: 0;
   z-index: 40;
   min-width: 240px;
   padding: 0.85rem;

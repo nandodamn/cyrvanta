@@ -66,11 +66,32 @@ const entry = (overrides: Partial<api.FeedbackEntry> = {}): api.FeedbackEntry =>
   ...overrides,
 });
 
+const incident = {
+  id: "00000000-0000-0000-0000-000000000202",
+  code: "INC-AF8E3CD4",
+  title: "Acceso anómalo",
+  description: "",
+  status: "investigating",
+  severity: "medium",
+  priority: 3,
+  classification: "unauthorized_access",
+  assignee_user_id: null,
+  version: 1,
+  is_simulated: false,
+  detected_at: "2026-08-01T00:00:00Z",
+  acknowledged_at: null,
+  resolved_at: null,
+  closed_at: null,
+  close_reason: null,
+} as unknown as Awaited<ReturnType<typeof api.getIncidents>>[number];
+
 function show(permissions: string[], overrides: Partial<api.MemoryCandidate> = {}) {
   vi.spyOn(api, "getMemoryCandidates").mockResolvedValue([candidate(overrides)]);
   vi.spyOn(api, "getActiveMemory").mockResolvedValue([]);
   vi.spyOn(api, "getMemoryMetrics").mockResolvedValue([]);
   vi.spyOn(api, "getFeedback").mockResolvedValue([entry()]);
+  vi.spyOn(api, "getIncidents").mockResolvedValue([incident]);
+  vi.spyOn(api, "getAlerts").mockResolvedValue([]);
   render(
     <QueryClientProvider client={new QueryClient()}>
       <GovernedMemoryPage permissions={new Set(permissions)} />
@@ -102,12 +123,22 @@ describe("governed memory", () => {
     expect(await screen.findByText(/todos los incidentes/i)).toBeVisible();
   });
 
-  it("refuses to act on synthetic memory", async () => {
-    // The API cannot create it, so this only arrives from a fixture -- which
-    // is exactly when a rule about synthetic data needs to still hold.
-    show(["memory.read", "memory.propose"], { is_synthetic: true });
-    expect(await screen.findByRole("alert")).toBeVisible();
-    expect(screen.queryByRole("button", { name: /solicitar revisión/i })).not.toBeInTheDocument();
+  it("offers real cases to give feedback on, never a UUID field", async () => {
+    // Nothing on this screen may ask for an identifier the product does not
+    // show anywhere. The choices are the tenant's own incidents.
+    show(["memory.read", "feedback.create"]);
+    fireEvent.click(await screen.findByRole("button", { name: /registrar/i }));
+    expect(await screen.findByRole("option", { name: /INC-AF8E3CD4/ })).toBeInTheDocument();
+    expect(screen.queryByPlaceholderText(/uuid/i)).not.toBeInTheDocument();
+  });
+
+  it("suggests the classifications this tenant actually uses", async () => {
+    // A list invented in the browser would offer conditions that match none of
+    // their incidents, and a memory conditioned on one would never appear.
+    show(["memory.read", "memory.propose"]);
+    fireEvent.click(await screen.findByRole("button", { name: /registrar/i }));
+    expect(await screen.findByRole("option", { name: "", hidden: true })).toBeInTheDocument();
+    expect(document.querySelector("#memory-classifications")).toBeTruthy();
   });
 
   it("distinguishes not being allowed to see metrics from there being none", async () => {
@@ -131,9 +162,9 @@ describe("governed memory", () => {
     // they remember, not an identifier they have no way to obtain.
     show(["memory.read", "memory.propose", "feedback.create"]);
     fireEvent.click(await screen.findByRole("button", { name: /registrar/i }));
-    // Twice: once in the ledger of what has been recorded, once as a choice in
-    // the evidence picker. Both are the point.
-    expect(await screen.findAllByText("INC-AF8E3CD4 · Acceso anómalo")).toHaveLength(2);
+    // Three times, all of them the point: as a case you can give feedback on,
+    // in the ledger of what has been recorded, and as evidence to tick.
+    expect(await screen.findAllByText("INC-AF8E3CD4 · Acceso anómalo")).toHaveLength(3);
     expect(screen.getByRole("checkbox")).toBeInTheDocument();
     expect(screen.queryByText(/separados por coma/i)).not.toBeInTheDocument();
   });

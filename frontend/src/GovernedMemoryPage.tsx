@@ -7,34 +7,28 @@ import {
   createMemoryCandidate,
   createMemoryVersion,
   getActiveMemory,
+  getAlerts,
   getFeedback,
+  getIncidents,
   getMemoryCandidates,
   getMemoryMetrics,
   reviewMemoryVersion,
   transitionMemoryVersion,
+  FEEDBACK_OUTCOMES,
   type FeedbackEntry,
   type MemoryCandidate,
 } from "./api";
+import { INCIDENT_STATUSES, SEVERITIES } from "./domain";
 import { PageState } from "./PageState";
 
-const OUTCOMES = [
-  "TRUE_POSITIVE",
-  "FALSE_POSITIVE",
-  "BENIGN_TRUE_POSITIVE",
-  "INCONCLUSIVE",
-  "ACTION_EFFECTIVE",
-  "ACTION_INEFFECTIVE",
-  "ACTION_PARTIAL",
-  "NOT_ASSESSED",
-] as const;
-
-const RESOURCE_TYPES = [
-  "INCIDENT",
-  "FINDING",
-  "CLAIM",
-  "ACTION_PROPOSAL",
-  "PLAYBOOK_EXECUTION",
-] as const;
+/** What this screen can offer to give feedback on.
+ *
+ * The two the tenant has live, listable inventories of. The backend accepts
+ * feedback on claims, proposals and executions too, and those belong beside
+ * the object itself rather than in a box asking someone to paste its UUID --
+ * which is what this used to be, and what nobody could ever fill.
+ */
+const RESOURCE_TYPES = ["INCIDENT", "FINDING"] as const;
 
 /** The facts an incident offers a memory to match on.
  *
@@ -44,17 +38,6 @@ const RESOURCE_TYPES = [
  * applied to something.
  */
 const CONDITION_KEYS = ["severity", "classification", "status"] as const;
-
-const SEVERITIES = ["informational", "low", "medium", "high", "critical"] as const;
-const STATUSES = [
-  "new",
-  "triaged",
-  "investigating",
-  "contained",
-  "resolved",
-  "closed",
-  "reopened",
-] as const;
 
 const TERMINAL = ["REJECTED", "EXPIRED", "DISABLED", "SUPERSEDED"];
 const FILTERS = [
@@ -170,9 +153,11 @@ function EvidencePicker({
 /** When a memory applies. Empty means always, and says so. */
 function ConditionEditor({
   value,
+  classifications,
   onChange,
 }: {
   value: Record<string, string>;
+  classifications: string[];
   onChange: (next: Record<string, string>) => void;
 }) {
   const { t } = useTranslation();
@@ -183,7 +168,7 @@ function ConditionEditor({
     onChange(merged);
   };
   const options = (key: (typeof CONDITION_KEYS)[number]): readonly string[] =>
-    key === "severity" ? SEVERITIES : key === "status" ? STATUSES : [];
+    key === "severity" ? SEVERITIES : key === "status" ? INCIDENT_STATUSES : [];
 
   return (
     <div className="condition-editor">
@@ -191,17 +176,30 @@ function ConditionEditor({
         <label key={key}>
           <span>{t(`memory.conditionKeys.${key}`)}</span>
           {key === "classification" ? (
-            <input
-              value={value[key] ?? ""}
-              placeholder={t("memory.conditionAny")}
-              onChange={(event) => set(key, event.target.value.trim())}
-            />
+            // Classification is free text in the domain and differs per tenant,
+            // so the suggestions come from the classifications this tenant has
+            // actually used -- while still accepting one it has not yet.
+            <>
+              <input
+                list="memory-classifications"
+                value={value[key] ?? ""}
+                placeholder={t("memory.conditionAny")}
+                onChange={(event) => set(key, event.target.value.trim())}
+              />
+              <datalist id="memory-classifications">
+                {classifications.map((option) => (
+                  <option key={option} value={option} />
+                ))}
+              </datalist>
+            </>
           ) : (
             <select value={value[key] ?? ""} onChange={(event) => set(key, event.target.value)}>
               <option value="">{t("memory.conditionAny")}</option>
               {options(key).map((option) => (
                 <option key={option} value={option}>
-                  {option}
+                  {key === "severity"
+                    ? t(`severities.${option}`, { defaultValue: option })
+                    : t(`statusCodes.${option}`, { defaultValue: option })}
                 </option>
               ))}
             </select>
@@ -220,10 +218,12 @@ function ConditionEditor({
 function MemoryCard({
   item,
   entries,
+  classifications,
   canPropose,
 }: {
   item: MemoryCandidate;
   entries: FeedbackEntry[];
+  classifications: string[];
   canPropose: boolean;
 }) {
   const { t, i18n } = useTranslation();
@@ -299,7 +299,7 @@ function MemoryCard({
         <div>
           <dt>{t("memory.validity")}</dt>
           <dd>
-            {new Date(item.valid_from).toLocaleDateString(i18n.language)} –{" "}
+            {new Date(item.valid_from).toLocaleDateString(i18n.language)} â€“{" "}
             {new Date(item.valid_until).toLocaleDateString(i18n.language)}
           </dd>
         </div>
@@ -344,17 +344,7 @@ function MemoryCard({
         )}
       </details>
 
-      {item.is_synthetic && (
-        // The API refuses to create synthetic memory at all, so this can only
-        // arrive from a fixture or a direct insert. Kept because the ADR
-        // ratified that synthetic context never becomes active, and a rule
-        // that only holds while nobody tests the system is not a rule.
-        <p className="memory-synthetic" role="alert">
-          {t("memory.syntheticBlocked")}
-        </p>
-      )}
-
-      {!item.is_synthetic && !TERMINAL.includes(item.status) && (
+      {!TERMINAL.includes(item.status) && (
         <div className="memory-actions">
           <label>
             <span>{t("memory.actionReason")}</span>
@@ -469,6 +459,7 @@ function MemoryCard({
           </label>
           <ConditionEditor
             value={draft.conditions}
+            classifications={classifications}
             onChange={(conditions) => setDraft({ ...draft, conditions })}
           />
           <fieldset>
@@ -522,6 +513,18 @@ export function GovernedMemoryPage({
   const candidates = useQuery({ queryKey: ["memory-candidates"], queryFn: getMemoryCandidates });
   const active = useQuery({ queryKey: ["memory-active"], queryFn: getActiveMemory });
   const entries = useQuery({ queryKey: ["feedback"], queryFn: getFeedback });
+  // The tenant's own incidents and alerts, so feedback is recorded against
+  // something the analyst recognises rather than an identifier they cannot get.
+  const incidents = useQuery({
+    queryKey: ["incidents", "feedback-targets"],
+    queryFn: () => getIncidents({ pageSize: 50 }),
+    retry: false,
+  });
+  const alerts = useQuery({
+    queryKey: ["alerts", "feedback-targets"],
+    queryFn: () => getAlerts({ pageSize: 50 }),
+    retry: false,
+  });
   const metrics = useQuery({
     queryKey: ["memory-metrics"],
     queryFn: getMemoryMetrics,
@@ -534,7 +537,7 @@ export function GovernedMemoryPage({
   const [feedback, setFeedback] = useState({
     resource_type: "INCIDENT" as (typeof RESOURCE_TYPES)[number],
     resource_id: "",
-    outcome: "TRUE_POSITIVE" as (typeof OUTCOMES)[number],
+    outcome: "TRUE_POSITIVE" as (typeof FEEDBACK_OUTCOMES)[number],
     reason: "",
   });
   const [feedbackKey, rotateFeedbackKey] = useSubmissionKey();
@@ -574,6 +577,30 @@ export function GovernedMemoryPage({
   const visible = (candidates.data ?? []).filter(
     (item) => statusFilter === "ALL" || item.status === statusFilter,
   );
+
+  // Simulated cases are excluded here rather than refused on submit. The
+  // server will not accept feedback about them -- it would contaminate the
+  // metrics the whole module rests on -- and offering a choice that is going
+  // to be rejected teaches people not to trust the screen.
+  const resourceOptions =
+    feedback.resource_type === "INCIDENT"
+      ? (incidents.data ?? [])
+          .filter((item) => !item.is_simulated)
+          .map((item) => ({ id: item.id, label: `${item.code} · ${item.title}` }))
+      : (alerts.data ?? [])
+          .filter((item) => !item.is_simulated)
+          .map((item) => ({ id: item.id, label: `${item.external_id} · ${item.title}` }));
+
+  // What this tenant actually classifies incidents as, rather than a list
+  // invented here that would not match anything they use.
+  const classifications = [
+    ...new Set(
+      (incidents.data ?? [])
+        .filter((item) => !item.is_simulated)
+        .map((item) => item.classification)
+        .filter((value): value is string => Boolean(value)),
+    ),
+  ].sort();
 
   return (
     <>
@@ -643,6 +670,7 @@ export function GovernedMemoryPage({
                 key={item.id}
                 item={item}
                 entries={entries.data ?? []}
+                classifications={classifications}
                 canPropose={mayPropose}
               />
             ))}
@@ -682,11 +710,11 @@ export function GovernedMemoryPage({
                     onChange={(event) =>
                       setFeedback({
                         ...feedback,
-                        outcome: event.target.value as (typeof OUTCOMES)[number],
+                        outcome: event.target.value as (typeof FEEDBACK_OUTCOMES)[number],
                       })
                     }
                   >
-                    {OUTCOMES.map((value) => (
+                    {FEEDBACK_OUTCOMES.map((value) => (
                       <option key={value} value={value}>
                         {t(`memory.outcomes.${value}`)}
                       </option>
@@ -695,15 +723,29 @@ export function GovernedMemoryPage({
                 </label>
                 <label style={{ gridColumn: "1 / -1" }}>
                   <span>{t("memory.resourceId")}</span>
-                  <input
+                  {/* Chosen from what the tenant actually has. The field this
+                      replaces asked for a UUID, and no screen in the product
+                      shows one, so the only way to fill it was a database. */}
+                  <select
                     required
                     value={feedback.resource_id}
-                    placeholder={t("memory.resourceIdPlaceholder")}
                     onChange={(event) =>
-                      setFeedback({ ...feedback, resource_id: event.target.value.trim() })
+                      setFeedback({ ...feedback, resource_id: event.target.value })
                     }
-                  />
+                  >
+                    <option value="">{t("memory.resourcePick")}</option>
+                    {resourceOptions.map((option) => (
+                      <option key={option.id} value={option.id}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
                 </label>
+                {resourceOptions.length === 0 && (
+                  <p className="muted small" style={{ gridColumn: "1 / -1" }}>
+                    {t("memory.resourceEmpty")}
+                  </p>
+                )}
                 <label style={{ gridColumn: "1 / -1" }}>
                   <span>{t("memory.reason")}</span>
                   <textarea
@@ -828,6 +870,7 @@ export function GovernedMemoryPage({
                   <legend>{t("memory.appliesTo")}</legend>
                   <ConditionEditor
                     value={draft.conditions}
+                    classifications={classifications}
                     onChange={(conditions) => setDraft({ ...draft, conditions })}
                   />
                 </fieldset>

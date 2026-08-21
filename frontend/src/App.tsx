@@ -43,8 +43,12 @@ import {
   getCollaborators,
   addCollaborator,
   removeCollaborator,
+  createFeedback,
+  getFeedbackFor,
   getIncidentMemoryContext,
   getMyPermissions,
+  FEEDBACK_OUTCOMES,
+  type FeedbackOutcome,
   getResolutionReadiness,
   getIncidentEnrichment,
   getIncidents,
@@ -78,6 +82,7 @@ import {
   updateUser,
 } from "./api";
 import { OperationalPulse } from "./OperationalPulse";
+import { SEVERITIES } from "./domain";
 import { PageState } from "./PageState";
 import { SecurityTopologyPanel } from "./SecurityTopologyPanel";
 import { useAuth } from "./AuthContext";
@@ -1025,6 +1030,118 @@ function ResolutionReview({ incidentId, mayClose }: { incidentId: string; mayClo
         {mayClose ? t("resolutionReviewOptions") : t("resolutionReviewNotYours")}
       </p>
     </div>
+  );
+}
+
+/** Say what this case actually turned out to be.
+ *
+ * Feedback used to be recordable only from the memory screen, against a UUID
+ * typed by hand -- so in practice it was never recorded, and the ledger every
+ * lesson and every metric rests on stayed empty. It belongs here, where the
+ * analyst already is and the case is already known.
+ *
+ * Immutable once written: this is a record of what someone concluded at a
+ * moment, and a conclusion that can be quietly rewritten later is not evidence
+ * of anything.
+ */
+function IncidentFeedback({ incidentId }: { incidentId: string }) {
+  const { t } = useTranslation();
+  const queryClient = useQueryClient();
+  const [outcome, setOutcome] = useState<FeedbackOutcome>("TRUE_POSITIVE");
+  const [reason, setReason] = useState("");
+  const [key, setKey] = useState(() => globalThis.crypto.randomUUID());
+
+  const entries = useQuery({
+    queryKey: ["feedback", incidentId],
+    queryFn: () => getFeedbackFor("INCIDENT", incidentId),
+    retry: false,
+  });
+
+  const record = useMutation({
+    mutationFn: () =>
+      createFeedback(
+        {
+          resource_type: "INCIDENT",
+          resource_id: incidentId,
+          outcome,
+          reason: reason.trim(),
+          occurred_at: new Date().toISOString(),
+        },
+        key,
+      ),
+    onSuccess: async () => {
+      setKey(globalThis.crypto.randomUUID());
+      setReason("");
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["feedback"] }),
+        queryClient.invalidateQueries({ queryKey: ["feedback", incidentId] }),
+      ]);
+    },
+  });
+
+  return (
+    <section className="panel">
+      <div>
+        <p className="eyebrow">{t("traceability")}</p>
+        <h2>{t("memory.incidentFeedback")}</h2>
+        <p>{t("memory.incidentFeedbackIntro")}</p>
+      </div>
+      <ul className="feedback-list">
+        {(entries.data ?? []).map((entry) => (
+          <li key={entry.id}>
+            <div>
+              <strong>{t(`memory.outcomes.${entry.outcome}`)}</strong>
+            </div>
+            <p>{entry.reason}</p>
+            <span className="evidence-meta">
+              {entry.actor_name ?? t("automaticActor")} ·{" "}
+              {new Date(entry.occurred_at).toLocaleString()}
+            </span>
+          </li>
+        ))}
+      </ul>
+      <form
+        className="form-grid"
+        style={{ marginTop: "1rem" }}
+        onSubmit={(event) => {
+          event.preventDefault();
+          record.mutate();
+        }}
+      >
+        <label>
+          {t("memory.outcome")}
+          <select
+            value={outcome}
+            onChange={(event) => setOutcome(event.target.value as FeedbackOutcome)}
+          >
+            {FEEDBACK_OUTCOMES.map((value) => (
+              <option key={value} value={value}>
+                {t(`memory.outcomes.${value}`)}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label style={{ gridColumn: "1 / -1" }}>
+          {t("memory.reason")}
+          <textarea
+            required
+            rows={2}
+            maxLength={1000}
+            value={reason}
+            placeholder={t("memory.reasonPlaceholder")}
+            onChange={(event) => setReason(event.target.value)}
+          />
+        </label>
+        <button type="submit" disabled={record.isPending || !reason.trim()}>
+          {t("memory.saveFeedback")}
+        </button>
+        {record.isError && (
+          <p className="form-error" role="alert">
+            {t("memory.feedbackError")}
+          </p>
+        )}
+      </form>
+    </section>
   );
 }
 
@@ -2146,7 +2263,7 @@ function IncidentsPage() {
           <label>
             <span>{t("severity")}</span>
             <select name="severity" defaultValue="medium">
-              {(["informational", "low", "medium", "high", "critical"] as const).map((value) => (
+              {SEVERITIES.map((value) => (
                 <option key={value} value={value}>
                   {t(`severityCodes.${value}`, { defaultValue: value })}
                 </option>
@@ -3061,13 +3178,11 @@ function IncidentDetailPage() {
                     })
                   }
                 >
-                  {(["informational", "low", "medium", "high", "critical"] as const).map(
-                    (value) => (
-                      <option key={value} value={value}>
-                        {t(`severityCodes.${value}`, { defaultValue: value })}
-                      </option>
-                    ),
-                  )}
+                  {SEVERITIES.map((value) => (
+                    <option key={value} value={value}>
+                      {t(`severityCodes.${value}`, { defaultValue: value })}
+                    </option>
+                  ))}
                 </select>
               </label>
               <label>
@@ -4399,6 +4514,7 @@ function IncidentDetailPage() {
           {/* First, because it is the record of the case itself; the playbook
               decisions below are one kind of event within it. */}
           <IncidentMemory incidentId={id} />
+          <IncidentFeedback incidentId={id} />
           <Collaborators incidentId={id} mayManage={permitted.has("update")} />
           <TechnicalFile
             incidentId={id}

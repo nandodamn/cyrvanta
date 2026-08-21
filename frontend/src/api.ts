@@ -1363,8 +1363,31 @@ export async function getMemoryMetrics(): Promise<MemoryMetric[]> {
     .items;
 }
 
+export const FEEDBACK_OUTCOMES = [
+  "TRUE_POSITIVE",
+  "FALSE_POSITIVE",
+  "BENIGN_TRUE_POSITIVE",
+  "INCONCLUSIVE",
+  "ACTION_EFFECTIVE",
+  "ACTION_INEFFECTIVE",
+  "ACTION_PARTIAL",
+  "NOT_ASSESSED",
+] as const;
+export type FeedbackOutcome = (typeof FEEDBACK_OUTCOMES)[number];
+
 export async function getFeedback(): Promise<FeedbackEntry[]> {
   return feedbackListSchema.parse(await authorized("/api/v1/feedback?limit=100&offset=0")).items;
+}
+
+export async function getFeedbackFor(
+  resourceType: string,
+  resourceId: string,
+): Promise<FeedbackEntry[]> {
+  return feedbackListSchema.parse(
+    await authorized(
+      `/api/v1/feedback?resource_type=${resourceType}&resource_id=${resourceId}&limit=25&offset=0`,
+    ),
+  ).items;
 }
 
 export async function getIncidentMemoryContext(incidentId: string): Promise<MemoryContext> {

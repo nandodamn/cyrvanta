@@ -45,7 +45,12 @@ class FeedbackResponse(BaseModel):
     id: UUID
     resource_type: str
     resource_id: UUID
+    # What the feedback is about and who wrote it, in words. An entry is chosen
+    # later as evidence for a memory candidate, and nobody recognises the case
+    # they worked on from a UUID.
+    resource_label: str | None = None
     actor_user_id: UUID
+    actor_name: str | None = None
     outcome: str
     reason: str
     is_synthetic: bool
@@ -81,6 +86,45 @@ class MemoryCandidateCreate(StrictBody):
 
     @model_validator(mode="after")
     def valid_window(self) -> "MemoryCandidateCreate":
+        if (
+            self.valid_from.tzinfo is None
+            or self.valid_from.utcoffset() is None
+            or self.valid_until.tzinfo is None
+            or self.valid_until.utcoffset() is None
+        ):
+            raise ValueError("memory validity timestamps must be timezone-aware")
+        if self.valid_until <= self.valid_from:
+            raise ValueError("valid_until must be after valid_from")
+        return self
+
+
+class MemoryVersionCreate(StrictBody):
+    """A correction: the same memory, said again and differently.
+
+    Carries a reason because a new version replaces what a reviewer may have
+    already read, and the record has to say why.
+    """
+
+    title_es: str = Field(min_length=1, max_length=200)
+    title_en: str = Field(min_length=1, max_length=200)
+    statement_es: str = Field(min_length=1, max_length=2000)
+    statement_en: str = Field(min_length=1, max_length=2000)
+    conditions: dict[str, object] = Field(default_factory=dict)
+    evidence_refs: list[UUID] = Field(min_length=1, max_length=100)
+    valid_from: datetime
+    valid_until: datetime
+    reason: str = Field(min_length=1, max_length=1000)
+
+    @field_validator("title_es", "title_en", "statement_es", "statement_en", "reason")
+    @classmethod
+    def normalize_text(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("text must not be blank")
+        return value
+
+    @model_validator(mode="after")
+    def valid_window(self) -> "MemoryVersionCreate":
         if (
             self.valid_from.tzinfo is None
             or self.valid_from.utcoffset() is None
@@ -142,6 +186,11 @@ class MemoryCandidateResponse(BaseModel):
     kind: str
     source_type: str
     created_by_user_id: UUID
+    # The author of *this* version, which after a correction is not always the
+    # author of the candidate. It is what the separation rules read, so it is
+    # what the screen has to show.
+    version_author_user_id: UUID
+    version_author_name: str | None = None
     title_es: str
     title_en: str
     statement_es: str
@@ -171,6 +220,14 @@ class MemoryContextEvaluate(StrictBody):
 
 class MemoryMatchResponse(BaseModel):
     version_id: UUID
+    version: int
+    # Carried with the match so a reader sees the lesson itself, not a UUID
+    # plus an invitation to go and look it up somewhere else.
+    title_es: str
+    title_en: str
+    statement_es: str
+    statement_en: str
+    valid_until: datetime
     matched: bool
     explanation: str
 

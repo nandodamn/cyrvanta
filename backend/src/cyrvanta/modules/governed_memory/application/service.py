@@ -25,6 +25,14 @@ from cyrvanta.modules.governed_memory.application.schemas import (
     MemoryReviewCreate,
     MemoryReviewResponse,
     MemoryStateResponse,
+    MemoryVersionCreate,
+)
+from cyrvanta.modules.governed_memory.domain.metrics import (
+    DEFINITION_VERSION,
+    DENOMINATOR,
+    NUMERATOR,
+    MetricCode,
+    tally,
 )
 from cyrvanta.modules.governed_memory.domain.models import (
     MemoryKind,
@@ -42,7 +50,7 @@ from cyrvanta.modules.governed_memory.infrastructure.models import (
     MemoryReviewModel,
     MemoryStateEventModel,
 )
-from cyrvanta.modules.identity.infrastructure.models import AuditEventModel
+from cyrvanta.modules.identity.infrastructure.models import AuditEventModel, UserModel
 from cyrvanta.modules.incident.infrastructure.models import (
     AlertReferenceModel,
     IncidentModel,
@@ -53,6 +61,10 @@ from cyrvanta.shared.config import get_settings
 from cyrvanta.shared.database import SessionFactory, tenant_session
 from cyrvanta.shared.domain.events import DomainEvent
 from cyrvanta.shared.infrastructure.event_store import SqlEventStore
+
+# Thirty days: long enough for a small SOC to assess twenty cases, short
+# enough that a number still describes how the team works now.
+_METRIC_WINDOW_DAYS = 30
 
 
 class GovernedMemoryNotFound(Exception):
@@ -169,8 +181,17 @@ class GovernedMemoryService:
                     )
                 ).all()
             )
+            labels = await self._resource_labels(session, items)
+            authors = await self._author_names(session, {item.actor_user_id for item in items})
             return FeedbackList(
-                items=[self._feedback_response(item) for item in items],
+                items=[
+                    self._feedback_response(
+                        item,
+                        resource_label=labels.get(item.resource_id),
+                        actor_name=authors.get(item.actor_user_id),
+                    )
+                    for item in items
+                ],
                 total=int(await session.scalar(count) or 0),
             )
 
@@ -245,6 +266,7 @@ class GovernedMemoryService:
                 tenant_id=tenant_id,
                 candidate_id=candidate.id,
                 version=1,
+                created_by_user_id=actor_user_id,
                 title_es=payload.title_es,
                 title_en=payload.title_en,
                 statement_es=payload.statement_es,
@@ -349,6 +371,159 @@ class GovernedMemoryService:
                 raise GovernedMemoryNotFound("Memory candidate was not found")
             return await self._candidate_response(session, candidate)
 
+    async def create_version(
+        self,
+        *,
+        tenant_id: UUID,
+        actor_user_id: UUID,
+        candidate_id: UUID,
+        payload: MemoryVersionCreate,
+        correlation_id: UUID,
+    ) -> MemoryCandidateResponse:
+        """Correct a memory by writing a new version of it.
+
+        Nothing is edited. The previous version keeps its text, its reviews and
+        its state history exactly as they were, which is the whole reason this
+        module stores versions at all -- an approved statement that can be
+        rewritten in place is an approval of nothing.
+
+        A correction to a memory that is currently live supersedes it in the
+        same transaction. Leaving the old one active while its replacement
+        waits for review would mean the incident screen keeps showing advice
+        that somebody has already judged wrong.
+        """
+        settings = get_settings()
+        if payload.valid_until - payload.valid_from > timedelta(
+            days=settings.memory_max_validity_days
+        ):
+            raise GovernedMemoryConflict("Memory validity exceeds configured maximum")
+        if (
+            len(payload.conditions) > 20
+            or len(json.dumps(payload.conditions, ensure_ascii=False)) > 16_384
+        ):
+            raise GovernedMemoryConflict("Memory conditions exceed safe limits")
+        async with tenant_session(tenant_id) as session:
+            candidate = await session.scalar(
+                select(MemoryCandidateModel).where(MemoryCandidateModel.id == candidate_id)
+            )
+            if candidate is None:
+                raise GovernedMemoryNotFound("Memory candidate was not found")
+            previous = await session.scalar(
+                select(MemoryCandidateVersionModel)
+                .where(
+                    MemoryCandidateVersionModel.candidate_id == candidate.id,
+                    MemoryCandidateVersionModel.is_synthetic.is_(False),
+                )
+                .order_by(MemoryCandidateVersionModel.version.desc())
+                .limit(1)
+                .with_for_update()
+            )
+            if previous is None:
+                raise GovernedMemoryNotFound("Memory candidate version was not found")
+            previous_status = await self._current_status(session, previous.id)
+            if previous_status in {MemoryStatus.IN_REVIEW, MemoryStatus.APPROVED}:
+                # Correcting something mid-review would leave a reviewer
+                # judging text that no longer exists.
+                raise GovernedMemoryConflict("Finish the current review before correcting")
+
+            evidence = list(
+                (
+                    await session.scalars(
+                        select(FeedbackEntryModel).where(
+                            FeedbackEntryModel.id.in_(payload.evidence_refs),
+                            FeedbackEntryModel.is_synthetic.is_(False),
+                        )
+                    )
+                ).all()
+            )
+            if len({item.id for item in evidence}) != len(set(payload.evidence_refs)):
+                raise GovernedMemoryNotFound("Evidence was not found")
+            if candidate.kind == MemoryKind.TREND.value:
+                if len(evidence) < settings.memory_minimum_sample_size:
+                    raise GovernedMemoryConflict(
+                        "Trend requires the configured minimum of real feedback entries"
+                    )
+
+            version = MemoryCandidateVersionModel(
+                tenant_id=tenant_id,
+                candidate_id=candidate.id,
+                version=previous.version + 1,
+                created_by_user_id=actor_user_id,
+                title_es=payload.title_es,
+                title_en=payload.title_en,
+                statement_es=payload.statement_es,
+                statement_en=payload.statement_en,
+                conditions=payload.conditions,
+                evidence_refs=[str(item) for item in payload.evidence_refs],
+                is_synthetic=False,
+                valid_from=payload.valid_from,
+                valid_until=payload.valid_until,
+            )
+            session.add(version)
+            await session.flush()
+            await self._state(
+                session,
+                tenant_id,
+                version.id,
+                actor_user_id,
+                None,
+                MemoryStatus.DRAFT,
+                payload.reason,
+                correlation_id,
+            )
+            if previous_status is MemoryStatus.ACTIVE:
+                assert_transition(previous_status, MemoryStatus.SUPERSEDED)
+                await self._state(
+                    session,
+                    tenant_id,
+                    previous.id,
+                    actor_user_id,
+                    previous_status,
+                    MemoryStatus.SUPERSEDED,
+                    f"superseded_by_v{version.version}",
+                    correlation_id,
+                )
+                await self._event(
+                    session,
+                    tenant_id,
+                    correlation_id,
+                    "security.memory_version.superseded",
+                    previous.id,
+                    {
+                        "version_id": str(previous.id),
+                        "superseded_by_version_id": str(version.id),
+                    },
+                )
+            await self._record(
+                session,
+                tenant_id,
+                actor_user_id,
+                correlation_id,
+                "memory.version.corrected",
+                "memory_version",
+                version.id,
+                {
+                    "candidate_id": str(candidate.id),
+                    "version": version.version,
+                    "previous_version_id": str(previous.id),
+                    "previous_status": previous_status.value,
+                },
+            )
+            await self._event(
+                session,
+                tenant_id,
+                correlation_id,
+                "security.memory_candidate.proposed",
+                candidate.id,
+                {
+                    "candidate_id": str(candidate.id),
+                    "version_id": str(version.id),
+                    "kind": candidate.kind,
+                    "source_type": candidate.source_type,
+                },
+            )
+            return await self._candidate_response(session, candidate)
+
     async def request_review(
         self,
         *,
@@ -384,7 +559,9 @@ class GovernedMemoryService:
             current = await self._current_status(session, version.id)
             if current is not MemoryStatus.IN_REVIEW:
                 raise GovernedMemoryConflict("Memory version is not in review")
-            if candidate.created_by_user_id == actor_user_id:
+            # Read off the version, not the candidate: a correction is written
+            # by whoever corrects it, and they are the one who must not judge it.
+            if version.created_by_user_id == actor_user_id:
                 raise GovernedMemoryConflict("Memory author cannot review own version")
             existing = await session.scalar(
                 select(MemoryReviewModel).where(
@@ -458,7 +635,7 @@ class GovernedMemoryService:
                 return await self._candidate_response(session, candidate)
             if current is not MemoryStatus.APPROVED:
                 raise GovernedMemoryConflict("Memory version is not approved")
-            if actor_user_id == candidate.created_by_user_id:
+            if actor_user_id == version.created_by_user_id:
                 raise GovernedMemoryConflict("Memory author cannot activate own version")
             if version.is_synthetic or version.valid_until <= now:
                 raise GovernedMemoryConflict("Synthetic or expired memory cannot be activated")
@@ -630,6 +807,29 @@ class GovernedMemoryService:
         async with tenant_session(tenant_id) as session:
             for index, item in enumerate(matched_items):
                 explanation = f"OBSERVATIONAL_ONLY:{item.version_id}:v{item.version}"
+                key = f"{idempotency_key}:{index}"
+                matches.append(
+                    MemoryMatchResponse(
+                        version_id=item.version_id,
+                        version=item.version,
+                        title_es=item.title_es,
+                        title_en=item.title_en,
+                        statement_es=item.statement_es,
+                        statement_en=item.statement_en,
+                        valid_until=item.valid_until,
+                        matched=True,
+                        explanation=explanation,
+                    )
+                )
+                # The same consultation, repeated, is still one consultation.
+                # Opening an incident twice must not grow the influence ledger,
+                # or it stops being a record of where memory was used.
+                if await session.scalar(
+                    select(func.count(MemoryInfluenceModel.id)).where(
+                        MemoryInfluenceModel.idempotency_key == key
+                    )
+                ):
+                    continue
                 influence = MemoryInfluenceModel(
                     tenant_id=tenant_id,
                     version_id=item.version_id,
@@ -639,7 +839,7 @@ class GovernedMemoryService:
                     base_fingerprint=payload.base_fingerprint,
                     presented_fingerprint=presented,
                     explanation=explanation,
-                    idempotency_key=f"{idempotency_key}:{index}",
+                    idempotency_key=key,
                     correlation_id=correlation_id,
                     occurred_at=datetime.now(UTC),
                 )
@@ -674,16 +874,64 @@ class GovernedMemoryService:
                         "matched": True,
                     },
                 )
-                matches.append(
-                    MemoryMatchResponse(
-                        version_id=item.version_id, matched=True, explanation=explanation
-                    )
-                )
         return MemoryContextResponse(
             influence_enabled=True,
             base_fingerprint=payload.base_fingerprint,
             presented_fingerprint=presented,
             matches=matches,
+        )
+
+    async def incident_context(
+        self,
+        *,
+        tenant_id: UUID,
+        actor_user_id: UUID,
+        incident_id: UUID,
+        correlation_id: UUID,
+    ) -> MemoryContextResponse:
+        """Which active memories apply to this incident.
+
+        The context is built here rather than sent by the browser. A caller
+        that chooses its own facts chooses its own matches, and the fingerprint
+        is supposed to be evidence of what the incident actually was when the
+        memory was shown -- not of what a client said it was.
+
+        Observational only, and it says so: the matches are context a person
+        reads, and nothing in this path writes to the incident.
+        """
+        async with tenant_session(tenant_id) as session:
+            incident = await session.scalar(
+                select(IncidentModel).where(IncidentModel.id == incident_id)
+            )
+            if incident is None:
+                raise GovernedMemoryNotFound("Incident was not found")
+            context: dict[str, object] = {
+                "severity": incident.severity,
+                "classification": incident.classification,
+                "status": incident.status,
+            }
+            base = hashlib.sha256(
+                json.dumps(
+                    {"incident": str(incident_id), "context": context},
+                    sort_keys=True,
+                    separators=(",", ":"),
+                ).encode()
+            ).hexdigest()
+        return await self.evaluate_context(
+            tenant_id=tenant_id,
+            actor_user_id=actor_user_id,
+            payload=MemoryContextEvaluate(
+                consumer_type="INCIDENT_VIEW",
+                consumer_id=incident_id,
+                base_fingerprint=base,
+                context=context,
+            ),
+            # Deterministic: opening the same incident twice is one consultation
+            # of the same memory against the same facts, not two. Without this
+            # the influence ledger would grow with every page view and stop
+            # being readable as a record of where memory was actually used.
+            idempotency_key=f"incident-view:{incident_id}:{base[:16]}",
+            correlation_id=correlation_id,
         )
 
     async def list_metrics(self, tenant_id: UUID, *, limit: int, offset: int) -> MemoryMetricList:
@@ -720,6 +968,126 @@ class GovernedMemoryService:
                 ],
                 total=total,
             )
+
+    async def compute_metrics(self) -> int:
+        """Take one reproducible reading of the feedback ledger per tenant.
+
+        Snapshots rather than a query behind the screen: a metric read live
+        changes under the reader, so two people looking at the same number on
+        the same day can see different things and neither can say which was
+        right. A snapshot carries its window, its counts, its definition
+        version and a fingerprint of its inputs, so it can be recomputed and
+        disputed later.
+
+        Written once per definition per day. Re-running the scheduler minutes
+        later must not fill the table with near-identical rows.
+        """
+        async with SessionFactory() as discovery_session:
+            tenant_ids = [
+                UUID(str(row[0]))
+                for row in (await discovery_session.execute(text("SELECT id FROM tenants"))).all()
+            ]
+        written = 0
+        now = datetime.now(UTC)
+        for tenant_id in tenant_ids:
+            async with tenant_session(tenant_id) as session:
+                for code in MetricCode:
+                    definition = await self._metric_definition(session, tenant_id, code)
+                    window_start = now - timedelta(days=definition.window_days)
+                    outcomes = list(
+                        (
+                            await session.scalars(
+                                select(FeedbackEntryModel.outcome).where(
+                                    FeedbackEntryModel.is_synthetic.is_(False),
+                                    FeedbackEntryModel.occurred_at >= window_start,
+                                    FeedbackEntryModel.occurred_at <= now,
+                                )
+                            )
+                        ).all()
+                    )
+                    ratio = tally(outcomes, code, definition.minimum_sample_size)
+                    fingerprint = hashlib.sha256(
+                        json.dumps(
+                            {
+                                "definition": definition.definition_sha256,
+                                "window_days": definition.window_days,
+                                "outcomes": sorted(outcomes),
+                            },
+                            sort_keys=True,
+                            separators=(",", ":"),
+                        ).encode()
+                    ).hexdigest()
+                    already = await session.scalar(
+                        select(func.count(MemoryMetricSnapshotModel.id)).where(
+                            MemoryMetricSnapshotModel.definition_id == definition.id,
+                            MemoryMetricSnapshotModel.window_end >= now - timedelta(days=1),
+                        )
+                    )
+                    if already:
+                        continue
+                    session.add(
+                        MemoryMetricSnapshotModel(
+                            tenant_id=tenant_id,
+                            definition_id=definition.id,
+                            window_start=window_start,
+                            window_end=now,
+                            sample_size=ratio.denominator,
+                            numerator=ratio.numerator,
+                            denominator=ratio.denominator,
+                            value=ratio.value,
+                            sufficient_sample=ratio.sufficient_sample,
+                            input_fingerprint=fingerprint,
+                        )
+                    )
+                    await session.flush()
+                    written += 1
+        return written
+
+    async def _metric_definition(
+        self, session: AsyncSession, tenant_id: UUID, code: MetricCode
+    ) -> MemoryMetricDefinitionModel:
+        """The contract this metric was computed under, created on first use.
+
+        Seeded here rather than in a migration because the minimum sample size
+        follows configuration, and a tenant that changes it gets a new
+        definition version rather than a silently different meaning for the
+        same number.
+        """
+        settings = get_settings()
+        digest = hashlib.sha256(
+            json.dumps(
+                {
+                    "code": code.value,
+                    "version": DEFINITION_VERSION,
+                    "numerator": sorted(NUMERATOR[code]),
+                    "denominator": sorted(DENOMINATOR[code]),
+                    "window_days": _METRIC_WINDOW_DAYS,
+                    "minimum_sample_size": settings.memory_minimum_sample_size,
+                },
+                sort_keys=True,
+                separators=(",", ":"),
+            ).encode()
+        ).hexdigest()
+        definition = await session.scalar(
+            select(MemoryMetricDefinitionModel).where(
+                MemoryMetricDefinitionModel.code == code.value,
+                MemoryMetricDefinitionModel.version == DEFINITION_VERSION,
+            )
+        )
+        if definition is not None:
+            return definition
+        definition = MemoryMetricDefinitionModel(
+            tenant_id=tenant_id,
+            code=code.value,
+            version=DEFINITION_VERSION,
+            definition_sha256=digest,
+            window_days=_METRIC_WINDOW_DAYS,
+            minimum_sample_size=settings.memory_minimum_sample_size,
+            active=True,
+        )
+        session.add(definition)
+        await session.flush()
+        return definition
 
     async def expire_due(self, batch_size: int = 100) -> int:
         async with SessionFactory() as discovery_session, discovery_session.begin():
@@ -839,18 +1207,114 @@ class GovernedMemoryService:
             return await self._candidate_response(session, candidate)
 
     @staticmethod
-    def _feedback_response(item: FeedbackEntryModel) -> FeedbackResponse:
+    def _feedback_response(
+        item: FeedbackEntryModel,
+        *,
+        resource_label: str | None = None,
+        actor_name: str | None = None,
+    ) -> FeedbackResponse:
         return FeedbackResponse(
             id=item.id,
             resource_type=item.resource_type,
             resource_id=item.resource_id,
+            resource_label=resource_label,
             actor_user_id=item.actor_user_id,
+            actor_name=actor_name,
             outcome=item.outcome,
             reason=item.reason,
             is_synthetic=item.is_synthetic,
             occurred_at=item.occurred_at,
             created_at=item.created_at,
         )
+
+    @staticmethod
+    async def _author_names(session: AsyncSession, user_ids: set[UUID]) -> dict[UUID, str]:
+        if not user_ids:
+            return {}
+        rows = (
+            await session.execute(
+                select(UserModel.id, UserModel.display_name).where(UserModel.id.in_(user_ids))
+            )
+        ).all()
+        return {row[0]: row[1] for row in rows}
+
+    @staticmethod
+    async def _resource_labels(
+        session: AsyncSession, items: list[FeedbackEntryModel]
+    ) -> dict[UUID, str]:
+        """Name each resource the way its own module names it.
+
+        Resolved in one query per kind rather than one per row: a page of
+        feedback about twenty-five incidents should not cost twenty-five
+        round trips.
+        """
+        by_type: dict[str, set[UUID]] = {}
+        for item in items:
+            by_type.setdefault(item.resource_type, set()).add(item.resource_id)
+        labels: dict[UUID, str] = {}
+
+        if incident_ids := by_type.get("INCIDENT"):
+            rows = (
+                await session.execute(
+                    select(IncidentModel.id, IncidentModel.code, IncidentModel.title).where(
+                        IncidentModel.id.in_(incident_ids)
+                    )
+                )
+            ).all()
+            labels.update({row[0]: f"{row[1]} · {row[2]}" for row in rows})
+
+        if finding_ids := by_type.get("FINDING"):
+            rows = (
+                await session.execute(
+                    select(
+                        FindingRevisionModel.id,
+                        AlertReferenceModel.external_id,
+                        AlertReferenceModel.title,
+                    )
+                    .join(
+                        AlertReferenceModel,
+                        AlertReferenceModel.id == FindingRevisionModel.alert_reference_id,
+                    )
+                    .where(FindingRevisionModel.id.in_(finding_ids))
+                )
+            ).all()
+            labels.update({row[0]: f"{row[1]} · {row[2]}" for row in rows})
+
+        if claim_ids := by_type.get("CLAIM"):
+            claim_rows = (
+                await session.execute(
+                    select(ClaimModel.id, ClaimModel.statement).where(ClaimModel.id.in_(claim_ids))
+                )
+            ).all()
+            labels.update({row[0]: row[1][:120] for row in claim_rows})
+
+        # Proposals and executions are named by the action they carry; the
+        # incident they belong to is what makes them recognisable.
+        if proposal_ids := by_type.get("ACTION_PROPOSAL"):
+            rows = (
+                await session.execute(
+                    select(
+                        ActionProposalModel.id,
+                        ActionProposalModel.action_type,
+                        IncidentModel.code,
+                    )
+                    .join(IncidentModel, IncidentModel.id == ActionProposalModel.incident_id)
+                    .where(ActionProposalModel.id.in_(proposal_ids))
+                )
+            ).all()
+            labels.update({row[0]: f"{row[2]} · {row[1]}" for row in rows})
+
+        if execution_ids := by_type.get("PLAYBOOK_EXECUTION"):
+            execution_rows = (
+                await session.execute(
+                    select(PlaybookExecutionModel.id, IncidentModel.code)
+                    .join(IncidentModel, IncidentModel.id == PlaybookExecutionModel.incident_id)
+                    .where(PlaybookExecutionModel.id.in_(execution_ids))
+                )
+            ).all()
+            labels.update({row[0]: f"{row[1]} · playbook" for row in execution_rows})
+
+        return labels
 
     async def _candidate_response(
         self, session: AsyncSession, candidate: MemoryCandidateModel
@@ -886,6 +1350,9 @@ class GovernedMemoryService:
         )
         if not states:
             raise RuntimeError("Memory state history is missing")
+        authors = await self._author_names(
+            session, {candidate.created_by_user_id, version.created_by_user_id}
+        )
         return MemoryCandidateResponse(
             id=candidate.id,
             version_id=version.id,
@@ -893,6 +1360,8 @@ class GovernedMemoryService:
             kind=candidate.kind,
             source_type=candidate.source_type,
             created_by_user_id=candidate.created_by_user_id,
+            version_author_user_id=version.created_by_user_id,
+            version_author_name=authors.get(version.created_by_user_id),
             title_es=version.title_es,
             title_en=version.title_en,
             statement_es=version.statement_es,

@@ -15,6 +15,7 @@ from cyrvanta.modules.governed_memory.application.schemas import (
     MemoryMetricList,
     MemoryReason,
     MemoryReviewCreate,
+    MemoryVersionCreate,
 )
 from cyrvanta.modules.governed_memory.application.service import (
     GovernedMemoryConflict,
@@ -121,6 +122,38 @@ async def get_candidate(candidate_id: UUID, context: MemoryReader) -> MemoryCand
     try:
         return await GovernedMemoryService().get_candidate(context.tenant_id, candidate_id)
     except GovernedMemoryNotFound as exc:
+        raise translate(exc) from exc
+
+
+@router.post(
+    "/memory-candidates/{candidate_id}/versions",
+    response_model=MemoryCandidateResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_version(
+    candidate_id: UUID,
+    payload: MemoryVersionCreate,
+    request: Request,
+    context: MemoryProposer,
+    idempotency_key: IdempotencyKey,
+) -> MemoryCandidateResponse:
+    """Correct a memory by writing a new version of it.
+
+    Nothing is edited: the previous version keeps its text, its reviews and
+    its history. Without this the review cycle had no exit -- asking for
+    changes returned a candidate to draft where the only possible act was to
+    submit the identical text again.
+    """
+    del idempotency_key
+    try:
+        return await GovernedMemoryService().create_version(
+            tenant_id=context.tenant_id,
+            actor_user_id=context.user_id,
+            candidate_id=candidate_id,
+            payload=payload,
+            correlation_id=correlation_id(request),
+        )
+    except (GovernedMemoryConflict, GovernedMemoryNotFound, ValueError) as exc:
         raise translate(exc) from exc
 
 
@@ -231,6 +264,29 @@ async def evaluate_context(
         idempotency_key=idempotency_key,
         correlation_id=correlation_id(request),
     )
+
+
+@router.get("/incidents/{incident_id}/memory-context", response_model=MemoryContextResponse)
+async def incident_memory_context(
+    incident_id: UUID,
+    request: Request,
+    context: MemoryReader,
+) -> MemoryContextResponse:
+    """Active memories that apply to this incident, as context to read.
+
+    The facts it matches on are read from the incident here, not sent by the
+    caller: a client that chooses its own facts chooses its own matches, and
+    the fingerprint is meant to be evidence of what the case actually was.
+    """
+    try:
+        return await GovernedMemoryService().incident_context(
+            tenant_id=context.tenant_id,
+            actor_user_id=context.user_id,
+            incident_id=incident_id,
+            correlation_id=correlation_id(request),
+        )
+    except GovernedMemoryNotFound as exc:
+        raise translate(exc) from exc
 
 
 @router.get("/memory/metrics", response_model=MemoryMetricList)

@@ -70,6 +70,19 @@ async def run() -> None:
                 "governed_memory_expirations_materialized",
                 extra={"count": expired_memories},
             )
+        # One reading a day per definition, taken here rather than computed
+        # behind the screen: a metric read live changes under the reader, and
+        # two people looking at the same number can then see different things.
+        try:
+            metric_snapshots = await memory.compute_metrics()
+        except Exception:
+            logger.exception("governed_memory_metrics_cycle_failed")
+        else:
+            if metric_snapshots:
+                logger.info(
+                    "governed_memory_metrics_recorded",
+                    extra={"count": metric_snapshots},
+                )
         # Detection already happened seconds ago at the manager; this interval is
         # only how long a finding waits before Cyrvanta records it, so a minute
         # was a minute of blindness during an active intrusion. Fifteen seconds

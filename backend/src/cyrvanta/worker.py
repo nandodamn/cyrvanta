@@ -63,6 +63,7 @@ OBSERVED_EVENT_NAMES = frozenset(
         "security.memory_version.activated",
         "security.memory_version.disabled",
         "security.memory_version.expired",
+        "security.memory_version.superseded",
         "security.memory.influence_recorded",
         "security.playbook_version.validated",
         "security.playbook_version.published",

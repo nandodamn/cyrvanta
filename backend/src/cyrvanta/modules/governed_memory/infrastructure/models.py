@@ -44,6 +44,10 @@ class MemoryCandidateVersionModel(Base):
     tenant_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), ForeignKey("tenants.id"))
     candidate_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), nullable=False)
     version: Mapped[int] = mapped_column(Integer, nullable=False)
+    # Whose text this is. A correction is a new version and need not come from
+    # whoever proposed the first one, so the separation rules read the author
+    # here rather than off the candidate.
+    created_by_user_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), nullable=False)
     title_es: Mapped[str] = mapped_column(String(200), nullable=False)
     title_en: Mapped[str] = mapped_column(String(200), nullable=False)
     statement_es: Mapped[str] = mapped_column(Text, nullable=False)

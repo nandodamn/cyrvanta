@@ -2331,7 +2331,10 @@ function IncidentsPage() {
               <NavLink
                 to={`/incidents/${incident.id}`}
                 key={incident.id}
-                style={{ display: "flex", alignItems: "center", gap: "14px" }}
+                // The row layout is a class so the narrow breakpoint can stack
+                // it. Left inline, the flex row stayed a row on a phone and
+                // squeezed the title into a column a few characters wide.
+                className="incident-row"
               >
                 <span className={`severity ${incident.severity}`}>
                   {t(`severityCodes.${incident.severity}`, { defaultValue: incident.severity })}

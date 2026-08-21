@@ -66,11 +66,31 @@ describe("reflow", () => {
     expect(collapsed).toMatch(/@media \(min-width: 1921px\) \{[^}]*\.login-shell/);
   });
 
+  it("gives the moved row layouts enough weight to actually apply", () => {
+    // The inline styles these replaced won by being inline. As bare classes
+    // they lost to `.data-list article, .data-list a`, which is one point
+    // heavier, and both rows silently fell back to the generic four-column
+    // template -- the audit date wrapped to a second grid row, and the
+    // incident row stopped being flex. Scoping through .data-list restores
+    // the precedence the inline styles used to have.
+    const selectores = collapsed
+      .split("}")
+      .map((bloque) => bloque.split("{")[0])
+      .filter(Boolean);
+    for (const fila of [".audit-row", ".incident-row "]) {
+      const declarantes = selectores.filter((s) => s.includes(fila));
+      expect(declarantes.length).toBeGreaterThan(0);
+      for (const s of declarantes) {
+        expect(s).toContain(".data-list");
+      }
+    }
+  });
+
   it("lets rows wrap only on narrow screens", () => {
     // The wrap belongs to the 640px breakpoint: a desktop row stays on one
     // line, and the components set no inline flex-wrap for it to fight.
     const narrow = css.slice(css.indexOf("@media (max-width: 640px)"));
     expect(narrow).toContain("flex-wrap: wrap");
-    expect(narrow).toContain(".audit-row");
+    expect(narrow).toContain(".data-list .audit-row");
   });
 });

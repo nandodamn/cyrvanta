@@ -1209,7 +1209,20 @@ details > .admin-list {
   text-overflow: ellipsis;
 }
 
-.audit-row {
+/* Scoped through .data-list for the same reason as the audit row: the generic
+   `.data-list a` template outranks a bare class, so this row would silently
+   become the four-column grid instead of the flex it was drawn as. */
+.data-list .incident-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+/* Scoped through .data-list so it outranks the generic `.data-list article`
+   row template. As a bare `.audit-row` it lost, and the five columns became
+   the generic four with the date pushed onto a second line -- which is what
+   the inline style it replaced had been quietly winning against. */
+.data-list .audit-row {
   display: grid;
   grid-template-columns: 100px 1.5fr 1.2fr 1fr 160px;
   align-items: center;
@@ -1802,8 +1815,19 @@ details > .admin-list {
   /* Five columns of audit metadata do not fit across a phone; stacked, every
      field stays readable and the row still reads top to bottom in the order a
      reader expects. */
-  .audit-row {
-    grid-template-columns: 1fr;
+  .data-list .audit-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 6px;
+  }
+
+  /* Stacked, not wrapped. Wrapping kept the severity chip, the date and the
+     status on the same line as the title and left the title a column a few
+     characters wide -- a long code broke one letter per line. Each field now
+     gets the full width in the order it is read. */
+  .data-list .incident-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
     gap: 6px;
   }
 

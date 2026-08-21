@@ -110,7 +110,6 @@ describe("governed memory", () => {
   it("shows provenance and the immutable state history", async () => {
     show(["memory.read"]);
     expect(await screen.findByText("Patrón de laboratorio")).toBeVisible();
-    expect(screen.getByText(/nada se activa solo/i)).toBeVisible();
     expect(screen.getByText(/candidate_created/)).toBeInTheDocument();
   });
 

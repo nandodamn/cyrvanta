@@ -625,9 +625,7 @@ export function GovernedMemoryPage({
     <>
       <div className="page-title memory-title">
         <div>
-          <p className="eyebrow">{t("memory.observationalOnly")}</p>
           <h1>{t("memory.title")}</h1>
-          <p className="muted">{t("memory.intro")}</p>
         </div>
         <nav aria-label={t("memory.tabsLabel")} className="memory-tabs">
           {(["base", "capture", "governance"] as const).map((name) => (

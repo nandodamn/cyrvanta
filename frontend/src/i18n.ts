@@ -134,8 +134,6 @@ const resources = {
       memory: {
         navigation: "Memoria gobernada",
         title: "Lecciones aprendidas",
-        intro:
-          "Lo que el equipo aprende de los casos, para que aparezca cuando vuelva a pasar. Nada se activa solo: una persona aprueba cada lección y otra la activa.",
         candidates: "Lecciones",
         active: "En uso",
         metrics: "Métricas reproducibles",
@@ -180,7 +178,6 @@ const resources = {
         sampleSize: "Muestra: {{count}} casos",
         sufficient: "Muestra suficiente",
         insufficient: "Muestra insuficiente",
-        observationalOnly: "Operaciones de seguridad",
         tabsLabel: "Secciones de memoria gobernada",
         tab: {
           base: "Lecciones",
@@ -1017,8 +1014,6 @@ const resources = {
       memory: {
         navigation: "Governed memory",
         title: "Lessons learned",
-        intro:
-          "What the team learns from cases, so it shows up when it happens again. Nothing activates on its own: one person approves each lesson and another activates it.",
         candidates: "Lessons",
         active: "In use",
         metrics: "Reproducible metrics",
@@ -1063,7 +1058,6 @@ const resources = {
         sampleSize: "Sample: {{count}} cases",
         sufficient: "Sufficient sample",
         insufficient: "Insufficient sample",
-        observationalOnly: "Security operations",
         tabsLabel: "Governed memory sections",
         tab: {
           base: "Lessons",

@@ -1175,7 +1175,7 @@ function IncidentMemory({ incidentId }: { incidentId: string }) {
   return (
     <section className="panel">
       <div>
-        <p className="eyebrow">{t("memory.observationalOnly")}</p>
+        <p className="eyebrow">{t("securityOperations")}</p>
         <h2>{t("memory.incidentPanel")}</h2>
         <p>{t("memory.incidentPanelIntro")}</p>
       </div>

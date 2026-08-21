@@ -1240,6 +1240,40 @@ details > .admin-list {
   border-bottom: 1px solid var(--line);
 }
 
+/* Order and severity, above the alert list. Both halves are flex items, and
+   a flex item shrinks below its content by default -- which is how "Ordenar
+   por" ended up broken across two lines while the bar itself still had room.
+   The label keeps its width and the severity half wraps to the next line
+   instead, which is the half that has somewhere to go. */
+.filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem;
+  padding: 0 0 0.75rem;
+}
+
+.filter-bar > label {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+  gap: 6px;
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+
+.filter-bar > label select {
+  padding: 4px 8px;
+}
+
+.filter-bar-severity {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+}
+
 .list-controls label {
   display: flex;
   align-items: center;

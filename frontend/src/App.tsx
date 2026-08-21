@@ -1891,16 +1891,8 @@ function AlertsPage() {
         />
         {/* Newest-first buries a critical alert under routine volume, so the
             order is selectable and severity can be narrowed. */}
-        <div
-          style={{
-            display: "flex",
-            flexWrap: "wrap",
-            gap: "1rem",
-            alignItems: "center",
-            padding: "0 0 0.75rem",
-          }}
-        >
-          <label style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "0.85rem" }}>
+        <div className="filter-bar">
+          <label>
             {t("alertSort.label")}
             <select
               value={alertSort}
@@ -1908,14 +1900,13 @@ function AlertsPage() {
                 setAlertSort(event.target.value as AlertSort);
                 controls.setPage(0);
               }}
-              style={{ padding: "4px 8px" }}
             >
               <option value="recent">{t("alertSort.recent")}</option>
               <option value="severity">{t("alertSort.severity")}</option>
             </select>
           </label>
-          <span style={{ display: "flex", flexWrap: "wrap", gap: "8px", alignItems: "center" }}>
-            <span style={{ fontSize: "0.85rem" }}>{t("alertSeverityFilter")}</span>
+          <span className="filter-bar-severity">
+            <span>{t("alertSeverityFilter")}</span>
             {(["critical", "high", "medium", "low", "informational"] as AlertSeverity[]).map(
               (level) => {
                 const active = alertSeverity.includes(level);

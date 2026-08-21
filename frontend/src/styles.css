@@ -946,7 +946,7 @@ details > .admin-list {
   gap: 12px;
   padding: 14px;
   margin: 4px 0 14px;
-  border: 1px solid var(--panel-border);
+  border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--panel-raised);
   animation: admin-inline-form-in 0.15s ease;
@@ -1490,7 +1490,7 @@ details > .admin-list {
   padding: 5px 8px;
   border: 1px solid var(--line);
   border-radius: 6px;
-  color: var(--text-muted);
+  color: var(--muted);
   font-size: 12px;
 }
 
@@ -1899,7 +1899,7 @@ details > .admin-list {
   flex-direction: column;
   gap: 6px;
   background: var(--panel);
-  border: 1px solid var(--panel-border);
+  border: 1px solid var(--line);
   border-radius: 8px;
   padding: 10px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
@@ -2626,9 +2626,9 @@ details > .admin-list {
   white-space: nowrap;
   margin-left: 8px;
   padding: 1px 6px;
-  border: 1px solid color-mix(in srgb, var(--warning, #e0a458) 60%, var(--line));
+  border: 1px solid color-mix(in srgb, var(--warning) 60%, var(--line));
   border-radius: 999px;
-  color: var(--warning, #e0a458);
+  color: var(--warning);
   font:
     700 9px "Space Mono",
     monospace;
@@ -2715,20 +2715,20 @@ details > .admin-list {
 }
 
 .readiness-list .is-done {
-  color: var(--text-muted, #94a3b8);
+  color: var(--muted);
 }
 
 .readiness-list .is-done span:first-child {
-  color: #22c55e;
+  color: var(--success);
 }
 
 .readiness-list .is-pending span:first-child {
-  color: #f59e0b;
+  color: var(--warning);
 }
 
 .readiness-ready {
   margin: 0.75rem 0 0;
-  color: #22c55e;
+  color: var(--success);
   font-size: 0.9rem;
 }
 
@@ -2741,7 +2741,7 @@ details > .admin-list {
 }
 
 .technical-file-entries li {
-  border-left: 2px solid var(--border, #1f2937);
+  border-left: 2px solid var(--line);
   padding-left: 0.75rem;
 }
 
@@ -2767,7 +2767,7 @@ details > .admin-list {
 .collaborator-meta {
   display: block;
   font-size: 0.82rem;
-  color: var(--text-muted, #94a3b8);
+  color: var(--muted);
 }
 
 .collaborator-reason {
@@ -2778,8 +2778,8 @@ details > .admin-list {
 /* A review is a decision about someone else's work, so the screen says whose
    before offering the buttons that accept or refuse it. */
 .review-banner {
-  border: 1px solid var(--border, #1f2937);
-  border-left: 3px solid #f59e0b;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--warning);
   border-radius: 6px;
   padding: 0.85rem 1rem;
   margin-bottom: 1rem;
@@ -2799,7 +2799,7 @@ details > .admin-list {
 }
 
 .review-guidance {
-  color: var(--text-muted, #94a3b8);
+  color: var(--muted);
 }
 
 /* The account button and its menu.
@@ -2816,7 +2816,7 @@ details > .admin-list {
   align-items: center;
   gap: 0.55rem;
   padding: 0.3rem 0.65rem 0.3rem 0.3rem;
-  border: 1px solid var(--border, #1f2937);
+  border: 1px solid var(--line);
   border-radius: 999px;
   background: transparent;
   color: inherit;
@@ -2836,7 +2836,9 @@ details > .admin-list {
   height: 28px;
   border-radius: 50%;
   background: var(--accent);
-  color: #06121f;
+  /* The palette's own ink for text on the accent, so the initials stay
+     readable when the light theme flips the accent to a dark teal. */
+  color: var(--accent-ink);
   font:
     700 11px "Space Mono",
     monospace;
@@ -2860,10 +2862,16 @@ details > .admin-list {
   z-index: 40;
   min-width: 240px;
   padding: 0.85rem;
-  border: 1px solid var(--border, #1f2937);
+  /* Raised, not merely bordered. It was painted in --surface, the same tone
+     as the sidebar it hangs off, so in the dark theme the two dissolved into
+     one another and only the border said where the panel began. A floating
+     layer has to read as being above the thing it covers: a lighter step in
+     the palette, the stronger rule, and a shadow deep enough to separate two
+     dark greys. */
+  border: 1px solid var(--line-strong);
   border-radius: 10px;
-  background: var(--surface, #0b1622);
-  box-shadow: 0 12px 32px rgb(0 0 0 / 35%);
+  background: var(--panel-raised);
+  box-shadow: var(--shadow);
   display: grid;
   gap: 0.75rem;
 }
@@ -2908,7 +2916,7 @@ details > .admin-list {
 .account-no-role {
   margin: 0;
   font-size: 0.88rem;
-  color: var(--warning, #e0a458);
+  color: var(--warning);
 }
 
 .account-row {
@@ -2958,11 +2966,13 @@ details > .admin-list {
 }
 
 /* The selected one is boxed rather than merely brighter: on a row of three
-   small glyphs, a colour difference alone is easy to misread. */
+   small glyphs, a colour difference alone is easy to misread. Set into the
+   panel rather than raised off it, so it reads as the one currently held
+   down. */
 .theme-choice button.is-selected {
-  background: var(--panel);
-  box-shadow: inset 0 0 0 1px var(--line);
-  color: var(--text);
+  background: var(--surface);
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+  color: var(--accent);
 }
 
 /* Last, and on its own: leaving is not one of the settings above it. */

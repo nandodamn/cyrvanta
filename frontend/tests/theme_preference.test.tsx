@@ -24,8 +24,12 @@ function systemPrefersLight(initial: boolean) {
       return matches;
     },
     onchange: null,
-    addEventListener: (_: string, listener: () => void) => listeners.add(listener),
-    removeEventListener: (_: string, listener: () => void) => listeners.delete(listener),
+    addEventListener: (_type: string, listener: EventListenerOrEventListenerObject) => {
+      listeners.add(listener as () => void);
+    },
+    removeEventListener: (_type: string, listener: EventListenerOrEventListenerObject) => {
+      listeners.delete(listener as () => void);
+    },
     addListener: () => {},
     removeListener: () => {},
     dispatchEvent: () => false,

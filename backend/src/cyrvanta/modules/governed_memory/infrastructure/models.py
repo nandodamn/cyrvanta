@@ -32,7 +32,10 @@ class MemoryCandidateModel(Base):
     tenant_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), ForeignKey("tenants.id"))
     kind: Mapped[str] = mapped_column(String(24), nullable=False)
     source_type: Mapped[str] = mapped_column(String(24), nullable=False)
-    created_by_user_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), nullable=False)
+    # Null when the AI proposed it. Naming a service user instead would put a
+    # non-person in the directory, assignable to roles and appearing as an
+    # actor in audit records.
+    created_by_user_id: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True))
     idempotency_key: Mapped[str] = mapped_column(String(200), nullable=False)
     correlation_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
@@ -46,8 +49,9 @@ class MemoryCandidateVersionModel(Base):
     version: Mapped[int] = mapped_column(Integer, nullable=False)
     # Whose text this is. A correction is a new version and need not come from
     # whoever proposed the first one, so the separation rules read the author
-    # here rather than off the candidate.
-    created_by_user_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), nullable=False)
+    # here rather than off the candidate. Null when the AI drafted it: there is
+    # no human to exclude, so any analyst may review it.
+    created_by_user_id: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True))
     title_es: Mapped[str] = mapped_column(String(200), nullable=False)
     title_en: Mapped[str] = mapped_column(String(200), nullable=False)
     statement_es: Mapped[str] = mapped_column(Text, nullable=False)

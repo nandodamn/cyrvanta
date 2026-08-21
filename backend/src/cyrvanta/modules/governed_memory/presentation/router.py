@@ -12,6 +12,7 @@ from cyrvanta.modules.governed_memory.application.schemas import (
     MemoryCandidateResponse,
     MemoryContextEvaluate,
     MemoryContextResponse,
+    MemoryInfluenceStatus,
     MemoryMetricList,
     MemoryReason,
     MemoryReviewCreate,
@@ -22,6 +23,7 @@ from cyrvanta.modules.governed_memory.application.service import (
     GovernedMemoryNotFound,
     GovernedMemoryService,
 )
+from cyrvanta.shared.config import get_settings
 from cyrvanta.shared.dependencies import SecurityContext, require_permission
 
 router = APIRouter(tags=["governed-memory"])
@@ -239,6 +241,20 @@ async def disable(
         )
     except (GovernedMemoryConflict, GovernedMemoryNotFound, ValueError) as exc:
         raise translate(exc) from exc
+
+
+@router.get("/memory/influence", response_model=MemoryInfluenceStatus)
+async def influence_status(context: MemoryReader) -> MemoryInfluenceStatus:
+    """Whether this installation consults memory at all.
+
+    The screen used to state the product's default instead of this
+    installation's setting, which reads as a claim about the system in front of
+    you. On a deployment that had turned influence on, the banner said it was
+    off -- the one kind of inaccuracy this module cannot afford, since its
+    entire promise is that you can tell what the software is doing.
+    """
+    del context
+    return MemoryInfluenceStatus(enabled=get_settings().memory_influence_enabled)
 
 
 @router.get("/memory/active", response_model=MemoryCandidateList)

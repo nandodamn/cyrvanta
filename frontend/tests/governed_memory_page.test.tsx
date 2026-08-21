@@ -92,6 +92,7 @@ function show(permissions: string[], overrides: Partial<api.MemoryCandidate> = {
   vi.spyOn(api, "getFeedback").mockResolvedValue([entry()]);
   vi.spyOn(api, "getIncidents").mockResolvedValue([incident]);
   vi.spyOn(api, "getAlerts").mockResolvedValue([]);
+  vi.spyOn(api, "getMemoryInfluenceEnabled").mockResolvedValue(true);
   render(
     <QueryClientProvider client={new QueryClient()}>
       <GovernedMemoryPage permissions={new Set(permissions)} />
@@ -167,6 +168,33 @@ describe("governed memory", () => {
     expect(await screen.findAllByText("INC-AF8E3CD4 · Acceso anómalo")).toHaveLength(3);
     expect(screen.getByRole("checkbox")).toBeInTheDocument();
     expect(screen.queryByText(/separados por coma/i)).not.toBeInTheDocument();
+  });
+
+  it("reports this installation's setting, not the product's default", async () => {
+    // The banner said "disabled by default" on a deployment that had turned
+    // influence on -- a claim about the product where a reader sees a claim
+    // about the system in front of them.
+    show(["memory.read"]);
+    expect(await screen.findByText(/influencia activa en esta instalación/i)).toBeVisible();
+  });
+
+  it("marks a memory the AI drafted, and says it has no human author", async () => {
+    // A reviewer reads a drafted sentence differently knowing a machine wrote
+    // it, and they are entitled to know before they approve it.
+    show(["memory.read"], { source_type: "AI_SUGGESTED", version_author_name: null });
+    expect(await screen.findByText(/redactada por la ia/i)).toBeVisible();
+    expect(screen.getByText(/sin autor humano/i)).toBeVisible();
+  });
+
+  it("gives an AI suggestion no shortcut through review", async () => {
+    // It enters the same queue as one a person wrote: still a draft, still
+    // needing someone to send it to review.
+    show(["memory.read", "memory.propose"], {
+      source_type: "AI_SUGGESTED",
+      version_author_name: null,
+    });
+    expect(await screen.findByRole("button", { name: /solicitar revisión/i })).toBeVisible();
+    expect(screen.queryByRole("button", { name: /^activar$/i })).not.toBeInTheDocument();
   });
 
   it("does not offer forms a role cannot submit", async () => {

@@ -58,6 +58,7 @@ OBSERVED_EVENT_NAMES = frozenset(
         "security.authorization.expired",
         "security.feedback.recorded",
         "security.memory_candidate.proposed",
+        "security.memory_candidate.suggested",
         "security.memory_candidate.review_requested",
         "security.memory_candidate.reviewed",
         "security.memory_version.activated",

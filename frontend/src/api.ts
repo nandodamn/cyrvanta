@@ -1375,6 +1375,11 @@ export const FEEDBACK_OUTCOMES = [
 ] as const;
 export type FeedbackOutcome = (typeof FEEDBACK_OUTCOMES)[number];
 
+export async function getMemoryInfluenceEnabled(): Promise<boolean> {
+  return z.object({ enabled: z.boolean() }).parse(await authorized("/api/v1/memory/influence"))
+    .enabled;
+}
+
 export async function getFeedback(): Promise<FeedbackEntry[]> {
   return feedbackListSchema.parse(await authorized("/api/v1/feedback?limit=100&offset=0")).items;
 }

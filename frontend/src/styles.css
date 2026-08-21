@@ -3339,3 +3339,29 @@ details > .admin-list {
 .small {
   font-size: 0.85rem;
 }
+
+/* The kill switch, reported as the state of this installation rather than as
+   the product's default. Muted when off; it is a fact, not a warning. */
+.memory-flag {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 8px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+.memory-flag.is-on {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* A reviewer reads a drafted sentence differently knowing a machine wrote it,
+   so the label sits with the title rather than in the details below. */
+.memory-suggested {
+  margin: 4px 0 0;
+  color: var(--cyan);
+  font-size: 0.75rem;
+}

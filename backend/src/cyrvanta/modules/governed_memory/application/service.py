@@ -36,10 +36,12 @@ from cyrvanta.modules.governed_memory.domain.metrics import (
 )
 from cyrvanta.modules.governed_memory.domain.models import (
     MemoryKind,
+    MemorySourceType,
     MemoryStatus,
     assert_transition,
     review_target,
 )
+from cyrvanta.modules.governed_memory.domain.suggestions import FeedbackFact, find_patterns
 from cyrvanta.modules.governed_memory.infrastructure.models import (
     FeedbackEntryModel,
     MemoryCandidateModel,
@@ -49,6 +51,9 @@ from cyrvanta.modules.governed_memory.infrastructure.models import (
     MemoryMetricSnapshotModel,
     MemoryReviewModel,
     MemoryStateEventModel,
+)
+from cyrvanta.modules.governed_memory.infrastructure.ollama_suggestions import (
+    OllamaSuggestionWriter,
 )
 from cyrvanta.modules.identity.infrastructure.models import AuditEventModel, UserModel
 from cyrvanta.modules.incident.infrastructure.models import (
@@ -973,6 +978,144 @@ class GovernedMemoryService:
                 total=total,
             )
 
+    async def suggest_candidates(self) -> int:
+        """Draft a memory for a pattern the feedback ledger is showing.
+
+        The SOC records outcomes case by case and nobody reads a hundred of
+        them looking for a shape. This finds the shape and writes it down as a
+        draft -- which is the whole of what automation is permitted to do here.
+
+        It proposes; it never approves, never activates, and gains nothing by
+        having been written by a machine. The suggestion enters the same queue
+        as one a person wrote, needs the same human review and the same
+        separate activation, and carries no author, because it has none.
+
+        What to propose is decided by counting, not by asking a model what
+        looks interesting. A system that could not say why it proposed
+        something would be the thing this module exists to avoid.
+        """
+        settings = get_settings()
+        writer = OllamaSuggestionWriter(settings)
+        async with SessionFactory() as discovery_session:
+            tenant_ids = [
+                UUID(str(row[0]))
+                for row in (await discovery_session.execute(text("SELECT id FROM tenants"))).all()
+            ]
+        proposed = 0
+        for tenant_id in tenant_ids:
+            async with tenant_session(tenant_id) as session:
+                window_start = datetime.now(UTC) - timedelta(days=_METRIC_WINDOW_DAYS)
+                rows = (
+                    await session.execute(
+                        select(
+                            FeedbackEntryModel.id,
+                            FeedbackEntryModel.outcome,
+                            IncidentModel.classification,
+                        )
+                        .join(IncidentModel, IncidentModel.id == FeedbackEntryModel.resource_id)
+                        .where(
+                            FeedbackEntryModel.resource_type == "INCIDENT",
+                            FeedbackEntryModel.is_synthetic.is_(False),
+                            FeedbackEntryModel.occurred_at >= window_start,
+                            IncidentModel.is_simulated.is_(False),
+                        )
+                    )
+                ).all()
+                facts = [
+                    FeedbackFact(feedback_id=row[0], outcome=row[1], classification=row[2] or "")
+                    for row in rows
+                ]
+                for pattern in find_patterns(facts):
+                    # The pattern identifies itself, so a sweep that sees the
+                    # same shape again recognises the suggestion it already
+                    # made rather than proposing it every cycle.
+                    if await session.scalar(
+                        select(func.count(MemoryCandidateModel.id)).where(
+                            MemoryCandidateModel.idempotency_key == pattern.signature
+                        )
+                    ):
+                        continue
+                    (title_es, title_en, statement_es, statement_en), model = await writer.word(
+                        pattern
+                    )
+                    correlation_id = uuid4()
+                    proposed_at = datetime.now(UTC)
+                    candidate = MemoryCandidateModel(
+                        tenant_id=tenant_id,
+                        kind=MemoryKind.CASE_NOTE.value,
+                        source_type=MemorySourceType.AI_SUGGESTED.value,
+                        created_by_user_id=None,
+                        idempotency_key=pattern.signature,
+                        correlation_id=correlation_id,
+                    )
+                    session.add(candidate)
+                    await session.flush()
+                    version = MemoryCandidateVersionModel(
+                        tenant_id=tenant_id,
+                        candidate_id=candidate.id,
+                        version=1,
+                        created_by_user_id=None,
+                        title_es=title_es,
+                        title_en=title_en,
+                        statement_es=statement_es,
+                        statement_en=statement_en,
+                        # The pattern's own terms, so the draft applies exactly
+                        # where its evidence came from and not everywhere.
+                        conditions={"classification": pattern.classification},
+                        evidence_refs=[str(item) for item in pattern.evidence],
+                        is_synthetic=False,
+                        # One reading of the clock. Two would make the window
+                        # the microseconds between them longer than the maximum
+                        # the schema allows, and the insert would be refused at
+                        # exactly the configured limit.
+                        valid_from=proposed_at,
+                        valid_until=proposed_at + timedelta(days=settings.memory_max_validity_days),
+                    )
+                    session.add(version)
+                    await session.flush()
+                    await self._state(
+                        session,
+                        tenant_id,
+                        version.id,
+                        None,
+                        None,
+                        MemoryStatus.DRAFT,
+                        f"ai_suggested_from_{len(pattern.evidence)}_cases",
+                        correlation_id,
+                    )
+                    await self._record(
+                        session,
+                        tenant_id,
+                        None,
+                        correlation_id,
+                        "memory.candidate.suggested",
+                        "memory_candidate",
+                        candidate.id,
+                        {
+                            "version_id": str(version.id),
+                            "pattern": pattern.signature,
+                            "case_count": len(pattern.evidence),
+                            # Which sentences a machine wrote, and which model.
+                            # Null means the deterministic wording was used.
+                            "model": model,
+                        },
+                    )
+                    await self._event(
+                        session,
+                        tenant_id,
+                        correlation_id,
+                        "security.memory_candidate.suggested",
+                        candidate.id,
+                        {
+                            "candidate_id": str(candidate.id),
+                            "version_id": str(version.id),
+                            "source_type": candidate.source_type,
+                            "case_count": len(pattern.evidence),
+                        },
+                    )
+                    proposed += 1
+        return proposed
+
     async def compute_metrics(self) -> int:
         """Take one reproducible reading of the feedback ledger per tenant.
 
@@ -1362,8 +1505,15 @@ class GovernedMemoryService:
         )
         if not states:
             raise RuntimeError("Memory state history is missing")
+        # An AI-suggested memory has no author, so there is no name to resolve
+        # and none to invent.
         authors = await self._author_names(
-            session, {candidate.created_by_user_id, version.created_by_user_id}
+            session,
+            {
+                value
+                for value in (candidate.created_by_user_id, version.created_by_user_id)
+                if value is not None
+            },
         )
         return MemoryCandidateResponse(
             id=candidate.id,
@@ -1373,7 +1523,9 @@ class GovernedMemoryService:
             source_type=candidate.source_type,
             created_by_user_id=candidate.created_by_user_id,
             version_author_user_id=version.created_by_user_id,
-            version_author_name=authors.get(version.created_by_user_id),
+            version_author_name=(
+                authors.get(version.created_by_user_id) if version.created_by_user_id else None
+            ),
             title_es=version.title_es,
             title_en=version.title_en,
             statement_es=version.statement_es,

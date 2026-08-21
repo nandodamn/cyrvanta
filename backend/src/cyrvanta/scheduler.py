@@ -83,6 +83,16 @@ async def run() -> None:
                     "governed_memory_metrics_recorded",
                     extra={"count": metric_snapshots},
                 )
+        # Reads the feedback ledger for patterns worth writing down and leaves
+        # them as drafts. It proposes and nothing more: every suggestion still
+        # needs a person to review it and a second to activate it.
+        try:
+            suggested = await memory.suggest_candidates()
+        except Exception:
+            logger.exception("governed_memory_suggestion_cycle_failed")
+        else:
+            if suggested:
+                logger.info("governed_memory_candidates_suggested", extra={"count": suggested})
         # Detection already happened seconds ago at the manager; this interval is
         # only how long a finding waits before Cyrvanta records it, so a minute
         # was a minute of blindness during an active intrusion. Fifteen seconds

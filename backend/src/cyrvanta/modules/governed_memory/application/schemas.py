@@ -185,11 +185,13 @@ class MemoryCandidateResponse(BaseModel):
     version: int
     kind: str
     source_type: str
-    created_by_user_id: UUID
+    # Null when the AI drafted it: there is no human author, which is why any
+    # analyst may review it.
+    created_by_user_id: UUID | None = None
     # The author of *this* version, which after a correction is not always the
     # author of the candidate. It is what the separation rules read, so it is
     # what the screen has to show.
-    version_author_user_id: UUID
+    version_author_user_id: UUID | None = None
     version_author_name: str | None = None
     title_es: str
     title_en: str
@@ -230,6 +232,12 @@ class MemoryMatchResponse(BaseModel):
     valid_until: datetime
     matched: bool
     explanation: str
+
+
+class MemoryInfluenceStatus(BaseModel):
+    """Whether this installation consults memory, not what the default is."""
+
+    enabled: bool
 
 
 class MemoryContextResponse(BaseModel):

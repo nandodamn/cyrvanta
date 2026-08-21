@@ -11,6 +11,7 @@ import {
   getFeedback,
   getIncidents,
   getMemoryCandidates,
+  getMemoryInfluenceEnabled,
   getMemoryMetrics,
   reviewMemoryVersion,
   transitionMemoryVersion,
@@ -277,6 +278,11 @@ function MemoryCard({
             {t(`memory.kinds.${item.kind}`)} · v{item.version}
           </p>
           <h3>{title}</h3>
+          {item.source_type === "AI_SUGGESTED" && (
+            // Marked, always. A reviewer reads a drafted sentence differently
+            // knowing a machine wrote it, and they are entitled to know.
+            <p className="memory-suggested">{t("memory.suggestedByAi")}</p>
+          )}
         </div>
         <span className={`memory-state is-${item.status.toLowerCase()}`}>
           {t(`memory.states.${item.status}`)}
@@ -299,7 +305,7 @@ function MemoryCard({
         <div>
           <dt>{t("memory.validity")}</dt>
           <dd>
-            {new Date(item.valid_from).toLocaleDateString(i18n.language)} â€“{" "}
+            {new Date(item.valid_from).toLocaleDateString(i18n.language)} –{" "}
             {new Date(item.valid_until).toLocaleDateString(i18n.language)}
           </dd>
         </div>
@@ -309,7 +315,15 @@ function MemoryCard({
         </div>
         <div>
           <dt>{t("memory.versionAuthor")}</dt>
-          <dd>{item.version_author_name ?? t("unassigned")}</dd>
+          {/* No author means the AI drafted it, which is why any analyst may
+              review it -- there is nobody to exclude. Said in words rather
+              than shown as a blank. */}
+          <dd>
+            {item.version_author_name ??
+              (item.source_type === "AI_SUGGESTED"
+                ? t("memory.authoredByMachine")
+                : t("unassigned"))}
+          </dd>
         </div>
       </dl>
 
@@ -513,6 +527,11 @@ export function GovernedMemoryPage({
   const candidates = useQuery({ queryKey: ["memory-candidates"], queryFn: getMemoryCandidates });
   const active = useQuery({ queryKey: ["memory-active"], queryFn: getActiveMemory });
   const entries = useQuery({ queryKey: ["feedback"], queryFn: getFeedback });
+  const influence = useQuery({
+    queryKey: ["memory-influence"],
+    queryFn: getMemoryInfluenceEnabled,
+    retry: false,
+  });
   // The tenant's own incidents and alerts, so feedback is recorded against
   // something the analyst recognises rather than an identifier they cannot get.
   const incidents = useQuery({
@@ -628,7 +647,16 @@ export function GovernedMemoryPage({
 
       <div className="panel memory-boundary">
         <div>
+          {/* What the software does, then what this installation is set to.
+              These used to be one sentence, so a deployment that had turned
+              influence on still read "disabled by default" -- a claim about
+              the product where a reader sees a claim about their system. */}
           <strong>{t("memory.safetyTitle")}</strong>: {t("memory.safetyBody")}
+          {influence.data !== undefined && (
+            <span className={influence.data ? "memory-flag is-on" : "memory-flag"}>
+              {influence.data ? t("memory.influenceOn") : t("memory.influenceOff")}
+            </span>
+          )}
         </div>
         <div className="memory-counts">
           <span>

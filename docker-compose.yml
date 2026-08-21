@@ -83,7 +83,13 @@ services:
       start_period: 20s
     depends_on:
       backend: { condition: service_healthy }
-    networks: [internal]
+    # host-access as well as internal: the worker redacts threat explanations
+    # through Ollama, which runs on the host. It declared the host-gateway
+    # alias but sat only on the internal network, which has no route off the
+    # bridge -- so the name resolved, the connection failed, and every
+    # explanation quietly fell back to the deterministic text. Silently, since
+    # falling back is the correct behaviour when the model is unreachable.
+    networks: [internal, host-access]
     extra_hosts: ["host.docker.internal:host-gateway"]
     restart: unless-stopped
 
@@ -106,7 +112,9 @@ services:
       start_period: 20s
     depends_on:
       backend: { condition: service_healthy }
-    networks: [internal]
+    # Same reason as the worker: the scheduler drafts memory suggestions
+    # through Ollama on the host.
+    networks: [internal, host-access]
     extra_hosts: ["host.docker.internal:host-gateway"]
     restart: unless-stopped
 

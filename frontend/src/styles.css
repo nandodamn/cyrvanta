@@ -3034,26 +3034,27 @@ details > .admin-list {
   font-weight: 600;
 }
 
+/* Counts only. It used to carry a paragraph of governance vocabulary as well,
+   which put the explanation of the module in the one place a returning user
+   scrolls past. That belongs in the subtitle, once. */
 .memory-boundary {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 12px;
+  justify-content: flex-end;
   margin-bottom: 1.25rem;
   padding: 10px 14px;
-  font-size: 0.85rem;
-}
-
-.memory-boundary strong:first-child {
-  color: var(--accent);
 }
 
 .memory-counts {
   display: flex;
+  align-items: center;
   gap: 16px;
+  flex-wrap: wrap;
   color: var(--text-soft);
   font-size: 0.8rem;
+}
+
+.memory-counts strong {
+  color: var(--text);
 }
 
 .memory-filters {
@@ -3340,22 +3341,18 @@ details > .admin-list {
   font-size: 0.85rem;
 }
 
-/* The kill switch, reported as the state of this installation rather than as
-   the product's default. Muted when off; it is a fact, not a warning. */
+/* Shown only when lessons are not reaching incidents, next to the count of
+   the ones in use -- which is exactly where that count stops meaning what a
+   reader assumes it means. */
 .memory-flag {
   display: inline-block;
   margin-left: 8px;
   padding: 2px 8px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--warning);
   border-radius: 999px;
-  color: var(--muted);
+  color: var(--warning);
   font-size: 0.75rem;
   white-space: nowrap;
-}
-
-.memory-flag.is-on {
-  border-color: var(--accent);
-  color: var(--accent);
 }
 
 /* A reviewer reads a drafted sentence differently knowing a machine wrote it,

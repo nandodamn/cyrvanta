@@ -646,24 +646,18 @@ export function GovernedMemoryPage({
       </div>
 
       <div className="panel memory-boundary">
-        <div>
-          {/* What the software does, then what this installation is set to.
-              These used to be one sentence, so a deployment that had turned
-              influence on still read "disabled by default" -- a claim about
-              the product where a reader sees a claim about their system. */}
-          <strong>{t("memory.safetyTitle")}</strong>: {t("memory.safetyBody")}
-          {influence.data !== undefined && (
-            <span className={influence.data ? "memory-flag is-on" : "memory-flag"}>
-              {influence.data ? t("memory.influenceOn") : t("memory.influenceOff")}
-            </span>
-          )}
-        </div>
         <div className="memory-counts">
           <span>
             {t("memory.candidates")}: <strong>{candidates.data?.length ?? 0}</strong>
           </span>
           <span>
             {t("memory.active")}: <strong>{active.data?.length ?? 0}</strong>
+            {influence.data === false && (
+              // Only when it is off, and only there: activated lessons not
+              // appearing on incidents is the surprise that needs explaining.
+              // That they do appear is what anyone would already assume.
+              <span className="memory-flag">{t("memory.influenceOff")}</span>
+            )}
           </span>
           <span>
             {t("memory.feedbackEntries")}: <strong>{entries.data?.length ?? 0}</strong>

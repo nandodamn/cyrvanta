@@ -85,14 +85,18 @@ const incident = {
   close_reason: null,
 } as unknown as Awaited<ReturnType<typeof api.getIncidents>>[number];
 
-function show(permissions: string[], overrides: Partial<api.MemoryCandidate> = {}) {
+function show(
+  permissions: string[],
+  overrides: Partial<api.MemoryCandidate> = {},
+  influenceEnabled = true,
+) {
   vi.spyOn(api, "getMemoryCandidates").mockResolvedValue([candidate(overrides)]);
   vi.spyOn(api, "getActiveMemory").mockResolvedValue([]);
   vi.spyOn(api, "getMemoryMetrics").mockResolvedValue([]);
   vi.spyOn(api, "getFeedback").mockResolvedValue([entry()]);
   vi.spyOn(api, "getIncidents").mockResolvedValue([incident]);
   vi.spyOn(api, "getAlerts").mockResolvedValue([]);
-  vi.spyOn(api, "getMemoryInfluenceEnabled").mockResolvedValue(true);
+  vi.spyOn(api, "getMemoryInfluenceEnabled").mockResolvedValue(influenceEnabled);
   render(
     <QueryClientProvider client={new QueryClient()}>
       <GovernedMemoryPage permissions={new Set(permissions)} />
@@ -170,12 +174,19 @@ describe("governed memory", () => {
     expect(screen.queryByText(/separados por coma/i)).not.toBeInTheDocument();
   });
 
-  it("reports this installation's setting, not the product's default", async () => {
-    // The banner said "disabled by default" on a deployment that had turned
-    // influence on -- a claim about the product where a reader sees a claim
-    // about the system in front of them.
+  it("says nothing when lessons are reaching incidents", async () => {
+    // Which is what anyone would already assume. A chip confirming the
+    // expected state is one more thing to read past.
     show(["memory.read"]);
-    expect(await screen.findByText(/se muestran en los incidentes/i)).toBeVisible();
+    expect(await screen.findByText("Patrón de laboratorio")).toBeVisible();
+    expect(screen.queryByText(/no se están mostrando/i)).not.toBeInTheDocument();
+  });
+
+  it("warns beside the count when lessons are reaching nobody", async () => {
+    // "In use: 3" stops meaning what a reader assumes the moment memory is
+    // switched off, so the correction belongs next to that number.
+    show(["memory.read"], {}, false);
+    expect(await screen.findByText(/no se están mostrando en los incidentes/i)).toBeVisible();
   });
 
   it("marks a memory the AI drafted, and says it has no human author", async () => {

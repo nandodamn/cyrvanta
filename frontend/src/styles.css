@@ -198,6 +198,23 @@ label {
     var(--bg);
 }
 
+/* Every measurement above is proportional to the viewport, so on a 4K panel
+   the card reached 1167px and its text fields over a thousand -- a login form
+   wide enough to look broken.
+   Above 1920px the columns, gap and padding freeze at exactly the values they
+   resolve to at 1920px and the grid centres itself, so the transition is
+   seamless and nothing at or below the widest desktop this was designed
+   against moves by a pixel. The gradient stays on the shell, which is still
+   full width. */
+@media (min-width: 1921px) {
+  .login-shell {
+    grid-template-columns: minmax(0, 876px) 584px;
+    justify-content: center;
+    gap: 154px;
+    padding: 154px;
+  }
+}
+
 .login-brand h1 {
   margin: 0.1em 0;
   font-size: clamp(52px, 9vw, 120px);
@@ -1181,6 +1198,24 @@ details > .admin-list {
   display: block;
 }
 
+/* Keeps a row's code and title together on one line. It ends in an ellipsis
+   rather than pushing the row, which is what it did before: a long title made
+   the row 1015px wide inside a 1280px window and gave the whole page a
+   horizontal scrollbar. The full text is one click away in the incident. */
+.incident-row-title {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.audit-row {
+  display: grid;
+  grid-template-columns: 100px 1.5fr 1.2fr 1fr 160px;
+  align-items: center;
+  gap: 12px;
+}
+
 .list-controls {
   display: flex;
   align-items: center;
@@ -1239,6 +1274,11 @@ details > .admin-list {
 
 .data-list {
   display: grid;
+  /* The implicit column was auto-sized, so a row grew to whatever its longest
+     field demanded and hung out of the list -- on a 1280px window an incident
+     row reached 1015px inside an 894px list and gave the page a horizontal
+     scrollbar. Pinned to the list, rows compress and the title ellipsises. */
+  grid-template-columns: minmax(0, 1fr);
   width: 100%;
 }
 
@@ -1725,7 +1765,46 @@ details > .admin-list {
   .panel {
     min-width: 0;
     display: grid;
+    /* Without a declared column the implicit one is auto-sized, so a panel
+       grew to whatever its widest child demanded -- on a phone the incident
+       list stretched its panel to 1015px inside a 288px box, and the search
+       and paging controls sat off-screen with no way to scroll to them.
+       minmax(0, 1fr) pins the column to the panel and lets its children
+       shrink. Only inside this breakpoint, so nothing wider is affected. */
+    grid-template-columns: minmax(0, 1fr);
     gap: 24px;
+  }
+
+  /* Identifiers, hashes and hostnames have no break opportunity, so once the
+     column stops growing they would spill out of it instead. */
+  .data-list article,
+  .data-list a,
+  .list-controls {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  /* An incident code and its title share a line on a desktop row. On a phone
+     the title is longer than the screen, so the pair wraps instead. */
+  .incident-row-main {
+    flex-wrap: wrap;
+  }
+
+  /* On a phone the title wraps instead of truncating: there is no second
+     column competing for the space, and a wrapped title is more useful than
+     an ellipsis on the only line the row has. */
+  .incident-row-title {
+    overflow: visible;
+    white-space: normal;
+    text-overflow: clip;
+  }
+
+  /* Five columns of audit metadata do not fit across a phone; stacked, every
+     field stays readable and the row still reads top to bottom in the order a
+     reader expects. */
+  .audit-row {
+    grid-template-columns: 1fr;
+    gap: 6px;
   }
 
   .panel-heading {
@@ -1755,10 +1834,28 @@ details > .admin-list {
     grid-template-columns: 1fr;
   }
 
+  /* minmax(0, 1fr) rather than 1fr: a bare fr keeps an automatic minimum equal
+     to its content, so a row whose longest field needed 357px held a 357px
+     column inside a 238px box and spilled out of it. */
   .data-list article,
-  .data-list a {
-    grid-template-columns: 1fr;
+  .data-list a,
+  .playbook-list,
+  .playbook-list > article {
+    grid-template-columns: minmax(0, 1fr);
     gap: 8px;
+  }
+
+  /* Rows lay themselves out with inline flex and no wrap, so a status chip or
+     a pair of action buttons stayed on the line and left the screen. The wrap
+     is set here because the components never set one inline, so there is
+     nothing to override -- and flex-wrap is inert on the rows that are grids.
+     Only inside this breakpoint: a desktop row stays on one line. */
+  .data-list a,
+  .data-list article,
+  .data-list a div,
+  .data-list article div {
+    min-width: 0;
+    flex-wrap: wrap;
   }
 
   .playbook-heading {
@@ -1990,7 +2087,7 @@ details > .admin-list {
 
 .integrations-cards-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr));
   gap: 1.25rem;
 }
 
@@ -3077,7 +3174,7 @@ details > .admin-list {
 
 .memory-list {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(360px, 100%), 1fr));
   gap: 14px;
 }
 
@@ -3213,7 +3310,7 @@ details > .admin-list {
 
 .memory-capture {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(340px, 100%), 1fr));
   gap: 1.25rem;
   align-items: start;
 }

@@ -2337,6 +2337,7 @@ function IncidentsPage() {
                   {t(`severityCodes.${incident.severity}`, { defaultValue: incident.severity })}
                 </span>
                 <div
+                  className="incident-row-main"
                   style={{
                     flex: 1,
                     display: "flex",
@@ -2345,7 +2346,11 @@ function IncidentsPage() {
                     minWidth: 0,
                   }}
                 >
-                  <strong style={{ whiteSpace: "nowrap" }}>
+                  {/* The no-wrap that keeps this on one line is in CSS rather
+                      than here, so a narrow screen can lift it. Inline, it kept
+                      a long incident title on one line at any width and pushed
+                      it off the side of a phone. */}
+                  <strong className="incident-row-title">
                     {incident.code} · {incident.title}
                   </strong>
                   <span
@@ -3383,7 +3388,7 @@ function IncidentDetailPage() {
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns: "repeat(auto-fill, minmax(360px, 1fr))",
+                gridTemplateColumns: "repeat(auto-fill, minmax(min(360px, 100%), 1fr))",
                 gap: "14px",
                 width: "100%",
               }}
@@ -3877,7 +3882,7 @@ function IncidentDetailPage() {
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))",
+                gridTemplateColumns: "repeat(auto-fill, minmax(min(320px, 100%), 1fr))",
                 gap: "12px",
                 marginTop: "1rem",
               }}
@@ -3991,7 +3996,7 @@ function IncidentDetailPage() {
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))",
+                gridTemplateColumns: "repeat(auto-fill, minmax(min(320px, 100%), 1fr))",
                 gap: "12px",
               }}
             >
@@ -4224,7 +4229,7 @@ function IncidentDetailPage() {
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))",
+                gridTemplateColumns: "repeat(auto-fill, minmax(min(320px, 100%), 1fr))",
                 gap: "12px",
                 marginTop: "1rem",
               }}
@@ -4541,7 +4546,7 @@ function IncidentDetailPage() {
               <div
                 style={{
                   display: "grid",
-                  gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))",
+                  gridTemplateColumns: "repeat(auto-fill, minmax(min(340px, 100%), 1fr))",
                   gap: "12px",
                 }}
               >
@@ -4833,15 +4838,11 @@ function AuditPage() {
                 ? recordedClientIp
                 : t("notAvailable");
             return (
-              <article
-                key={event.id}
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "100px 1.5fr 1.2fr 1fr 160px",
-                  alignItems: "center",
-                  gap: "12px",
-                }}
-              >
+              // Five columns on a desktop row. The layout lives in CSS rather
+              // than here so the narrow breakpoint can stack it; inline, it
+              // held all five columns at any width and ran off the side of a
+              // phone.
+              <article key={event.id} className="audit-row">
                 <span className="severity" style={{ textAlign: "center" }}>
                   {event.outcome}
                 </span>

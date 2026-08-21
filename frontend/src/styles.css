@@ -1792,10 +1792,6 @@ details > .admin-list {
   }
 }
 
-.memory-boundary {
-  border-color: color-mix(in srgb, var(--accent) 44%, var(--line));
-}
-
 .compact-metrics {
   margin: 0;
 }
@@ -3034,14 +3030,15 @@ details > .admin-list {
   font-weight: 600;
 }
 
-/* Counts only. It used to carry a paragraph of governance vocabulary as well,
-   which put the explanation of the module in the one place a returning user
-   scrolls past. That belongs in the subtitle, once. */
+/* A rule, not a box. These are three small numbers; a bordered panel around
+   them framed them as a thing to read rather than as the line separating the
+   header from the work. */
 .memory-boundary {
   display: flex;
   justify-content: flex-end;
   margin-bottom: 1.25rem;
-  padding: 10px 14px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--line);
 }
 
 .memory-counts {

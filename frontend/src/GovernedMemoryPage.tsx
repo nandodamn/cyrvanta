@@ -643,7 +643,7 @@ export function GovernedMemoryPage({
         </nav>
       </div>
 
-      <div className="panel memory-boundary">
+      <div className="memory-boundary">
         <div className="memory-counts">
           <span>
             {t("memory.candidates")}: <strong>{candidates.data?.length ?? 0}</strong>

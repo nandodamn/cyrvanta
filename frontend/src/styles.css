@@ -2995,3 +2995,347 @@ details > .admin-list {
 .account-exit:hover {
   color: var(--accent);
 }
+
+/* ---- Governed memory ------------------------------------------------- */
+
+.memory-title {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.memory-tabs {
+  display: inline-flex;
+  gap: 4px;
+  padding: 4px;
+  max-width: 100%;
+  overflow-x: auto;
+  background: var(--panel-raised);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.memory-tabs button {
+  padding: 8px 16px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  font-size: 0.875rem;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.memory-tabs button.is-selected {
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 600;
+}
+
+.memory-boundary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 1.25rem;
+  padding: 10px 14px;
+  font-size: 0.85rem;
+}
+
+.memory-boundary strong:first-child {
+  color: var(--accent);
+}
+
+.memory-counts {
+  display: flex;
+  gap: 16px;
+  color: var(--text-soft);
+  font-size: 0.8rem;
+}
+
+.memory-filters {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 1.25rem;
+}
+
+.memory-filters button {
+  min-height: 32px;
+  padding: 4px 12px;
+  border: 1px solid transparent;
+  font-size: 0.8rem;
+}
+
+.memory-filters button.is-selected {
+  border-color: var(--accent);
+  background: var(--panel-raised);
+  color: var(--accent);
+}
+
+.memory-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+  gap: 14px;
+}
+
+.memory-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.memory-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.memory-card-head h3 {
+  margin: 4px 0 0;
+  font-size: 1.05rem;
+}
+
+.memory-card-head .eyebrow {
+  margin: 0;
+}
+
+/* The state is the first thing a reviewer looks for, so it is a chip and not
+   a word in a sentence. Only the live one is filled: everything else is a
+   step on the way there or a way it ended. */
+.memory-state {
+  padding: 4px 10px;
+  border-radius: 4px;
+  background: var(--line);
+  color: var(--text);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.memory-state.is-active {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+.memory-state.is-draft {
+  background: var(--panel-raised);
+}
+
+.memory-statement {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.memory-facts {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 6px;
+  background: var(--panel-raised);
+  font-size: 0.85rem;
+}
+
+.memory-facts dt {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.memory-facts dd {
+  margin: 0;
+  font-weight: 600;
+}
+
+.memory-detail {
+  font-size: 0.85rem;
+  color: var(--text-soft);
+}
+
+.memory-detail summary {
+  padding: 4px 0;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.memory-history {
+  margin: 8px 0 0;
+  padding-left: 1.2rem;
+}
+
+.memory-history li {
+  margin: 4px 0;
+}
+
+.memory-synthetic {
+  margin: 0;
+  padding: 8px 12px;
+  border: 1px solid var(--danger);
+  border-radius: 6px;
+  color: var(--danger);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.memory-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: auto;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.memory-buttons {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.memory-buttons button {
+  flex: 1 1 auto;
+}
+
+.memory-correction {
+  display: grid;
+  gap: 0.6rem;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--line);
+}
+
+.memory-capture {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  gap: 1.25rem;
+  align-items: start;
+}
+
+/* Evidence is chosen by recognising the case, so each row leads with what the
+   feedback said and about what -- never with an identifier. */
+.evidence-picker,
+.feedback-list {
+  list-style: none;
+  margin: 0.6rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.5rem;
+  max-height: 340px;
+  overflow-y: auto;
+}
+
+.evidence-picker label {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  cursor: pointer;
+}
+
+.evidence-picker label > span {
+  display: grid;
+  gap: 1px;
+}
+
+.evidence-target {
+  display: block;
+  font-size: 0.85rem;
+}
+
+.evidence-meta {
+  display: block;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.feedback-list li {
+  padding: 0.5rem 0.7rem;
+  border-left: 2px solid var(--line);
+  background: var(--panel-raised);
+  border-radius: 0 6px 6px 0;
+}
+
+.feedback-list p {
+  margin: 0.2rem 0;
+  font-size: 0.88rem;
+}
+
+.condition-editor {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 0.6rem;
+}
+
+.condition-editor p {
+  grid-column: 1 / -1;
+}
+
+.metric-list {
+  list-style: none;
+  margin: 1rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.metric-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 12px 16px;
+  border-radius: 6px;
+  background: var(--panel-raised);
+}
+
+.metric-value {
+  display: grid;
+  justify-items: end;
+  gap: 2px;
+}
+
+.metric-value strong {
+  font-size: 1.25rem;
+}
+
+/* A thin sample is labelled next to the number it qualifies, because that is
+   the only place a reader will see it before believing the number. */
+.metric-value .is-sufficient {
+  color: var(--success);
+  font-size: 0.75rem;
+}
+
+.metric-value .is-thin {
+  color: var(--warning);
+  font-size: 0.75rem;
+}
+
+.incident-memory {
+  list-style: none;
+  margin: 1rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.incident-memory li {
+  padding-left: 0.75rem;
+  border-left: 2px solid var(--accent);
+}
+
+.incident-memory p {
+  margin: 0.15rem 0 0;
+  font-size: 0.9rem;
+}
+
+.small {
+  font-size: 0.85rem;
+}

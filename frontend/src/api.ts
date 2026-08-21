@@ -489,6 +489,8 @@ const memoryCandidateSchema = z.object({
   kind: z.string(),
   source_type: z.string(),
   created_by_user_id: z.string().uuid(),
+  version_author_user_id: z.string().uuid(),
+  version_author_name: z.string().nullable().optional(),
   title_es: z.string(),
   title_en: z.string(),
   statement_es: z.string(),
@@ -524,8 +526,44 @@ const memoryMetricListSchema = z.object({
   items: z.array(memoryMetricSchema),
   total: z.number().int().nonnegative(),
 });
+const feedbackEntrySchema = z.object({
+  id: z.string().uuid(),
+  resource_type: z.string(),
+  resource_id: z.string().uuid(),
+  resource_label: z.string().nullable().optional(),
+  actor_user_id: z.string().uuid(),
+  actor_name: z.string().nullable().optional(),
+  outcome: z.string(),
+  reason: z.string(),
+  is_synthetic: z.boolean(),
+  occurred_at: z.string(),
+  created_at: z.string(),
+});
+const feedbackListSchema = z.object({
+  items: z.array(feedbackEntrySchema),
+  total: z.number().int().nonnegative(),
+});
+const memoryMatchSchema = z.object({
+  version_id: z.string().uuid(),
+  version: z.number().int(),
+  title_es: z.string(),
+  title_en: z.string(),
+  statement_es: z.string(),
+  statement_en: z.string(),
+  valid_until: z.string(),
+  matched: z.boolean(),
+  explanation: z.string(),
+});
+const memoryContextSchema = z.object({
+  influence_enabled: z.boolean(),
+  base_fingerprint: z.string(),
+  presented_fingerprint: z.string(),
+  matches: z.array(memoryMatchSchema),
+});
 export type MemoryCandidate = z.infer<typeof memoryCandidateSchema>;
 export type MemoryMetric = z.infer<typeof memoryMetricSchema>;
+export type FeedbackEntry = z.infer<typeof feedbackEntrySchema>;
+export type MemoryContext = z.infer<typeof memoryContextSchema>;
 
 const tokenSchema = z.object({
   access_token: z.string(),
@@ -648,6 +686,10 @@ function listPath(path: string, options: ListQuery = {}): string {
 
 export async function getMe(): Promise<CurrentUser> {
   return userSchema.parse(await authorized("/api/v1/auth/me"));
+}
+
+export async function getMyPermissions(): Promise<string[]> {
+  return z.array(z.string()).parse(await authorized("/api/v1/auth/me/permissions"));
 }
 
 export async function getTenant(): Promise<Tenant> {
@@ -1279,13 +1321,25 @@ export async function downloadIncidentReport(id: string, code: string): Promise<
   URL.revokeObjectURL(url);
 }
 
-async function governedMutation(path: string, body: unknown): Promise<unknown> {
+/** A POST whose key identifies the attempt, not the call.
+ *
+ * This used to mint a fresh UUID on every invocation, which defeats the whole
+ * mechanism: the server compares the body against whatever the key already
+ * recorded and refuses a mismatch, and a key that is never reused can never
+ * match anything. Two clicks made two entries. The caller now owns the key and
+ * keeps it across retries of the same submission.
+ */
+async function governedMutation(
+  path: string,
+  body: unknown,
+  idempotencyKey: string,
+): Promise<unknown> {
   return checked(
     await authenticatedFetch(path, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Idempotency-Key": globalThis.crypto.randomUUID(),
+        "Idempotency-Key": idempotencyKey,
       },
       body: JSON.stringify(body),
     }),
@@ -1309,14 +1363,49 @@ export async function getMemoryMetrics(): Promise<MemoryMetric[]> {
     .items;
 }
 
-export async function createFeedback(input: Record<string, unknown>): Promise<void> {
-  await governedMutation("/api/v1/feedback", input);
+export async function getFeedback(): Promise<FeedbackEntry[]> {
+  return feedbackListSchema.parse(await authorized("/api/v1/feedback?limit=100&offset=0")).items;
+}
+
+export async function getIncidentMemoryContext(incidentId: string): Promise<MemoryContext> {
+  return memoryContextSchema.parse(
+    await authorized(`/api/v1/incidents/${incidentId}/memory-context`),
+  );
+}
+
+export async function createFeedback(
+  input: Record<string, unknown>,
+  idempotencyKey: string,
+): Promise<FeedbackEntry> {
+  // The created entry is returned rather than discarded: its id is what makes
+  // it selectable as evidence for a memory candidate, and throwing it away was
+  // half of why the circuit could not be completed from the screen.
+  return feedbackEntrySchema.parse(
+    await governedMutation("/api/v1/feedback", input, idempotencyKey),
+  );
 }
 
 export async function createMemoryCandidate(
   input: Record<string, unknown>,
+  idempotencyKey: string,
 ): Promise<MemoryCandidate> {
-  return memoryCandidateSchema.parse(await governedMutation("/api/v1/memory-candidates", input));
+  return memoryCandidateSchema.parse(
+    await governedMutation("/api/v1/memory-candidates", input, idempotencyKey),
+  );
+}
+
+export async function createMemoryVersion(
+  candidateId: string,
+  input: Record<string, unknown>,
+  idempotencyKey: string,
+): Promise<MemoryCandidate> {
+  return memoryCandidateSchema.parse(
+    await governedMutation(
+      `/api/v1/memory-candidates/${candidateId}/versions`,
+      input,
+      idempotencyKey,
+    ),
+  );
 }
 
 export async function transitionMemoryVersion(
@@ -1325,7 +1414,13 @@ export async function transitionMemoryVersion(
   reason: string,
 ): Promise<MemoryCandidate> {
   return memoryCandidateSchema.parse(
-    await governedMutation(`/api/v1/memory-versions/${versionId}/${action}`, { reason }),
+    await governedMutation(
+      `/api/v1/memory-versions/${versionId}/${action}`,
+      { reason },
+      // The state it is moving out of makes the attempt unique: repeating the
+      // same move on the same version is the same act, not a second one.
+      `memory-${action}-${versionId}`,
+    ),
   );
 }
 
@@ -1335,10 +1430,11 @@ export async function reviewMemoryVersion(
   reason: string,
 ): Promise<MemoryCandidate> {
   return memoryCandidateSchema.parse(
-    await governedMutation(`/api/v1/memory-versions/${versionId}/reviews`, {
-      decision,
-      reason,
-    }),
+    await governedMutation(
+      `/api/v1/memory-versions/${versionId}/reviews`,
+      { decision, reason },
+      `memory-review-${versionId}-${decision}`,
+    ),
   );
 }
 

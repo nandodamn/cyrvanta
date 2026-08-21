@@ -47,8 +47,11 @@ def test_the_author_of_a_version_cannot_review_or_activate_it() -> None:
 
 
 def test_a_memory_cannot_be_corrected_while_someone_is_reviewing_it() -> None:
-    """Otherwise a reviewer approves text that no longer exists."""
-    assert "Finish the current review before correcting" in SERVICE
+    """Otherwise a reviewer approves text that no longer exists -- and an
+    approval on record for a statement nobody can read any more is worse than
+    no approval at all.
+    """
+    assert "A version awaiting review or activation cannot be corrected" in SERVICE
 
 
 def test_correcting_a_live_memory_supersedes_it_at_once() -> None:

@@ -43,6 +43,8 @@ import {
   getCollaborators,
   addCollaborator,
   removeCollaborator,
+  getIncidentMemoryContext,
+  getMyPermissions,
   getResolutionReadiness,
   getIncidentEnrichment,
   getIncidents,
@@ -76,6 +78,7 @@ import {
   updateUser,
 } from "./api";
 import { OperationalPulse } from "./OperationalPulse";
+import { PageState } from "./PageState";
 import { SecurityTopologyPanel } from "./SecurityTopologyPanel";
 import { useAuth } from "./AuthContext";
 
@@ -90,172 +93,179 @@ const VerifiedIntegrationsPage = lazy(() =>
     default: module.VerifiedIntegrationsPage,
   })),
 );
-const NAV_ITEMS: ReadonlyArray<{ to: string; icon: React.ReactNode; key: string; end?: boolean }> =
-  [
-    {
-      to: "/",
-      key: "overview",
-      end: true,
-      icon: (
-        <svg
-          width="18"
-          height="18"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <rect x="3" y="3" width="7" height="7" rx="1.5" />
-          <rect x="14" y="3" width="7" height="7" rx="1.5" />
-          <rect x="14" y="14" width="7" height="7" rx="1.5" />
-          <rect x="3" y="14" width="7" height="7" rx="1.5" />
-        </svg>
-      ),
-    },
-    {
-      to: "/incidents",
-      key: "incidents",
-      icon: (
-        <svg
-          width="18"
-          height="18"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-          <line x1="12" y1="8" x2="12" y2="12" />
-          <line x1="12" y1="16" x2="12.01" y2="16" />
-        </svg>
-      ),
-    },
-    {
-      to: "/alerts",
-      key: "alerts",
-      icon: (
-        <svg
-          width="18"
-          height="18"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
-          <path d="M13.73 21a2 2 0 0 1-3.46 0" />
-        </svg>
-      ),
-    },
-    {
-      to: "/playbooks",
-      key: "playbooks",
-      icon: (
-        <svg
-          width="18"
-          height="18"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <rect x="3" y="3" width="6" height="6" rx="1.5" />
-          <rect x="15" y="15" width="6" height="6" rx="1.5" />
-          <path d="M6 9v3a3 3 0 0 0 3 3h6" />
-          <polyline points="14 12 17 15 14 18" />
-        </svg>
-      ),
-    },
-    {
-      to: "/integrations",
-      key: "integrations",
-      icon: (
-        <svg
-          width="18"
-          height="18"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <path d="M16 16v1a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h11a2 2 0 0 1 2 2v1" />
-          <path d="M18 8l4 4-4 4" />
-          <line x1="8" y1="12" x2="22" y2="12" />
-        </svg>
-      ),
-    },
-    {
-      to: "/memory",
-      key: "memory.navigation",
-      icon: (
-        <svg
-          width="18"
-          height="18"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <ellipse cx="12" cy="5" rx="9" ry="3" />
-          <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3" />
-          <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5" />
-        </svg>
-      ),
-    },
+const NAV_ITEMS: ReadonlyArray<{
+  to: string;
+  icon: React.ReactNode;
+  key: string;
+  end?: boolean;
+  /** Hidden from anyone who could only be refused by the page behind it. */
+  requires?: string;
+}> = [
+  {
+    to: "/",
+    key: "overview",
+    end: true,
+    icon: (
+      <svg
+        width="18"
+        height="18"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <rect x="3" y="3" width="7" height="7" rx="1.5" />
+        <rect x="14" y="3" width="7" height="7" rx="1.5" />
+        <rect x="14" y="14" width="7" height="7" rx="1.5" />
+        <rect x="3" y="14" width="7" height="7" rx="1.5" />
+      </svg>
+    ),
+  },
+  {
+    to: "/incidents",
+    key: "incidents",
+    icon: (
+      <svg
+        width="18"
+        height="18"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+        <line x1="12" y1="8" x2="12" y2="12" />
+        <line x1="12" y1="16" x2="12.01" y2="16" />
+      </svg>
+    ),
+  },
+  {
+    to: "/alerts",
+    key: "alerts",
+    icon: (
+      <svg
+        width="18"
+        height="18"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+        <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+      </svg>
+    ),
+  },
+  {
+    to: "/playbooks",
+    key: "playbooks",
+    icon: (
+      <svg
+        width="18"
+        height="18"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <rect x="3" y="3" width="6" height="6" rx="1.5" />
+        <rect x="15" y="15" width="6" height="6" rx="1.5" />
+        <path d="M6 9v3a3 3 0 0 0 3 3h6" />
+        <polyline points="14 12 17 15 14 18" />
+      </svg>
+    ),
+  },
+  {
+    to: "/integrations",
+    key: "integrations",
+    icon: (
+      <svg
+        width="18"
+        height="18"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="M16 16v1a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h11a2 2 0 0 1 2 2v1" />
+        <path d="M18 8l4 4-4 4" />
+        <line x1="8" y1="12" x2="22" y2="12" />
+      </svg>
+    ),
+  },
+  {
+    to: "/memory",
+    key: "memory.navigation",
+    requires: "memory.read",
+    icon: (
+      <svg
+        width="18"
+        height="18"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <ellipse cx="12" cy="5" rx="9" ry="3" />
+        <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3" />
+        <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5" />
+      </svg>
+    ),
+  },
 
-    {
-      to: "/audit",
-      key: "audit",
-      icon: (
-        <svg
-          width="18"
-          height="18"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-          <polyline points="14 2 14 8 20 8" />
-          <line x1="16" y1="13" x2="8" y2="13" />
-          <line x1="16" y1="17" x2="8" y2="17" />
-        </svg>
-      ),
-    },
-    {
-      to: "/administration",
-      key: "administration",
-      icon: (
-        <svg
-          width="18"
-          height="18"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <circle cx="12" cy="12" r="3" />
-          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
-        </svg>
-      ),
-    },
-  ];
+  {
+    to: "/audit",
+    key: "audit",
+    icon: (
+      <svg
+        width="18"
+        height="18"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+        <polyline points="14 2 14 8 20 8" />
+        <line x1="16" y1="13" x2="8" y2="13" />
+        <line x1="16" y1="17" x2="8" y2="17" />
+      </svg>
+    ),
+  },
+  {
+    to: "/administration",
+    key: "administration",
+    icon: (
+      <svg
+        width="18"
+        height="18"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <circle cx="12" cy="12" r="3" />
+        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
+      </svg>
+    ),
+  },
+];
 
 const loginSchema = z.object({
   tenantSlug: z.string().min(3),
@@ -377,6 +387,22 @@ type ThemePreference = "system" | "light" | "dark";
 
 const SYSTEM_LIGHT = "(prefers-color-scheme: light)";
 
+/** What the signed-in person may attempt.
+ *
+ * Asked once and shared, so a screen can stop offering what will be refused.
+ * An empty set while it loads is the safe default: briefly hiding a control
+ * costs a moment, briefly offering one that then fails costs trust.
+ */
+function useMyPermissions(): Set<string> {
+  const query = useQuery({
+    queryKey: ["my-permissions"],
+    queryFn: getMyPermissions,
+    retry: false,
+    staleTime: 5 * 60 * 1000,
+  });
+  return new Set(query.data ?? []);
+}
+
 /** Line icons for the three theme choices: a screen, a sun, a moon.
  *
  * Drawn rather than written, because the three fit on one row as glyphs and
@@ -423,6 +449,7 @@ function Layout() {
     return stored === "light" || stored === "dark" ? stored : "system";
   });
   const me = useQuery({ queryKey: ["me"], queryFn: getMe, retry: false });
+  const permissions = useMyPermissions();
   useEffect(() => {
     if (me.isError) void signOut();
   }, [me.isError, signOut]);
@@ -457,14 +484,16 @@ function Layout() {
           <strong>Cyrvanta</strong>
         </div>
         <nav aria-label={t("primaryNavigation")}>
-          {NAV_ITEMS.map((item) => (
-            <NavLink key={item.to} to={item.to} end={item.end} title={t(item.key)}>
-              <span className="nav-icon" aria-hidden="true">
-                {item.icon}
-              </span>
-              <span className="nav-label">{t(item.key)}</span>
-            </NavLink>
-          ))}
+          {NAV_ITEMS.filter((item) => !item.requires || permissions.has(item.requires)).map(
+            (item) => (
+              <NavLink key={item.to} to={item.to} end={item.end} title={t(item.key)}>
+                <span className="nav-icon" aria-hidden="true">
+                  {item.icon}
+                </span>
+                <span className="nav-label">{t(item.key)}</span>
+              </NavLink>
+            ),
+          )}
         </nav>
         {/* The account sits at the foot of the navigation, with the tenant it
             belongs to. Both answer the same question -- where am I and as
@@ -999,6 +1028,58 @@ function ResolutionReview({ incidentId, mayClose }: { incidentId: string; mayClo
   );
 }
 
+/** Lessons this SOC has already approved that apply to this case.
+ *
+ * Context to read, and nothing more. Every line here was written by a person,
+ * reviewed by a second and activated by a third, and none of it touches the
+ * incident -- it cannot close, reassign, or alter a single field. That is the
+ * whole permitted role of memory, and the panel says so rather than leaving a
+ * reader to wonder whether something is acting on their case unasked.
+ */
+function IncidentMemory({ incidentId }: { incidentId: string }) {
+  const { t, i18n } = useTranslation();
+  const context = useQuery({
+    queryKey: ["incident-memory", incidentId],
+    queryFn: () => getIncidentMemoryContext(incidentId),
+    retry: false,
+  });
+
+  // Nothing to say is better said by saying nothing: an empty panel on every
+  // incident would be furniture people learn to scroll past.
+  if (context.isError) return null;
+  if (context.data && context.data.matches.length === 0) return null;
+
+  const spanish = i18n.language.startsWith("es");
+  return (
+    <section className="panel">
+      <div>
+        <p className="eyebrow">{t("memory.observationalOnly")}</p>
+        <h2>{t("memory.incidentPanel")}</h2>
+        <p>{t("memory.incidentPanelIntro")}</p>
+      </div>
+      {context.data?.influence_enabled === false && (
+        // The kill switch is off, so nothing is being consulted. Saying that
+        // is not the same as having nothing to say.
+        <p className="status-message">{t("memory.influenceDisabled")}</p>
+      )}
+      <ul className="incident-memory">
+        {(context.data?.matches ?? []).map((match) => (
+          <li key={match.version_id}>
+            <p className="eyebrow">
+              v{match.version} ·{" "}
+              {t("memory.validUntilShort", {
+                date: new Date(match.valid_until).toLocaleDateString(i18n.language),
+              })}
+            </p>
+            <strong>{spanish ? match.title_es : match.title_en}</strong>
+            <p>{spanish ? match.statement_es : match.statement_en}</p>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 function Collaborators({ incidentId, mayManage }: { incidentId: string; mayManage: boolean }) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
@@ -1304,30 +1385,15 @@ function IncidentHistory({ incidentId }: { incidentId: string }) {
   );
 }
 
-function PageState({
-  loading,
-  error,
-  empty,
-}: {
-  loading: boolean;
-  error: boolean;
-  empty: boolean;
-}) {
-  const { t } = useTranslation();
-  if (loading)
-    return (
-      <p className="status-message" role="status">
-        {t("loading")}
-      </p>
-    );
-  if (error)
-    return (
-      <p className="status-message status-error" role="alert">
-        {t("loadError")}
-      </p>
-    );
-  if (empty) return <p className="status-message">{t("emptyState")}</p>;
-  return null;
+/** The governed memory screen, told what this person may do.
+ *
+ * The page decides what to offer from the permission set rather than showing
+ * everything and letting the server refuse -- most of all for metrics, where
+ * a refusal used to be rendered as "no metrics recorded", which told every
+ * analyst the SOC had measured nothing.
+ */
+function GovernedMemoryRoute() {
+  return <GovernedMemoryPage permissions={useMyPermissions()} />;
 }
 
 function useListControls(defaultPageSize = 10) {
@@ -4332,6 +4398,7 @@ function IncidentDetailPage() {
         <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
           {/* First, because it is the record of the case itself; the playbook
               decisions below are one kind of event within it. */}
+          <IncidentMemory incidentId={id} />
           <Collaborators incidentId={id} mayManage={permitted.has("update")} />
           <TechnicalFile
             incidentId={id}
@@ -5835,7 +5902,7 @@ export default function App() {
             <Route path="incidents/:id" element={<IncidentDetailPage />} />
             <Route path="playbooks" element={<PlaybooksPage />} />
             <Route path="integrations" element={<VerifiedIntegrationsPage />} />
-            <Route path="memory" element={<GovernedMemoryPage />} />
+            <Route path="memory" element={<GovernedMemoryRoute />} />
 
             <Route path="audit" element={<AuditPage />} />
             <Route path="administration" element={<Administration />} />

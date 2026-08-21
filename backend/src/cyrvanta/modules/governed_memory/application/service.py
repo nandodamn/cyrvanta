@@ -422,9 +422,13 @@ class GovernedMemoryService:
                 raise GovernedMemoryNotFound("Memory candidate version was not found")
             previous_status = await self._current_status(session, previous.id)
             if previous_status in {MemoryStatus.IN_REVIEW, MemoryStatus.APPROVED}:
-                # Correcting something mid-review would leave a reviewer
-                # judging text that no longer exists.
-                raise GovernedMemoryConflict("Finish the current review before correcting")
+                # Mid-review, a correction would leave a reviewer judging text
+                # that no longer exists. Approved-but-not-yet-active is the
+                # same problem one step later: the approval on record would be
+                # of a statement nobody can read any more.
+                raise GovernedMemoryConflict(
+                    "A version awaiting review or activation cannot be corrected"
+                )
 
             evidence = list(
                 (
@@ -1006,6 +1010,14 @@ class GovernedMemoryService:
                         ).all()
                     )
                     ratio = tally(outcomes, code, definition.minimum_sample_size)
+                    # A window nobody assessed has no population, and the
+                    # schema refuses to store a ratio without one -- rightly:
+                    # zero out of zero is not a rate, and writing it as 0%
+                    # would put a confident-looking number on a month in which
+                    # nothing was measured. The absence of a snapshot is the
+                    # honest record of that.
+                    if ratio.denominator == 0:
+                        continue
                     fingerprint = hashlib.sha256(
                         json.dumps(
                             {

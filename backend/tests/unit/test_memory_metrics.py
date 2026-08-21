@@ -67,11 +67,14 @@ def test_too_small_a_sample_is_reported_as_such_rather_than_hidden() -> None:
     assert ratio.value == Decimal("0.50000000")
 
 
-def test_a_quiet_window_is_a_fact_and_not_an_error() -> None:
-    """No assessed feedback in thirty days is an ordinary month, not a failure
-    to compute. It reports zero and says the sample is insufficient.
+def test_a_window_nobody_assessed_has_no_population() -> None:
+    """The arithmetic still answers -- it must not raise on an ordinary quiet
+    month -- but the answer has an empty denominator, and the service declines
+    to store it. Zero out of zero is not a rate, and recording it as 0% would
+    put a confident-looking number on a month in which nothing was measured.
     """
     ratio = tally([], MetricCode.FALSE_POSITIVE_RATE, minimum_sample_size=20)
+    assert ratio.denominator == 0
     assert ratio.value == Decimal(0)
     assert not ratio.sufficient_sample
 

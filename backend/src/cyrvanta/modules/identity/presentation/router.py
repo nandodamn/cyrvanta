@@ -17,7 +17,11 @@ from cyrvanta.modules.identity.presentation.session_cookie import (
     set_refresh_cookie,
 )
 from cyrvanta.shared.config import get_settings
-from cyrvanta.shared.dependencies import SecurityContext, get_security_context
+from cyrvanta.shared.dependencies import (
+    SecurityContext,
+    get_security_context,
+    granted_permissions,
+)
 
 router = APIRouter(prefix="/auth", tags=["authentication"])
 
@@ -69,6 +73,24 @@ async def logout(
 ) -> None:
     await service.logout(resolve_refresh_token(request, payload))
     clear_refresh_cookie(response, get_settings())
+
+
+@router.get("/me/permissions", response_model=list[str])
+async def my_permissions(
+    context: SecurityContext = Depends(get_security_context),
+) -> list[str]:
+    """What the signed-in person may attempt, as codes.
+
+    The interface needs this to stop offering what will be refused. Without it
+    a screen either shows every control and lets the server say no -- which
+    teaches people the product is broken -- or reads a 403 as an empty result,
+    which is worse: it reports an absence of data where there is only an
+    absence of permission.
+
+    Only ever the caller's own set: it is derived from their security context,
+    not from a parameter, so it cannot be asked about anybody else.
+    """
+    return sorted(await granted_permissions(context))
 
 
 @router.get("/me", response_model=CurrentUserResponse)

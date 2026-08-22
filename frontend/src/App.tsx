@@ -1983,21 +1983,13 @@ function AlertsPage() {
                     {alert.source} · {alert.category}
                   </small>
                 </div>
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "8px",
-                    justifyContent: "flex-end",
-                    flexWrap: "wrap",
-                  }}
-                >
+                <div className="alert-row-actions">
                   <time dateTime={alert.observed_at}>
                     {new Date(alert.observed_at).toLocaleString(i18n.language)}
                   </time>
 
                   {/* Quick Inline Triage Buttons */}
-                  <div style={{ display: "flex", gap: "4px" }}>
+                  <div className="alert-row-buttons">
                     <button
                       type="button"
                       className="ghost"

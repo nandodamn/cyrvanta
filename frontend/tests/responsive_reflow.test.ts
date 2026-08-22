@@ -24,7 +24,7 @@ describe("reflow", () => {
   it("pins list and panel columns so a row cannot outgrow its container", () => {
     // A bare `1fr` keeps an automatic minimum equal to its content, so a grid
     // column grows to the widest field and the row hangs out of the box.
-    expect(collapsed).toContain(".data-list { display: grid;");
+    expect(collapsed).toMatch(/\.data-list \{[^}]*display: grid/);
     expect(collapsed).toMatch(/\.data-list \{[^}]*grid-template-columns: minmax\(0, 1fr\)/);
     expect(collapsed).toMatch(/\.panel \{[^}]*grid-template-columns: minmax\(0, 1fr\)/);
   });
@@ -71,13 +71,19 @@ describe("reflow", () => {
     // they lost to `.data-list article, .data-list a`, which is one point
     // heavier, and both rows silently fell back to the generic four-column
     // template -- the audit date wrapped to a second grid row, and the
-    // incident row stopped being flex. Scoping through .data-list restores
+    // incident row stopped being flex, and `.data-list div` turned the alert
+    // action cell into a grid. Scoping through .data-list restores
     // the precedence the inline styles used to have.
     const selectores = collapsed
       .split("}")
       .map((bloque) => bloque.split("{")[0])
       .filter(Boolean);
-    for (const fila of [".audit-row", ".incident-row "]) {
+    for (const fila of [
+      ".audit-row",
+      ".incident-row ",
+      ".alert-row-actions",
+      ".alert-row-buttons",
+    ]) {
       const declarantes = selectores.filter((s) => s.includes(fila));
       expect(declarantes.length).toBeGreaterThan(0);
       for (const s of declarantes) {
@@ -86,11 +92,38 @@ describe("reflow", () => {
     }
   });
 
-  it("lets rows wrap only on narrow screens", () => {
-    // The wrap belongs to the 640px breakpoint: a desktop row stays on one
-    // line, and the components set no inline flex-wrap for it to fight.
-    const narrow = css.slice(css.indexOf("@media (max-width: 640px)"));
-    expect(narrow).toContain("flex-wrap: wrap");
-    expect(narrow).toContain(".data-list .audit-row");
+  it("lets rows reflow on the list's width, not the window's", () => {
+    // The window is the wrong thing to measure. At an 888px viewport the
+    // sidebar and the page padding left this panel 502px -- narrower than the
+    // same panel at a 640px viewport, where the sidebar has already collapsed
+    // to icons -- so the audit row still ran off the side at every width in
+    // between, which no viewport breakpoint could reach.
+    expect(collapsed).toMatch(/\.data-list \{[^}]*container-type: inline-size/);
+    expect(collapsed).toMatch(/\.data-list \{[^}]*container-name: lista/);
+    const contenedor = collapsed.slice(collapsed.indexOf("@container lista"));
+    expect(contenedor).toContain(".data-list .audit-row");
+    expect(contenedor).toContain(".data-list .incident-row");
+    expect(contenedor).toContain("flex-wrap: wrap");
+  });
+
+  it("declares the row rules after the base ones they override", () => {
+    // Same specificity, so source order decides. Written above the base rules
+    // the container query lost every one of them and changed nothing.
+    expect(collapsed.indexOf("@container lista")).toBeGreaterThan(
+      collapsed.indexOf(".data-list { container-type"),
+    );
+  });
+
+  it("leaves the alert row's action cell exactly as wide as it was", () => {
+    // Those two buttons each carry white-space: nowrap, so as an unwrapped
+    // pair they are one 340px unit -- and that minimum is the only thing
+    // holding the auto track open. Wrapping them at every width collapsed the
+    // track to a single button, the title column took the difference, and the
+    // desktop row grew from 82px to 155px. The wrap belongs to the container
+    // query, where the row is stacked anyway.
+    const base = collapsed.slice(0, collapsed.indexOf("@container lista"));
+    expect(base).toMatch(/\.data-list \.alert-row-buttons \{[^}]*\}/);
+    expect(base).not.toMatch(/\.data-list \.alert-row-buttons \{[^}]*flex-wrap/);
+    expect(app).toContain('className="alert-row-actions"');
   });
 });

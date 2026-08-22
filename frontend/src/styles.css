@@ -1245,6 +1245,28 @@ details > .admin-list {
    por" ended up broken across two lines while the bar itself still had room.
    The label keeps its width and the severity half wraps to the next line
    instead, which is the half that has somewhere to go. */
+/* The date and the two triage buttons, deliberately unchanged from the inline
+   styles this replaced -- including the button pair not wrapping. Each button
+   carries white-space: nowrap, so the pair is one unbreakable 340px unit, and
+   that minimum is what forces the auto track wide enough to hold it; wrapping
+   the pair here dropped the track to a single button and the row grew from
+   82px to 155px. The wrap belongs in the container query, where the row is
+   stacked anyway. Scoped through .data-list because `.data-list div` sets
+   display: grid on every cell and outranks a bare class -- which is what the
+   inline styles had been quietly winning against. */
+.data-list .alert-row-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.data-list .alert-row-buttons {
+  display: flex;
+  gap: 4px;
+}
+
 .filter-bar {
   display: flex;
   flex-wrap: wrap;
@@ -1319,7 +1341,14 @@ details > .admin-list {
   grid-column: auto;
 }
 
+/* The list is what gets narrow, not the window. At an 888px viewport the
+   sidebar and the page padding leave this panel 502px -- narrower than the
+   same panel is at a 640px viewport, where the sidebar has already collapsed
+   to icons. A media query cannot see that, which is why rows still ran off
+   the side at the widths in between. The rows ask their own container now. */
 .data-list {
+  container-type: inline-size;
+  container-name: lista;
   display: grid;
   /* The implicit column was auto-sized, so a row grew to whatever its longest
      field demanded and hung out of the list -- on a 1280px window an incident
@@ -1729,6 +1758,75 @@ details > .admin-list {
   }
 }
 
+/* 720px is the width below which the five audit columns, or a title beside a
+   date and a pair of buttons, stop fitting. A desktop panel is around 880px,
+   so nothing there moves; the widths that used to break are the ones between
+   the phone breakpoint and the desktop, where the sidebar is still full. */
+@container lista (max-width: 720px) {
+  /* minmax(0, 1fr) rather than 1fr: a bare fr keeps an automatic minimum equal
+     to its content, so a row whose longest field needed 357px held a 357px
+     column inside a 238px box and spilled out of it. */
+  .data-list article,
+  .data-list a {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  /* Rows lay themselves out with inline flex and no wrap, so a status chip or
+     a pair of action buttons stayed on the line and left the list. The wrap is
+     set here because the components never set one inline, so there is nothing
+     to override -- and flex-wrap is inert on the rows that are grids. */
+  .data-list a div,
+  .data-list article div {
+    min-width: 0;
+    flex-wrap: wrap;
+  }
+
+  /* Five columns of audit metadata do not fit across a narrow panel; stacked,
+     every field stays readable and the row still reads top to bottom in the
+     order a reader expects. */
+  .data-list .audit-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 6px;
+  }
+
+  /* Stacked, not wrapped. Wrapping kept the severity chip, the date and the
+     status on the same line as the title and left the title a column a few
+     characters wide -- a long code broke one letter per line. Each field now
+     gets the full width in the order it is read. */
+  .data-list .incident-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+    gap: 6px;
+  }
+
+  .incident-row-main {
+    flex-wrap: wrap;
+  }
+
+  /* The title wraps instead of truncating: there is no second column competing
+     for the space, and a wrapped title is more useful than an ellipsis on the
+     only line the row has. */
+  .incident-row-title {
+    overflow: visible;
+    white-space: normal;
+    text-overflow: clip;
+  }
+
+  /* Left, not right: with the date above them, buttons pushed to the far edge
+     read as belonging to nothing. */
+  .data-list .alert-row-actions {
+    justify-content: flex-start;
+  }
+
+  .data-list .alert-row-buttons {
+    flex-wrap: wrap;
+  }
+}
+
 @media (max-width: 640px) {
   .app-shell {
     display: flex;
@@ -1831,40 +1929,6 @@ details > .admin-list {
     overflow-wrap: anywhere;
   }
 
-  /* An incident code and its title share a line on a desktop row. On a phone
-     the title is longer than the screen, so the pair wraps instead. */
-  .incident-row-main {
-    flex-wrap: wrap;
-  }
-
-  /* On a phone the title wraps instead of truncating: there is no second
-     column competing for the space, and a wrapped title is more useful than
-     an ellipsis on the only line the row has. */
-  .incident-row-title {
-    overflow: visible;
-    white-space: normal;
-    text-overflow: clip;
-  }
-
-  /* Five columns of audit metadata do not fit across a phone; stacked, every
-     field stays readable and the row still reads top to bottom in the order a
-     reader expects. */
-  .data-list .audit-row {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 6px;
-  }
-
-  /* Stacked, not wrapped. Wrapping kept the severity chip, the date and the
-     status on the same line as the title and left the title a column a few
-     characters wide -- a long code broke one letter per line. Each field now
-     gets the full width in the order it is read. */
-  .data-list .incident-row {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    align-items: start;
-    gap: 6px;
-  }
-
   .panel-heading {
     min-width: 0;
     flex-wrap: wrap;
@@ -1892,28 +1956,10 @@ details > .admin-list {
     grid-template-columns: 1fr;
   }
 
-  /* minmax(0, 1fr) rather than 1fr: a bare fr keeps an automatic minimum equal
-     to its content, so a row whose longest field needed 357px held a 357px
-     column inside a 238px box and spilled out of it. */
-  .data-list article,
-  .data-list a,
   .playbook-list,
   .playbook-list > article {
     grid-template-columns: minmax(0, 1fr);
     gap: 8px;
-  }
-
-  /* Rows lay themselves out with inline flex and no wrap, so a status chip or
-     a pair of action buttons stayed on the line and left the screen. The wrap
-     is set here because the components never set one inline, so there is
-     nothing to override -- and flex-wrap is inert on the rows that are grids.
-     Only inside this breakpoint: a desktop row stays on one line. */
-  .data-list a,
-  .data-list article,
-  .data-list a div,
-  .data-list article div {
-    min-width: 0;
-    flex-wrap: wrap;
   }
 
   .playbook-heading {
